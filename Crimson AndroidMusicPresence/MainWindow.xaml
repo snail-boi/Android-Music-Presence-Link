@@ -1,0 +1,69 @@
+﻿<Window x:Class="musicpresense.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Music Presence Settings" Height="540" Width="640" WindowStartupLocation="CenterScreen">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="16" Orientation="Vertical" >
+            <TextBlock Text="Device Selection" FontWeight="Bold" Margin="0,0,0,8" />
+
+            <Grid Margin="0,0,0,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="USB Serial:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
+                <TextBox x:Name="TxtUsbSerial" Grid.Row="0" Grid.Column="1" Margin="0,4" />
+
+                <TextBlock Text="Wi-Fi (ip:port):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" />
+                <TextBox x:Name="TxtWifi" Grid.Row="1" Grid.Column="1" Margin="0,4" />
+
+                <TextBlock Text="Device Name:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
+                <TextBox x:Name="TxtDeviceName" Grid.Row="2" Grid.Column="1" Margin="0,4" />
+            </Grid>
+
+            <TextBlock Text="Music Remote Root" FontWeight="Bold" Margin="0,0,0,4" />
+            <TextBox x:Name="TxtRemoteRoot" Margin="0,0,0,12" />
+
+            <TextBlock Text="Eligible Apps" FontWeight="Bold" Margin="0,0,0,4" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <Button x:Name="BtnRefreshApps" Content="Refresh Apps" Width="120" />
+                <TextBlock x:Name="TxtAppsStatus" Margin="12,4,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+            <ListBox x:Name="LstAllowedApps" Height="180" Margin="0,0,0,12" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox Content="{Binding PackageName}" IsChecked="{Binding IsSelected}" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="Update Interval:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
+                <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" />
+            </Grid>
+
+            <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,12" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="BtnSave" Content="Save" Width="100" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
