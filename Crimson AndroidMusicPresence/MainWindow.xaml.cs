@@ -44,10 +44,31 @@ namespace musicpresense
             BtnRefreshApps.Click += BtnRefreshApps_Click;
             BtnListCodecs.Click += BtnListCodecs_Click;
             BtnAutoGather.Click += BtnAutoGather_Click;
+            BtnPickRemoteRoot.Click += BtnPickRemoteRoot_Click;
             LstAudioCodecs.SelectionChanged += LstAudioCodecs_SelectionChanged;
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
             _isInitializing = false;
+        }
+
+        private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)
+        {
+            var device = await GetCurrentDeviceForAppsAsync();
+            if (string.IsNullOrWhiteSpace(device))
+            {
+                MessageBox.Show("No device connected.", "Device Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var picker = new RemoteFolderPicker(device)
+            {
+                Owner = this
+            };
+
+            if (picker.ShowDialog() == true)
+            {
+                TxtRemoteRoot.Text = picker.SelectedFolder;
+            }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)

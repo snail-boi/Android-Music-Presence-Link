@@ -38,7 +38,14 @@
             </Grid>
 
             <TextBlock Text="Music Remote Root" FontWeight="Bold" Margin="0,0,0,4" />
-            <TextBox x:Name="TxtRemoteRoot" Margin="0,0,0,12" />
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TxtRemoteRoot" Grid.Column="0" Margin="0,0,8,0" />
+                <Button x:Name="BtnPickRemoteRoot" Grid.Column="1" Content="Browse" Width="90" />
+            </Grid>
 
             <Expander Header="Eligible Apps" IsExpanded="False" Margin="0,0,0,12">
                 <StackPanel>
