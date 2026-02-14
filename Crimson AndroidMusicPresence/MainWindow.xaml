@@ -4,7 +4,69 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Music Presence Settings" Height="540" Width="640" WindowStartupLocation="CenterScreen">
+        Title="Music Presence Settings" Height="540" Width="640" WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource ThemeBackgroundBrush}"
+        Foreground="{DynamicResource ThemeForegroundBrush}">
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+        </Style>
+        <Style TargetType="Expander">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource ThemeControlForegroundBrush}" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+        </Style>
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentPressedBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="16" Orientation="Vertical" >
             <Grid Margin="0,0,0,8">
@@ -47,7 +109,7 @@
                 <Button x:Name="BtnPickRemoteRoot" Grid.Column="1" Content="Browse" Width="90" />
             </Grid>
 
-            <Expander Header="Eligible Apps" IsExpanded="False" Margin="0,0,0,12">
+            <Expander Header="Eligible Apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <Button x:Name="BtnRefreshApps" Content="Refresh Apps" Width="120" />
@@ -63,7 +125,7 @@
                 </StackPanel>
             </Expander>
 
-            <Expander Header="Scrcpy Audio" IsExpanded="False" Margin="0,0,0,12">
+            <Expander Header="Scrcpy Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <Button x:Name="BtnListCodecs" Content="List codecs" Width="120" />
@@ -90,7 +152,7 @@
                 </StackPanel>
             </Expander>
 
-            <Expander Header="Update &amp; Debug" IsExpanded="False" Margin="0,0,0,12">
+            <Expander Header="Update &amp; Debug" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
                     <Grid Margin="0,0,0,12">
                         <Grid.RowDefinitions>
@@ -106,6 +168,10 @@
                     </Grid>
 
                     <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,0" />
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <CheckBox x:Name="ChkDarkMode" Content="Use dark mode" VerticalAlignment="Center" Visibility="Collapsed" />
+                        <Button x:Name="BtnToggleTheme" Content="Switch" Width="110" Margin="12,0,0,0" />
+                    </StackPanel>
                 </StackPanel>
             </Expander>
 

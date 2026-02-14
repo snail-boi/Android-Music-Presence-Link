@@ -10,6 +10,8 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Microsoft.VisualBasic;
 
 namespace musicpresense
@@ -46,6 +48,9 @@ namespace musicpresense
             BtnAutoGather.Click += BtnAutoGather_Click;
             BtnPickRemoteRoot.Click += BtnPickRemoteRoot_Click;
             LstAudioCodecs.SelectionChanged += LstAudioCodecs_SelectionChanged;
+            ChkDarkMode.Checked += ChkDarkMode_CheckedChanged;
+            ChkDarkMode.Unchecked += ChkDarkMode_CheckedChanged;
+            BtnToggleTheme.Click += BtnToggleTheme_Click;
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
             _isInitializing = false;
@@ -224,6 +229,8 @@ namespace musicpresense
             CmbUpdateInterval.SelectedIndex = mode - 1;
 
             ChkDebugMode.IsChecked = _config.DebugMode;
+            ChkDarkMode.IsChecked = _config.UseDarkMode;
+            UpdateThemeToggleText(_config.UseDarkMode);
 
             TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
             TxtAudioBuffer.Text = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
@@ -231,6 +238,29 @@ namespace musicpresense
 
             SelectCodecFromConfig();
             UpdateCodecDependentFields();
+        }
+
+        private void ChkDarkMode_CheckedChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing)
+                return;
+
+            var useDarkMode = ChkDarkMode.IsChecked == true;
+            (Application.Current as App)?.ApplyTheme(useDarkMode);
+            UpdateThemeToggleText(useDarkMode);
+        }
+
+        private void BtnToggleTheme_Click(object sender, RoutedEventArgs e)
+        {
+            ChkDarkMode.IsChecked = !(ChkDarkMode.IsChecked == true);
+        }
+
+        private void UpdateThemeToggleText(bool useDarkMode)
+        {
+            if (BtnToggleTheme == null)
+                return;
+
+            BtnToggleTheme.Content = useDarkMode ? "Switch to Light" : "Switch to Dark";
         }
 
         private void SelectCodecFromConfig()
@@ -361,6 +391,7 @@ namespace musicpresense
             }
 
             _config.DebugMode = ChkDebugMode.IsChecked == true;
+            _config.UseDarkMode = ChkDarkMode.IsChecked == true;
 
             var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
             _config.ScrcpyAudioCodec = selectedCodec;
@@ -613,6 +644,34 @@ namespace musicpresense
                 .OrderBy(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
                 .ThenBy(c => c)
                 .ToList();
+        }
+
+        private void Expander_Expanded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Expander expander)
+                return;
+
+            if (expander.Content is not FrameworkElement content)
+                return;
+
+            content.RenderTransformOrigin = new Point(0.5, 0);
+            if (content.RenderTransform is not ScaleTransform scaleTransform)
+            {
+                scaleTransform = new ScaleTransform(1, 0.9);
+                content.RenderTransform = scaleTransform;
+            }
+
+            content.Opacity = 0;
+            scaleTransform.ScaleY = 0.9;
+
+            var duration = TimeSpan.FromMilliseconds(200);
+            var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+            var scaleAnimation = new DoubleAnimation(0.9, 1, duration) { EasingFunction = easing };
+            var opacityAnimation = new DoubleAnimation(0, 1, duration) { EasingFunction = easing };
+
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation);
+            content.BeginAnimation(OpacityProperty, opacityAnimation);
         }
 
         private sealed class AppPackageItem : INotifyPropertyChanged

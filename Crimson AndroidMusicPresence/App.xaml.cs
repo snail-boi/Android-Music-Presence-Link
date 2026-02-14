@@ -7,6 +7,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 
 namespace musicpresense
 {
@@ -38,6 +39,7 @@ namespace musicpresense
             Config = MusicConfigManager.Load();
             Debugger.IsEnabled = Config.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
+            ApplyTheme(Config.UseDarkMode);
 
             _settingsWindow = new MainWindow();
             _settingsWindow.Hide();
@@ -55,7 +57,27 @@ namespace musicpresense
             Config = config;
             Debugger.IsEnabled = Config.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
+            ApplyTheme(config.UseDarkMode);
             _presenceService?.UpdateConfig(config);
+        }
+
+        internal void ApplyTheme(bool useDarkMode)
+        {
+            Resources["ThemeBackgroundBrush"] = CreateBrush(useDarkMode ? "#1E1E1E" : "#F7F7F7");
+            Resources["ThemeForegroundBrush"] = CreateBrush(useDarkMode ? "#EAEAEA" : "#1A1A1A");
+            Resources["ThemeControlBackgroundBrush"] = CreateBrush(useDarkMode ? "#2B2B2B" : "#FFFFFF");
+            Resources["ThemeControlForegroundBrush"] = CreateBrush(useDarkMode ? "#EAEAEA" : "#1A1A1A");
+            Resources["ThemeControlBorderBrush"] = CreateBrush(useDarkMode ? "#3C3C3C" : "#C8C8C8");
+            Resources["ThemeAccentBrush"] = CreateBrush(useDarkMode ? "#3E7BFF" : "#2D6CDF");
+            Resources["ThemeAccentHoverBrush"] = CreateBrush(useDarkMode ? "#5A8BFF" : "#3E7BFF");
+            Resources["ThemeAccentPressedBrush"] = CreateBrush(useDarkMode ? "#275ED6" : "#1F5DD1");
+        }
+
+        private static SolidColorBrush CreateBrush(string color)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+            brush.Freeze();
+            return brush;
         }
 
         private void ShowSettingsWindow()
