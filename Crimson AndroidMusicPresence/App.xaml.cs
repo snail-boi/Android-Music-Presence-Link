@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -32,6 +33,8 @@ namespace musicpresense
         private const int WmHotkey = 0x0312;
         private const float ScrcpyVolumeStep = 0.05f;
 
+        private static readonly string version = "1.0.1.0";
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -50,8 +53,9 @@ namespace musicpresense
             _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication);
 
             InitializeHotkeys();
-        }
 
+            _ = Updater.CheckForUpdateAsync(version);
+        }
         internal void UpdateConfig(MusicConfig config)
         {
             Config = config;
