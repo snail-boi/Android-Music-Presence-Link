@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Threading;
 
 namespace musicpresense
@@ -16,6 +17,8 @@ namespace musicpresense
         private readonly SemaphoreSlim _updateLock = new SemaphoreSlim(1, 1);
         private readonly MediaController _mediaController;
         private string _currentDevice = string.Empty;
+        private bool _wifiReconnectPromptShown;
+        private bool _isRecoveringWifi;
 
         internal string CurrentDevice => _currentDevice;
 
@@ -109,8 +112,11 @@ namespace musicpresense
                     if (wifiConnected)
                     {
                         _currentDevice = _config.SelectedDeviceWiFi;
+                        _wifiReconnectPromptShown = false;
                         return;
                     }
+
+                    await RecoverWirelessConnectionAsync().ConfigureAwait(false);
                 }
 
                 if (!string.IsNullOrEmpty(_currentDevice))
@@ -123,6 +129,132 @@ namespace musicpresense
             {
                 Debugger.show("DetectDeviceAsync failed: " + ex.Message);
             }
+        }
+
+        private async Task RecoverWirelessConnectionAsync()
+        {
+            if (_isRecoveringWifi) return;
+            _isRecoveringWifi = true;
+
+            try
+            {
+                if (!_wifiReconnectPromptShown)
+                {
+                    await _dispatcher.InvokeAsync(() =>
+                    {
+                        MessageBox.Show(
+                            "Wireless connection failed. Please reconnect your phone via USB to re-setup wireless.",
+                            "Reconnect Device",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    });
+                    _wifiReconnectPromptShown = true;
+                }
+
+                var usbDevice = await GetUsbDeviceForRecoveryAsync().ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(usbDevice))
+                    return;
+
+                var newWifi = await SetupWirelessFromUsbAsync(usbDevice).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(newWifi))
+                    return;
+
+                _config.SelectedDeviceWiFi = newWifi;
+                MusicConfigManager.Save(_config);
+                (Application.Current as App)?.UpdateConfig(_config);
+                _wifiReconnectPromptShown = false;
+
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show(
+                        $"Wireless device has been re-setup and saved as {newWifi}.",
+                        "Wireless Reconnected",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                });
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("RecoverWirelessConnectionAsync failed: " + ex.Message);
+            }
+            finally
+            {
+                _isRecoveringWifi = false;
+            }
+        }
+
+        private async Task<string> GetUsbDeviceForRecoveryAsync()
+        {
+            var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
+            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            bool IsDeviceConnected(string id) => deviceList.Any(l => l.StartsWith(id) && l.EndsWith("device"));
+
+            if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB) && IsDeviceConnected(_config.SelectedDeviceUSB))
+                return _config.SelectedDeviceUSB;
+
+            foreach (var entry in deviceList)
+            {
+                if (!entry.EndsWith("device"))
+                    continue;
+
+                var serial = entry.Split('\t', ' ').FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(serial))
+                    continue;
+
+                if (!serial.Contains(':'))
+                    return serial;
+            }
+
+            return string.Empty;
+        }
+
+        private async Task<string> SetupWirelessFromUsbAsync(string usbDevice)
+        {
+            int port = ExtractWifiPort(_config.SelectedDeviceWiFi);
+            var ip = await GetDeviceWifiIpAsync(usbDevice).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(ip))
+                return string.Empty;
+
+            await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} tcpip {port}").ConfigureAwait(false);
+            await Task.Delay(750).ConfigureAwait(false);
+            await AdbHelper.RunAdbCaptureAsync($"connect {ip}:{port}").ConfigureAwait(false);
+            await Task.Delay(750).ConfigureAwait(false);
+
+            var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
+            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var wifiId = $"{ip}:{port}";
+            if (deviceList.Any(l => l.StartsWith(wifiId) && l.EndsWith("device")))
+            {
+                _currentDevice = wifiId;
+                return wifiId;
+            }
+
+            return string.Empty;
+        }
+
+        private static int ExtractWifiPort(string wifiAddress)
+        {
+            if (string.IsNullOrWhiteSpace(wifiAddress))
+                return 5555;
+
+            var parts = wifiAddress.Split(':');
+            if (parts.Length == 2 && int.TryParse(parts[1], out var port) && port > 0)
+                return port;
+
+            return 5555;
+        }
+
+        private static async Task<string> GetDeviceWifiIpAsync(string usbDevice)
+        {
+            var ipOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip -f inet addr show wlan0").ConfigureAwait(false);
+            var match = Regex.Match(ipOutput, @"inet\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
+            if (match.Success)
+                return match.Groups["ip"].Value;
+
+            var routeOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip route").ConfigureAwait(false);
+            match = Regex.Match(routeOutput, @"src\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
+            return match.Success ? match.Groups["ip"].Value : string.Empty;
         }
 
         private async Task UpdateCurrentSongAsync()

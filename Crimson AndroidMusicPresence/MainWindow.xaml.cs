@@ -2,10 +2,15 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.VisualBasic;
 
 namespace musicpresense
 {
@@ -19,6 +24,9 @@ namespace musicpresense
         private bool _allowClose;
         private readonly ObservableCollection<AppPackageItem> _appPackages = new();
         private bool _isLoadingApps;
+        private readonly ObservableCollection<string> _audioCodecs = new();
+        private bool _isLoadingCodecs;
+        private bool _isAutoGathering;
 
         public MainWindow()
         {
@@ -26,12 +34,17 @@ namespace musicpresense
 
             _config = App.Config;
             InitializeUpdateIntervalUI();
+            InitializeAudioCodecUI();
             ApplyConfigToUI();
 
             LstAllowedApps.ItemsSource = _appPackages;
+            LstAudioCodecs.ItemsSource = _audioCodecs;
 
             BtnSave.Click += BtnSave_Click;
             BtnRefreshApps.Click += BtnRefreshApps_Click;
+            BtnListCodecs.Click += BtnListCodecs_Click;
+            BtnAutoGather.Click += BtnAutoGather_Click;
+            LstAudioCodecs.SelectionChanged += LstAudioCodecs_SelectionChanged;
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
             _isInitializing = false;
@@ -56,6 +69,97 @@ namespace musicpresense
             Hide();
         }
 
+        private async void BtnAutoGather_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isAutoGathering)
+                return;
+
+            _isAutoGathering = true;
+            BtnAutoGather.IsEnabled = false;
+
+            try
+            {
+                await AutoGatherDeviceInfoAsync();
+            }
+            finally
+            {
+                _isAutoGathering = false;
+                BtnAutoGather.IsEnabled = true;
+            }
+        }
+
+        private async Task AutoGatherDeviceInfoAsync()
+        {
+            var usbSerial = await GetConnectedUsbDeviceAsync();
+            if (string.IsNullOrWhiteSpace(usbSerial))
+            {
+                MessageBox.Show("Please connect your device via USB first.", "USB Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            TxtUsbSerial.Text = usbSerial;
+
+            var port = await GetWifiPortAsync(usbSerial);
+            var ip = await GetDeviceWifiIpAsync(usbSerial);
+            if (!string.IsNullOrWhiteSpace(ip))
+            {
+                TxtWifi.Text = $"{ip}:{port}";
+            }
+            else
+            {
+                MessageBox.Show("Could not read the device Wi-Fi IP address.", "Wi-Fi Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            var deviceNamePrompt = string.IsNullOrWhiteSpace(TxtDeviceName.Text) ? "" : TxtDeviceName.Text.Trim();
+            var deviceName = Interaction.InputBox("Enter a name for this device:", "Device Name", deviceNamePrompt);
+            if (!string.IsNullOrWhiteSpace(deviceName))
+            {
+                TxtDeviceName.Text = deviceName.Trim();
+            }
+        }
+
+        private static async Task<string> GetConnectedUsbDeviceAsync()
+        {
+            var devices = await AdbHelper.RunAdbCaptureAsync("devices");
+            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var entry in deviceList)
+            {
+                if (!entry.EndsWith("device", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var serial = entry.Split('\t', ' ').FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(serial))
+                    continue;
+
+                if (!serial.Contains(':'))
+                    return serial;
+            }
+
+            return string.Empty;
+        }
+
+        private static async Task<int> GetWifiPortAsync(string usbSerial)
+        {
+            var output = await AdbHelper.RunAdbCaptureAsync($"-s {usbSerial} shell getprop service.adb.tcp.port");
+            if (int.TryParse(output.Trim(), out var port) && port > 0)
+                return port;
+
+            return 5555;
+        }
+
+        private static async Task<string> GetDeviceWifiIpAsync(string usbDevice)
+        {
+            var ipOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip -f inet addr show wlan0");
+            var match = Regex.Match(ipOutput, @"inet\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
+            if (match.Success)
+                return match.Groups["ip"].Value;
+
+            var routeOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip route");
+            match = Regex.Match(routeOutput, @"src\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
+            return match.Success ? match.Groups["ip"].Value : string.Empty;
+        }
+
         private void InitializeUpdateIntervalUI()
         {
             CmbUpdateInterval.ItemsSource = new[]
@@ -66,6 +170,23 @@ namespace musicpresense
                 "Slow (30s)",
                 "No automatic update"
             };
+        }
+
+        private void InitializeAudioCodecUI()
+        {
+            _audioCodecs.Clear();
+            if (_config.ScrcpyAvailableAudioCodecs != null && _config.ScrcpyAvailableAudioCodecs.Count > 0)
+            {
+                foreach (var codec in _config.ScrcpyAvailableAudioCodecs.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    _audioCodecs.Add(codec.ToLowerInvariant());
+                }
+            }
+
+            if (!_audioCodecs.Any(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase)))
+            {
+                _audioCodecs.Insert(0, "raw");
+            }
         }
 
         private void ApplyConfigToUI()
@@ -82,6 +203,25 @@ namespace musicpresense
             CmbUpdateInterval.SelectedIndex = mode - 1;
 
             ChkDebugMode.IsChecked = _config.DebugMode;
+
+            TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
+            TxtAudioBuffer.Text = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
+            TxtFlacCompressionLevel.Text = _config.ScrcpyFlacCompressionLevel.ToString();
+
+            SelectCodecFromConfig();
+            UpdateCodecDependentFields();
+        }
+
+        private void SelectCodecFromConfig()
+        {
+            var codec = string.IsNullOrWhiteSpace(_config.ScrcpyAudioCodec) ? "raw" : _config.ScrcpyAudioCodec.Trim();
+            if (!_audioCodecs.Any(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase)))
+            {
+                codec = "raw";
+            }
+
+            var selected = _audioCodecs.FirstOrDefault(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase));
+            LstAudioCodecs.SelectedItem = selected ?? _audioCodecs.FirstOrDefault();
         }
 
         private void ApplyAllowedAppsSelection()
@@ -201,10 +341,257 @@ namespace musicpresense
 
             _config.DebugMode = ChkDebugMode.IsChecked == true;
 
+            var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
+            _config.ScrcpyAudioCodec = selectedCodec;
+
+            if (selectedCodec.Equals("raw", StringComparison.OrdinalIgnoreCase))
+            {
+                _config.ScrcpyAudioBitrate = string.Empty;
+            }
+            else
+            {
+                var bitrateText = TxtAudioBitrate.Text.Trim();
+                if (string.IsNullOrEmpty(bitrateText))
+                {
+                    _config.ScrcpyAudioBitrate = string.Empty;
+                }
+                else if (int.TryParse(bitrateText, out var bitrateValue))
+                {
+                    if (bitrateValue < 1)
+                        bitrateValue = 1;
+
+                    if (bitrateValue > 10000)
+                    {
+                        var message = BuildBitrateWarningMessage(selectedCodec, bitrateValue);
+                        var response = MessageBox.Show(message, "High bitrate warning", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                        if (response == MessageBoxResult.No)
+                        {
+                            bitrateValue = GetTypicalBitrate(selectedCodec);
+                            TxtAudioBitrate.Text = bitrateValue.ToString();
+                        }
+                    }
+
+                    _config.ScrcpyAudioBitrate = bitrateValue > 0 ? bitrateValue.ToString() : string.Empty;
+                }
+                else
+                {
+                    _config.ScrcpyAudioBitrate = string.Empty;
+                }
+            }
+
+            if (int.TryParse(TxtAudioBuffer.Text.Trim(), out var bufferValue) && bufferValue > 0)
+            {
+                if (bufferValue > 2000)
+                {
+                    var response = MessageBox.Show(
+                        "The audio buffer is above 2000 ms, which can introduce a noticeable delay. Continue with this value?",
+                        "Large audio buffer",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+
+                    if (response == MessageBoxResult.No)
+                    {
+                        bufferValue = 2000;
+                        TxtAudioBuffer.Text = bufferValue.ToString();
+                    }
+                }
+
+                _config.ScrcpyAudioBuffer = Math.Max(1, bufferValue);
+            }
+            else
+            {
+                _config.ScrcpyAudioBuffer = 50;
+            }
+
+            if (int.TryParse(TxtFlacCompressionLevel.Text.Trim(), out var flacLevel))
+            {
+                var clampedFlac = Math.Clamp(flacLevel, 1, 8);
+                if (clampedFlac != flacLevel)
+                {
+                    TxtFlacCompressionLevel.Text = clampedFlac.ToString();
+                }
+
+                _config.ScrcpyFlacCompressionLevel = clampedFlac;
+            }
+            else
+            {
+                _config.ScrcpyFlacCompressionLevel = 5;
+            }
+
             MusicConfigManager.Save(_config);
             (Application.Current as App)?.UpdateConfig(_config);
 
             MessageBox.Show("Music presence settings saved.", "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private static int GetTypicalBitrate(string codec)
+        {
+            return codec.ToLowerInvariant() switch
+            {
+                "opus" => 160,
+                "aac" => 256,
+                "flac" => 1000,
+                "raw" => 0,
+                _ => 320
+            };
+        }
+
+        private static string BuildBitrateWarningMessage(string codec, int bitrateValue)
+        {
+            var guidance = codec.ToLowerInvariant() switch
+            {
+                "opus" => "Opus is typically transparent around 96-160 kbps for stereo music.",
+                "aac" => "AAC is typically transparent around 128-256 kbps for stereo music.",
+                "flac" => "FLAC is lossless; bitrate depends on content and is often 700-1100 kbps.",
+                "raw" => "RAW is uncompressed PCM; bitrate depends on sample rate and channels.",
+                _ => "Most encoders reach high quality well below 10000 kbps."
+            };
+
+            return $"The selected bitrate ({bitrateValue} kbps) is extremely high and usually unnecessary.\n\n" +
+                   $"Encoder info: {guidance}\n\n" +
+                   "Do you want to keep this value?";
+        }
+
+        private void BtnListCodecs_Click(object sender, RoutedEventArgs e)
+        {
+            _ = LoadScrcpyCodecsAsync();
+        }
+
+        private void LstAudioCodecs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateCodecDependentFields();
+        }
+
+        private void UpdateCodecDependentFields()
+        {
+            var codec = LstAudioCodecs.SelectedItem as string ?? "raw";
+            bool isRaw = codec.Equals("raw", StringComparison.OrdinalIgnoreCase);
+            PanelAudioBitrate.Visibility = isRaw ? Visibility.Collapsed : Visibility.Visible;
+            PanelFlacCompression.Visibility = codec.Equals("flac", StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private async Task LoadScrcpyCodecsAsync()
+        {
+            if (_isLoadingCodecs)
+                return;
+
+            _isLoadingCodecs = true;
+            TxtCodecStatus.Text = "Loading...";
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_config.Paths.Scrcpy) || !File.Exists(_config.Paths.Scrcpy))
+                {
+                    TxtCodecStatus.Text = "scrcpy.exe not found.";
+                    return;
+                }
+
+                var device = await GetCurrentDeviceForAppsAsync().ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(device))
+                {
+                    await Dispatcher.InvokeAsync(() => TxtCodecStatus.Text = "No device connected.");
+                    return;
+                }
+
+                Debugger.show("Listing scrcpy encoders...");
+                var output = await Task.Run(() => RunScrcpyListEncoders(_config.Paths.Scrcpy, device)).ConfigureAwait(false);
+                Debugger.show(string.IsNullOrWhiteSpace(output) ? "scrcpy encoder list returned no output." : "scrcpy encoder list received.");
+                var codecs = ParseScrcpyAudioCodecs(output);
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    _audioCodecs.Clear();
+                    foreach (var codec in codecs)
+                    {
+                        _audioCodecs.Add(codec);
+                    }
+
+                    _config.ScrcpyAvailableAudioCodecs = codecs.ToList();
+                    MusicConfigManager.Save(_config);
+
+                    SelectCodecFromConfig();
+                    UpdateCodecDependentFields();
+                    TxtCodecStatus.Text = $"{_audioCodecs.Count} codecs";
+                });
+            }
+            catch (Exception ex)
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    TxtCodecStatus.Text = "Failed to list codecs.";
+                    MessageBox.Show($"Failed to list scrcpy codecs: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+            }
+            finally
+            {
+                _isLoadingCodecs = false;
+            }
+        }
+
+        private static string RunScrcpyListEncoders(string scrcpyPath, string device)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = scrcpyPath,
+                Arguments = $"-s {device} --list-encoders",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            try
+            {
+                using var proc = Process.Start(psi);
+                if (proc == null)
+                {
+                    return string.Empty;
+                }
+
+                string output = proc.StandardOutput.ReadToEnd();
+                string error = proc.StandardError.ReadToEnd();
+                proc.WaitForExit();
+                return output + Environment.NewLine + error;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("scrcpy list encoders failed: " + ex.Message);
+                return string.Empty;
+            }
+        }
+
+        private static List<string> ParseScrcpyAudioCodecs(string output)
+        {
+            var codecs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "raw"
+            };
+
+            if (!string.IsNullOrWhiteSpace(output))
+            {
+                foreach (var line in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!line.Contains("--audio-codec=", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var match = Regex.Match(line, "--audio-codec=([a-z0-9]+)", RegexOptions.IgnoreCase);
+                    if (match.Success)
+                    {
+                        codecs.Add(match.Groups[1].Value.ToLowerInvariant());
+                    }
+                }
+            }
+
+            Debugger.show($"Parsed scrcpy audio codecs: {string.Join(", ", codecs.OrderBy(c => c))}");
+
+            return codecs
+                .OrderBy(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(c => c)
+                .ToList();
         }
 
         private sealed class AppPackageItem : INotifyPropertyChanged

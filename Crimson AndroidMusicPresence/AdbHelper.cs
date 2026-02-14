@@ -39,13 +39,36 @@ namespace musicpresense
             });
         }
 
+        public static void StopServer()
+        {
+            if (string.IsNullOrWhiteSpace(AdbPath) || !File.Exists(AdbPath))
+                return;
+
+            try
+            {
+                var psi = new ProcessStartInfo(AdbPath, "kill-server")
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var proc = Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("ADB stop failed: " + ex.Message);
+            }
+        }
+
         public static Task<string> RunAdbCaptureAsync(string args)
         {
             return Task.Run(() =>
             {
                 if (string.IsNullOrWhiteSpace(AdbPath) || !File.Exists(AdbPath))
                 {
-                    Debugger.show("ADB path not set or missing: " + AdbPath);
+                    Debugger.show("ADB path not set or missing: " + AdbHelper.AdbPath);
                     return string.Empty;
                 }
 

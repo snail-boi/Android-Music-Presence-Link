@@ -25,6 +25,11 @@ namespace musicpresense
         public List<string> AllowedApps { get; set; } = new List<string> { "in.krosbits.musicolet" };
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Medium;
         public bool DebugMode { get; set; } = false;
+        public string ScrcpyAudioCodec { get; set; } = "raw";
+        public string ScrcpyAudioBitrate { get; set; } = string.Empty;
+        public int ScrcpyAudioBuffer { get; set; } = 50;
+        public int ScrcpyFlacCompressionLevel { get; set; } = 5;
+        public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
     }
 
     public class PathsConfig
@@ -110,6 +115,24 @@ namespace musicpresense
 
             if (config.AllowedApps.Count == 0)
                 config.AllowedApps.Add("in.krosbits.musicolet");
+
+            if (string.IsNullOrWhiteSpace(config.ScrcpyAudioCodec))
+                config.ScrcpyAudioCodec = "raw";
+
+            if (config.ScrcpyAudioBitrate == null)
+                config.ScrcpyAudioBitrate = string.Empty;
+
+            if (config.ScrcpyAudioBuffer <= 0)
+                config.ScrcpyAudioBuffer = 50;
+
+            if (config.ScrcpyFlacCompressionLevel < 1)
+                config.ScrcpyFlacCompressionLevel = 1;
+            else if (config.ScrcpyFlacCompressionLevel > 8)
+                config.ScrcpyFlacCompressionLevel = 8;
+
+            config.ScrcpyAvailableAudioCodecs ??= new List<string>();
+            if (config.ScrcpyAvailableAudioCodecs.Count == 0)
+                config.ScrcpyAvailableAudioCodecs.Add("raw");
 
             return config;
         }

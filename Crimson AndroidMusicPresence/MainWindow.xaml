@@ -7,7 +7,14 @@
         Title="Music Presence Settings" Height="540" Width="640" WindowStartupLocation="CenterScreen">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="16" Orientation="Vertical" >
-            <TextBlock Text="Device Selection" FontWeight="Bold" Margin="0,0,0,8" />
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Device Selection" FontWeight="Bold" Grid.Column="0" VerticalAlignment="Center" />
+                <Button x:Name="BtnAutoGather" Content="Auto Gather Info" Grid.Column="1" />
+            </Grid>
 
             <Grid Margin="0,0,0,12">
                 <Grid.RowDefinitions>
@@ -33,33 +40,67 @@
             <TextBlock Text="Music Remote Root" FontWeight="Bold" Margin="0,0,0,4" />
             <TextBox x:Name="TxtRemoteRoot" Margin="0,0,0,12" />
 
-            <TextBlock Text="Eligible Apps" FontWeight="Bold" Margin="0,0,0,4" />
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                <Button x:Name="BtnRefreshApps" Content="Refresh Apps" Width="120" />
-                <TextBlock x:Name="TxtAppsStatus" Margin="12,4,0,0" VerticalAlignment="Center" />
-            </StackPanel>
-            <ListBox x:Name="LstAllowedApps" Height="180" Margin="0,0,0,12" ScrollViewer.VerticalScrollBarVisibility="Auto">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <CheckBox Content="{Binding PackageName}" IsChecked="{Binding IsSelected}" />
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <Expander Header="Eligible Apps" IsExpanded="False" Margin="0,0,0,12">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <Button x:Name="BtnRefreshApps" Content="Refresh Apps" Width="120" />
+                        <TextBlock x:Name="TxtAppsStatus" Margin="12,4,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <ListBox x:Name="LstAllowedApps" Height="180" Margin="0,0,0,0" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding PackageName}" IsChecked="{Binding IsSelected}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Expander>
 
-            <Grid Margin="0,0,0,12">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="140" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+            <Expander Header="Scrcpy Audio" IsExpanded="False" Margin="0,0,0,12">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <Button x:Name="BtnListCodecs" Content="List codecs" Width="120" />
+                        <TextBlock x:Name="TxtCodecStatus" Margin="12,4,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <ListBox x:Name="LstAudioCodecs" Height="120" Margin="0,0,0,8" ScrollViewer.VerticalScrollBarVisibility="Auto" />
 
-                <TextBlock Text="Update Interval:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
-                <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" />
-            </Grid>
+                    <StackPanel x:Name="PanelAudioBitrate" Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="Bitrate:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtAudioBitrate" Width="220" />
+                        <TextBlock Text="kbps" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
 
-            <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,12" />
+                    <StackPanel x:Name="PanelAudioBuffer" Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="Audio Buffer:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtAudioBuffer" Width="220" />
+                        <TextBlock Text="ms" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="PanelFlacCompression" Orientation="Horizontal" Margin="0,0,0,0">
+                        <TextBlock Text="Flac Level:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtFlacCompressionLevel" Width="220" />
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
+
+            <Expander Header="Update &amp; Debug" IsExpanded="False" Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Update Interval:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
+                        <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" />
+                    </Grid>
+
+                    <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,0" />
+                </StackPanel>
+            </Expander>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="BtnSave" Content="Save" Width="100" />

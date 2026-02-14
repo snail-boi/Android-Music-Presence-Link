@@ -1,8 +1,12 @@
-﻿using System.Configuration;
+﻿using System;
+using System.Collections.Generic;
+using System.Configuration;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 
 namespace musicpresense
 {
@@ -17,6 +21,15 @@ namespace musicpresense
         private MusicPresenceService? _presenceService;
         private MainWindow? _settingsWindow;
         private Process? _scrcpyProcess;
+        private HwndSource? _hotkeySource;
+
+        private const int HotkeyIdVolumeUp = 1;
+        private const int HotkeyIdVolumeDown = 2;
+        private const int ModShift = 0x0004;
+        private const int VkVolumeUp = 0xAF;
+        private const int VkVolumeDown = 0xAE;
+        private const int WmHotkey = 0x0312;
+        private const float ScrcpyVolumeStep = 0.05f;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -33,6 +46,8 @@ namespace musicpresense
             _presenceService.Start();
 
             _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication);
+
+            InitializeHotkeys();
         }
 
         internal void UpdateConfig(MusicConfig config)
@@ -73,7 +88,7 @@ namespace musicpresense
         {
             if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
             {
-                StopScrcpy();
+                _ = StopScrcpyAsync();
             }
             else
             {
@@ -96,7 +111,41 @@ namespace musicpresense
                 return;
             }
 
-            var args = $"-s {device} --no-video --no-window --audio-source=playback --audio-buffer=300";
+            var codec = string.IsNullOrWhiteSpace(Config.ScrcpyAudioCodec) ? "raw" : Config.ScrcpyAudioCodec.Trim();
+            var buffer = Config.ScrcpyAudioBuffer > 0 ? Config.ScrcpyAudioBuffer : 50;
+
+            var argParts = new List<string>
+            {
+                $"-s {device}",
+                "--no-video",
+                "--no-window",
+                "--audio-source=playback",
+                $"--audio-codec={codec}",
+                $"--audio-buffer={buffer}"
+            };
+
+            if (!codec.Equals("raw", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(Config.ScrcpyAudioBitrate))
+            {
+                var bitrateText = Config.ScrcpyAudioBitrate.Trim();
+                if (bitrateText.EndsWith("K", StringComparison.OrdinalIgnoreCase))
+                {
+                    bitrateText = bitrateText[..^1];
+                }
+
+                if (int.TryParse(bitrateText, out var bitrateValue) && bitrateValue > 0)
+                {
+                    argParts.Add($"--audio-bit-rate={bitrateValue}K");
+                }
+            }
+
+            if (codec.Equals("flac", StringComparison.OrdinalIgnoreCase))
+            {
+                argParts.Add($"--audio-codec-options=flac-compression-level={Math.Clamp(Config.ScrcpyFlacCompressionLevel, 1, 8)}");
+            }
+
+            var args = string.Join(" ", argParts);
+
+            Debugger.show($"Starting scrcpy with args: {args}");
 
             try
             {
@@ -127,7 +176,7 @@ namespace musicpresense
             }
         }
 
-        private async void StopScrcpy()
+        private async Task StopScrcpyAsync()
         {
             var process = _scrcpyProcess;
             _scrcpyProcess = null;
@@ -138,18 +187,27 @@ namespace musicpresense
 
             try
             {
+                process.Exited -= ScrcpyProcessExited;
+                process.EnableRaisingEvents = false;
+
                 await Task.Run(() =>
                 {
                     if (!process.HasExited)
                     {
                         process.Kill(true);
-                        process.WaitForExit();
+                        process.WaitForExit(2000);
                     }
                 });
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to stop scrcpy: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (!Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show($"Failed to stop scrcpy: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
+                }
             }
             finally
             {
@@ -159,7 +217,14 @@ namespace musicpresense
 
         private void ScrcpyProcessExited(object? sender, EventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+            {
+                _scrcpyProcess?.Dispose();
+                _scrcpyProcess = null;
+                return;
+            }
+
+            Dispatcher.BeginInvoke(() =>
             {
                 _scrcpyProcess?.Dispose();
                 _scrcpyProcess = null;
@@ -169,11 +234,103 @@ namespace musicpresense
 
         protected override void OnExit(ExitEventArgs e)
         {
-            StopScrcpy();
+            StopScrcpyOnExit();
             _trayIconManager?.Dispose();
             _presenceService?.Dispose();
+            DisposeHotkeys();
+            AdbHelper.StopServer();
             base.OnExit(e);
         }
+
+        private void StopScrcpyOnExit()
+        {
+            var process = _scrcpyProcess;
+            _scrcpyProcess = null;
+            _trayIconManager?.SetScrcpyRunning(false);
+
+            if (process == null)
+                return;
+
+            try
+            {
+                process.Exited -= ScrcpyProcessExited;
+                process.EnableRaisingEvents = false;
+
+                if (!process.HasExited)
+                {
+                    process.Kill(true);
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        private void InitializeHotkeys()
+        {
+            var parameters = new HwndSourceParameters("HotkeySink")
+            {
+                Width = 0,
+                Height = 0,
+                WindowStyle = unchecked((int)0x80000000)
+            };
+
+            _hotkeySource = new HwndSource(parameters);
+            _hotkeySource.AddHook(HotkeyHook);
+
+            RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, ModShift, VkVolumeUp);
+            RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, ModShift, VkVolumeDown);
+        }
+
+        private void DisposeHotkeys()
+        {
+            if (_hotkeySource != null)
+            {
+                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp);
+                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown);
+                _hotkeySource.RemoveHook(HotkeyHook);
+                _hotkeySource.Dispose();
+                _hotkeySource = null;
+            }
+        }
+
+        private IntPtr HotkeyHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WmHotkey)
+            {
+                int id = wParam.ToInt32();
+                switch (id)
+                {
+                    case HotkeyIdVolumeUp:
+                        handled = TryAdjustScrcpyVolume(ScrcpyVolumeStep);
+                        break;
+                    case HotkeyIdVolumeDown:
+                        handled = TryAdjustScrcpyVolume(-ScrcpyVolumeStep);
+                        break;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private bool TryAdjustScrcpyVolume(float delta)
+        {
+            var process = _scrcpyProcess;
+            if (process == null || process.HasExited)
+                return false;
+
+            return ScrcpyVolumeController.TryAdjustVolume(process.Id, delta);
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, int fsModifiers, int vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     }
 
 }
