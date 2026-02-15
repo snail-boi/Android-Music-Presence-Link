@@ -178,6 +178,8 @@ namespace musicpresense
                 string folderPath = Path.GetDirectoryName(remoteFilePath)?.Replace("\\", "/") ?? string.Empty;
                 string key = ComputeKey(deviceId, remoteFilePath);
                 string folderKey = ComputeFolderKey(deviceId, folderPath);
+                double? embeddedDuration = null;
+                MediaMetadata? embeddedMetadata = null;
 
                 if (folderIndex.TryGetValue(folderKey, out var mappedImageKey))
                 {
@@ -227,6 +229,9 @@ namespace musicpresense
                             try { durEmb = await GetMediaDurationAsync(tempPullEmb).ConfigureAwait(false); } catch { }
                             try { metaEmb = await GetMediaMetadataAsync(tempPullEmb).ConfigureAwait(false); } catch { }
 
+                            embeddedDuration = durEmb ?? embeddedDuration;
+                            embeddedMetadata = metaEmb ?? embeddedMetadata;
+
                             try { File.Delete(tempPullEmb); } catch { }
 
                             if (extractedEmbedded && File.Exists(cachedFullEmb))
@@ -242,8 +247,6 @@ namespace musicpresense
                             else
                             {
                                 Debugger.show("No embedded cover extracted for " + remoteFilePath);
-                                if (metaEmb != null)
-                                    return (null, durEmb, metaEmb);
                             }
                         }
                         else
@@ -303,7 +306,7 @@ namespace musicpresense
                                                 EnforceCacheSizeLimit();
                                                 try { File.Delete(tempImg); } catch { }
                                                 Debugger.show("Cached subfolder image for file: " + remoteFilePath);
-                                                return (cachedPath, null, null);
+                                                return (cachedPath, embeddedDuration, embeddedMetadata);
                                             }
                                         }
 
@@ -318,7 +321,7 @@ namespace musicpresense
                                             SaveIndex();
                                             EnforceCacheSizeLimit();
                                             Debugger.show("Cached subfolder image for file: " + remoteFilePath);
-                                            return (cachedPath, null, null);
+                                            return (cachedPath, embeddedDuration, embeddedMetadata);
                                         }
                                     }
                                 }
@@ -359,7 +362,7 @@ namespace musicpresense
                                     EnforceCacheSizeLimit();
                                     try { File.Delete(tempImg); } catch { }
                                     Debugger.show("Cached folder image for file: " + remoteFilePath);
-                                    return (cachedPath, null, null);
+                                    return (cachedPath, embeddedDuration, embeddedMetadata);
                                 }
                             }
 
@@ -374,7 +377,7 @@ namespace musicpresense
                                 SaveIndex();
                                 EnforceCacheSizeLimit();
                                 Debugger.show("Cached folder image for file: " + remoteFilePath);
-                                return (cachedPath, null, null);
+                                return (cachedPath, embeddedDuration, embeddedMetadata);
                             }
                             else
                             {
@@ -434,7 +437,7 @@ namespace musicpresense
                                         EnforceCacheSizeLimit();
                                         Debugger.show("Cached discovered folder image for file: " + remoteFilePath);
                                         try { File.Delete(tempImg); } catch { }
-                                        return (cachedPath, null, null);
+                                        return (cachedPath, embeddedDuration, embeddedMetadata);
                                     }
                                 }
 
@@ -449,7 +452,7 @@ namespace musicpresense
                                     SaveIndex();
                                     EnforceCacheSizeLimit();
                                     Debugger.show("Cached discovered folder image for file: " + remoteFilePath);
-                                    return (cachedPath, null, null);
+                                    return (cachedPath, embeddedDuration, embeddedMetadata);
                                 }
                             }
                         }
@@ -491,7 +494,7 @@ namespace musicpresense
                                                 EnforceCacheSizeLimit();
                                                 try { File.Delete(tempImg); } catch { }
                                                 Debugger.show("Cached discovered subfolder image for file: " + remoteFilePath);
-                                                return (cachedPath, null, null);
+                                                return (cachedPath, embeddedDuration, embeddedMetadata);
                                             }
                                         }
 
@@ -506,7 +509,7 @@ namespace musicpresense
                                             SaveIndex();
                                             EnforceCacheSizeLimit();
                                             Debugger.show("Cached discovered subfolder image for file: " + remoteFilePath);
-                                            return (cachedPath, null, null);
+                                            return (cachedPath, embeddedDuration, embeddedMetadata);
                                         }
                                     }
                                 }
@@ -530,7 +533,7 @@ namespace musicpresense
                     Debugger.show("Failed to pull remote file: " + remoteFilePath);
                     nocover[key] = DateTime.UtcNow;
                     SaveNoCover();
-                    return (null, null, null);
+                    return (null, embeddedDuration, embeddedMetadata);
                 }
 
                 string cachedFilename = key + ".jpg";
@@ -560,7 +563,7 @@ namespace musicpresense
                     Debugger.show("No cover extracted for " + remoteFilePath + "; marking as nocover");
                     nocover[key] = DateTime.UtcNow;
                     SaveNoCover();
-                    return (null, dur, meta);
+                    return (null, dur ?? embeddedDuration, meta ?? embeddedMetadata);
                 }
             }
             catch (Exception ex)
