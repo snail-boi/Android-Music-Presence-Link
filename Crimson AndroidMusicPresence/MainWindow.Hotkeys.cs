@@ -39,6 +39,21 @@ namespace musicpresense
             });
         }
 
+        private void CmbHotkeyModifier_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (CmbHotkeyModifier.SelectedItem is System.Windows.Controls.ComboBoxItem item && item.Tag != null)
+                {
+                    if (int.TryParse(item.Tag.ToString()?.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var mod))
+                    {
+                        _config.HotkeyModifier = mod;
+                    }
+                }
+            }
+            catch { }
+        }
+
         private void StartRecordingHotkey(Action<int> onRecorded)
         {
             if (_isRecordingHotkey)

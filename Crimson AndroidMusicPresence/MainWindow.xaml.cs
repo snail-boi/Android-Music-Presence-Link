@@ -243,6 +243,23 @@ namespace musicpresense
             try { TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
             try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
             try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
+
+            // Set modifier combobox to current config
+            try
+            {
+                foreach (var item in CmbHotkeyModifier.Items)
+                {
+                    if (item is System.Windows.Controls.ComboBoxItem cbi && cbi.Tag != null)
+                    {
+                        if (int.TryParse(cbi.Tag.ToString()?.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var mod) && mod == _config.HotkeyModifier)
+                        {
+                            CmbHotkeyModifier.SelectedItem = cbi;
+                            break;
+                        }
+                    }
+                }
+            }
+            catch { }
         }
 
         private void ChkDarkMode_CheckedChanged(object sender, RoutedEventArgs e)
@@ -479,6 +496,19 @@ namespace musicpresense
             _config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
             _config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
             _config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
+
+            // Modifier: use selected combobox item
+            try
+            {
+                if (CmbHotkeyModifier.SelectedItem is System.Windows.Controls.ComboBoxItem cbi && cbi.Tag != null)
+                {
+                    if (int.TryParse(cbi.Tag.ToString()?.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var mod))
+                    {
+                        _config.HotkeyModifier = mod;
+                    }
+                }
+            }
+            catch { }
 
             MusicConfigManager.Save(_config);
             (Application.Current as App)?.UpdateConfig(_config);

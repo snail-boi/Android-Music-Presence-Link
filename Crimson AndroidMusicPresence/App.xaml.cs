@@ -317,9 +317,9 @@ namespace musicpresense
             _hotkeySource.AddHook(HotkeyHook);
 
             // Register Shift + configured keys. Use try/catch to avoid crashing if registration fails.
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, ModShift, Config.HotkeyVolumeUpKey); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, ModShift, Config.HotkeyVolumeDownKey); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, ModShift, Config.HotkeyToggleScrcpyKey); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, Config.HotkeyModifier, Config.HotkeyVolumeUpKey); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, Config.HotkeyModifier, Config.HotkeyVolumeDownKey); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.HotkeyModifier, Config.HotkeyToggleScrcpyKey); } catch { }
         }
 
         private void DisposeHotkeys()

@@ -32,11 +32,13 @@ namespace musicpresense
         public int ScrcpyFlacCompressionLevel { get; set; } = 5;
         public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
 
-        // Configurable hotkeys (virtual key codes). Hotkeys are always registered with SHIFT modifier.
+        // Configurable hotkeys (virtual key codes) and modifier.
+        // Modifier flags for RegisterHotKey: MOD_ALT=0x0001, MOD_CONTROL=0x0002, MOD_SHIFT=0x0004
         // Defaults: Volume Up = 0xAF (VK_VOLUME_UP), Volume Down = 0xAE (VK_VOLUME_DOWN), Toggle Scrcpy = 'S' (0x53)
         public int HotkeyVolumeUpKey { get; set; } = 0xAF;
         public int HotkeyVolumeDownKey { get; set; } = 0xAE;
         public int HotkeyToggleScrcpyKey { get; set; } = 0x53;
+        public int HotkeyModifier { get; set; } = 0x0004; // default SHIFT
     }
 
     public class PathsConfig
@@ -148,6 +150,10 @@ namespace musicpresense
                 config.HotkeyVolumeDownKey = 0xAE;
             if (config.HotkeyToggleScrcpyKey < 0 || config.HotkeyToggleScrcpyKey > 0xFF)
                 config.HotkeyToggleScrcpyKey = 0x53;
+
+            // Ensure modifier is one of allowed flags (ALT=0x0001, CONTROL=0x0002, SHIFT=0x0004)
+            var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };
+            if (!allowedMods.Contains(config.HotkeyModifier)) config.HotkeyModifier = 0x0004;
 
             return config;
         }

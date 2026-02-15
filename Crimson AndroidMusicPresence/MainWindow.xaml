@@ -23,10 +23,93 @@
             <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
             <Setter Property="CaretBrush" Value="{DynamicResource ThemeControlForegroundBrush}" />
         </Style>
+        <!-- Updated ComboBox style: includes template for dropdown and item styling to respect dark theme brushes -->
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton"
+                                          Grid.Column="2"
+                                          Focusable="false"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}">
+                                <Grid>
+                                    <ContentPresenter Name="ContentSite"
+                                                      IsHitTestVisible="False"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      Margin="6,0,24,0"
+                                                      VerticalAlignment="Center" />
+                                    <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" Width="10" Height="6" Fill="{DynamicResource ThemeControlForegroundBrush}"
+                                          Data="M 0 0 L 10 0 L 5 6 Z" />
+                                </Grid>
+                            </ToggleButton>
+
+                            <Popup Name="Popup"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   PopupAnimation="Slide">
+                                <Border Name="DropDownBorder"
+                                        Background="{DynamicResource ThemeControlBackgroundBrush}"
+                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="2">
+                                    <ScrollViewer Margin="0" CanContentScroll="True">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasItems" Value="false">
+                                <Setter TargetName="DropDownBorder" Property="MinHeight" Value="0" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+                        <Setter Property="Padding" Value="6,4" />
+                        <Setter Property="HorizontalContentAlignment" Value="Left" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border Name="Bd" Background="{TemplateBinding Background}" Padding="2">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style TargetType="ListBox">
             <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
@@ -177,7 +260,16 @@
 
             <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
-                    <TextBlock Text="All keysbinds are performed using shift + configured key" TextWrapping="Wrap" Margin="0,0,0,8" />
+                    <TextBlock Text="Enter virtual-key codes (letters, function keys or common names). Choose modifier below." TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Modifier:" Width="140" VerticalAlignment="Center" />
+                        <ComboBox x:Name="CmbHotkeyModifier" Width="220" SelectionChanged="CmbHotkeyModifier_SelectionChanged">
+                            <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
+                            <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
+                            <ComboBoxItem Tag="0x0001">Alt</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                         <TextBlock Text="Volume Up key:" Width="140" VerticalAlignment="Center" />
