@@ -238,6 +238,11 @@ namespace musicpresense
 
             SelectCodecFromConfig();
             UpdateCodecDependentFields();
+
+            // Populate hotkey fields with hex representation
+            try { TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
+            try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
+            try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
         }
 
         private void ChkDarkMode_CheckedChanged(object sender, RoutedEventArgs e)
@@ -469,6 +474,11 @@ namespace musicpresense
             {
                 _config.ScrcpyFlacCompressionLevel = 5;
             }
+
+            // Parse and store hotkey settings (allows hex 0x.., decimal, single letters or common names)
+            _config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
+            _config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
+            _config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
 
             MusicConfigManager.Save(_config);
             (Application.Current as App)?.UpdateConfig(_config);

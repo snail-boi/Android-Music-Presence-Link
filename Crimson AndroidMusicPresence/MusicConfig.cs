@@ -31,6 +31,12 @@ namespace musicpresense
         public int ScrcpyAudioBuffer { get; set; } = 50;
         public int ScrcpyFlacCompressionLevel { get; set; } = 5;
         public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
+
+        // Configurable hotkeys (virtual key codes). Hotkeys are always registered with SHIFT modifier.
+        // Defaults: Volume Up = 0xAF (VK_VOLUME_UP), Volume Down = 0xAE (VK_VOLUME_DOWN), Toggle Scrcpy = 'S' (0x53)
+        public int HotkeyVolumeUpKey { get; set; } = 0xAF;
+        public int HotkeyVolumeDownKey { get; set; } = 0xAE;
+        public int HotkeyToggleScrcpyKey { get; set; } = 0x53;
     }
 
     public class PathsConfig
@@ -134,6 +140,14 @@ namespace musicpresense
             config.ScrcpyAvailableAudioCodecs ??= new List<string>();
             if (config.ScrcpyAvailableAudioCodecs.Count == 0)
                 config.ScrcpyAvailableAudioCodecs.Add("raw");
+
+            // Ensure hotkey values are reasonable
+            if (config.HotkeyVolumeUpKey < 0 || config.HotkeyVolumeUpKey > 0xFF)
+                config.HotkeyVolumeUpKey = 0xAF;
+            if (config.HotkeyVolumeDownKey < 0 || config.HotkeyVolumeDownKey > 0xFF)
+                config.HotkeyVolumeDownKey = 0xAE;
+            if (config.HotkeyToggleScrcpyKey < 0 || config.HotkeyToggleScrcpyKey > 0xFF)
+                config.HotkeyToggleScrcpyKey = 0x53;
 
             return config;
         }

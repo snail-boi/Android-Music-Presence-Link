@@ -175,6 +175,30 @@
                 </StackPanel>
             </Expander>
 
+            <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                <StackPanel>
+                    <TextBlock Text="All keysbinds are performed using shift + configured key" TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Volume Up key:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtHotkeyVolumeUp" Width="220" />
+                        <Button x:Name="BtnRecordHotkeyVolumeUp" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyVolumeUp_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Volume Down key:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtHotkeyVolumeDown" Width="220" />
+                        <Button x:Name="BtnRecordHotkeyVolumeDown" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyVolumeDown_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                        <TextBlock Text="Toggle Scrcpy key:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtHotkeyToggleScrcpy" Width="220" />
+                        <Button x:Name="BtnRecordHotkeyToggleScrcpy" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleScrcpy_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
+
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="BtnSave" Content="Save" Width="100" />
             </StackPanel>

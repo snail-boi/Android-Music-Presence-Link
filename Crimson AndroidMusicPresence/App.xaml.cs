@@ -27,6 +27,7 @@ namespace musicpresense
 
         private const int HotkeyIdVolumeUp = 1;
         private const int HotkeyIdVolumeDown = 2;
+        private const int HotkeyIdToggleScrcpy = 3;
         private const int ModShift = 0x0004;
         private const int VkVolumeUp = 0xAF;
         private const int VkVolumeDown = 0xAE;
@@ -63,6 +64,13 @@ namespace musicpresense
             AdbHelper.AdbPath = Config.Paths.Adb;
             ApplyTheme(config.UseDarkMode);
             _presenceService?.UpdateConfig(config);
+            // Reinitialize hotkeys to reflect updated configuration
+            try
+            {
+                DisposeHotkeys();
+                InitializeHotkeys();
+            }
+            catch { }
         }
 
         internal void ApplyTheme(bool useDarkMode)
@@ -308,8 +316,10 @@ namespace musicpresense
             _hotkeySource = new HwndSource(parameters);
             _hotkeySource.AddHook(HotkeyHook);
 
-            RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, ModShift, VkVolumeUp);
-            RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, ModShift, VkVolumeDown);
+            // Register Shift + configured keys. Use try/catch to avoid crashing if registration fails.
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, ModShift, Config.HotkeyVolumeUpKey); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, ModShift, Config.HotkeyVolumeDownKey); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, ModShift, Config.HotkeyToggleScrcpyKey); } catch { }
         }
 
         private void DisposeHotkeys()
@@ -318,6 +328,7 @@ namespace musicpresense
             {
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp);
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown);
+                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy);
                 _hotkeySource.RemoveHook(HotkeyHook);
                 _hotkeySource.Dispose();
                 _hotkeySource = null;
@@ -336,6 +347,10 @@ namespace musicpresense
                         break;
                     case HotkeyIdVolumeDown:
                         handled = TryAdjustScrcpyVolume(-ScrcpyVolumeStep);
+                        break;
+                    case HotkeyIdToggleScrcpy:
+                        ToggleScrcpyNoAudio();
+                        handled = true;
                         break;
                 }
             }
