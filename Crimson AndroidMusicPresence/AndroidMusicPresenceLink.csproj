@@ -8,7 +8,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PackageIcon>logo.png</PackageIcon>
+    <ApplicationIcon>Android_logo_2019(1).ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Android_logo_2019(1).ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="..\Version.txt" CopyToOutputDirectory="PreserveNewest" />
@@ -49,6 +56,8 @@
 	  </None>
 	  <None Update="Resources\logo.png">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
 	  </None>
 	  <None Update="Resources\open_a_terminal_here.bat">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
