@@ -419,11 +419,12 @@ namespace musicpresense
                     string imagePath = result.ImagePath;
                     double? durSeconds = result.DurationSeconds;
                     metadata = result.Metadata ?? metadata;
+                    if (durSeconds.HasValue && durSeconds.Value > 0)
+                        duration = TimeSpan.FromSeconds(durSeconds.Value);
 
                     if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
                     {
-                        if (durSeconds.HasValue && durSeconds.Value > 0)
-                            duration = TimeSpan.FromSeconds(durSeconds.Value);
+
 
                         Debugger.show($"Found cached image at {imagePath}, setting SMTC thumbnail");
                         var imageFile = await StorageFile.GetFileFromPathAsync(imagePath).AsTask().ConfigureAwait(false);
