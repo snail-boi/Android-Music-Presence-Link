@@ -300,7 +300,7 @@ namespace musicpresense
                                             if (File.Exists(cachedPath))
                                             {
                                                 var fi = new FileInfo(cachedPath);
-                                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null };
+                                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
                                                 index[key] = entry;
                                                 SaveIndex();
                                                 EnforceCacheSizeLimit();
@@ -316,7 +316,7 @@ namespace musicpresense
                                         if (ffOut && File.Exists(cachedPath))
                                         {
                                             var fi = new FileInfo(cachedPath);
-                                            var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null };
+                                            var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
                                             index[key] = entry;
                                             SaveIndex();
                                             EnforceCacheSizeLimit();
@@ -356,7 +356,7 @@ namespace musicpresense
                                 if (File.Exists(cachedPath))
                                 {
                                     var fi = new FileInfo(cachedPath);
-                                    var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null };
+                                    var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
                                     index[key] = entry;
                                     SaveIndex();
                                     EnforceCacheSizeLimit();
@@ -372,7 +372,7 @@ namespace musicpresense
                             if (ffOut && File.Exists(cachedPath))
                             {
                                 var fi = new FileInfo(cachedPath);
-                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null };
+                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
                                 index[key] = entry;
                                 SaveIndex();
                                 EnforceCacheSizeLimit();
@@ -431,7 +431,7 @@ namespace musicpresense
                                     if (File.Exists(cachedPath))
                                     {
                                         var fi = new FileInfo(cachedPath);
-                                        var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null };
+                                        var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
                                         index[key] = entry;
                                         SaveIndex();
                                         EnforceCacheSizeLimit();
@@ -447,7 +447,7 @@ namespace musicpresense
                                 if (ffOut && File.Exists(cachedPath))
                                 {
                                     var fi = new FileInfo(cachedPath);
-                                    var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null };
+                                    var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
                                     index[key] = entry;
                                     SaveIndex();
                                     EnforceCacheSizeLimit();
@@ -488,7 +488,7 @@ namespace musicpresense
                                             if (File.Exists(cachedPath))
                                             {
                                                 var fi = new FileInfo(cachedPath);
-                                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null };
+                                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
                                                 index[key] = entry;
                                                 SaveIndex();
                                                 EnforceCacheSizeLimit();
@@ -504,7 +504,7 @@ namespace musicpresense
                                         if (ffOut && File.Exists(cachedPath))
                                         {
                                             var fi = new FileInfo(cachedPath);
-                                            var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null };
+                                            var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
                                             index[key] = entry;
                                             SaveIndex();
                                             EnforceCacheSizeLimit();
