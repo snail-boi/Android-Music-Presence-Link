@@ -47,6 +47,7 @@ namespace musicpresense
             BtnListCodecs.Click += BtnListCodecs_Click;
             BtnAutoGather.Click += BtnAutoGather_Click;
             BtnPickRemoteRoot.Click += BtnPickRemoteRoot_Click;
+            BtnClearCoverCache.Click += BtnClearCoverCache_Click;
             LstAudioCodecs.SelectionChanged += LstAudioCodecs_SelectionChanged;
             ChkDarkMode.Checked += ChkDarkMode_CheckedChanged;
             ChkDarkMode.Unchecked += ChkDarkMode_CheckedChanged;
@@ -54,6 +55,20 @@ namespace musicpresense
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
             _isInitializing = false;
+        }
+
+        private void BtnClearCoverCache_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var manager = new CoverCacheManager(_config.Paths.FfmpegPath, _config.Paths.CoverCachePath);
+                manager.ClearCache();
+                MessageBox.Show("Cover cache cleared.", "Cover Cache", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to clear cover cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)

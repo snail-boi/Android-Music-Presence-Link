@@ -191,6 +191,9 @@
                 <TextBox x:Name="TxtRemoteRoot" Grid.Column="0" Margin="0,0,8,0" />
                 <Button x:Name="BtnPickRemoteRoot" Grid.Column="1" Content="Browse" Width="90" />
             </Grid>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <Button x:Name="BtnClearCoverCache" Content="Clear Cover Cache" Width="160" />
+            </StackPanel>
 
             <Expander Header="Eligible Apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
