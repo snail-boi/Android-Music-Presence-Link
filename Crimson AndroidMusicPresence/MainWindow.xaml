@@ -254,6 +254,12 @@
                         <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" />
                     </Grid>
 
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Paused clear delay:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtPauseClearDelayMinutes" Width="220" />
+                        <TextBlock Text="min" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+
                     <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,0" />
                     <CheckBox x:Name="ChkOpenInTaskbar" Content="Open in taskbar" Margin="0,8,0,0" />
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

@@ -261,6 +261,7 @@ namespace musicpresense
 
                 smtcControls = null;
                 smtcDisplayUpdater = null;
+                lastSMTCTitle = null;
             }
             catch (Exception ex)
             {

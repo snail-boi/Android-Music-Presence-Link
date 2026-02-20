@@ -19,6 +19,9 @@ namespace musicpresense
         private string _currentDevice = string.Empty;
         private bool _wifiReconnectPromptShown;
         private bool _isRecoveringWifi;
+        private DateTimeOffset? _pausedSince;
+        private string? _pausedSignature;
+        private bool _smtcPausedCleared;
 
         internal string CurrentDevice => _currentDevice;
 
@@ -218,7 +221,7 @@ namespace musicpresense
 
             await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} tcpip {port}").ConfigureAwait(false);
             await Task.Delay(750).ConfigureAwait(false);
-            await AdbHelper.RunAdbCaptureAsync($"connect {ip}:{port}").ConfigureAwait(false);
+            await AdbHelper.RunAdbCaptureAsync($"connect {ip}:{port}"). ConfigureAwait(false);
             await Task.Delay(750).ConfigureAwait(false);
 
             var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
@@ -312,6 +315,40 @@ namespace musicpresense
 
                     if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
                     {
+                        if (!isPlaying)
+                        {
+                            var signature = $"{title}\n{artist}\n{album}";
+                            if (_pausedSince == null || !string.Equals(_pausedSignature, signature, StringComparison.Ordinal))
+                            {
+                                _pausedSince = DateTimeOffset.UtcNow;
+                                _pausedSignature = signature;
+                            }
+
+                            if (_config.SmtcPauseClearDelayMinutes > 0 && _pausedSince.HasValue)
+                            {
+                                var elapsed = DateTimeOffset.UtcNow - _pausedSince.Value;
+                                if (elapsed.TotalMinutes >= _config.SmtcPauseClearDelayMinutes)
+                                {
+                                    if (!_smtcPausedCleared)
+                                    {
+                                        _mediaController.Clear();
+                                        _smtcPausedCleared = true;
+                                    }
+
+                                    return;
+                                }
+                            }
+
+                            if (_smtcPausedCleared)
+                                return;
+                        }
+                        else
+                        {
+                            _pausedSince = null;
+                            _pausedSignature = null;
+                            _smtcPausedCleared = false;
+                        }
+
                         await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying).ConfigureAwait(false);
                         return;
                     }

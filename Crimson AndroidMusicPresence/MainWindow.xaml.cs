@@ -278,6 +278,7 @@ namespace musicpresense
             TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
             TxtAudioBuffer.Text = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
             TxtFlacCompressionLevel.Text = _config.ScrcpyFlacCompressionLevel.ToString();
+            TxtPauseClearDelayMinutes.Text = _config.SmtcPauseClearDelayMinutes.ToString();
 
             SelectCodecFromConfig();
             UpdateCodecDependentFields();
@@ -541,6 +542,15 @@ namespace musicpresense
                 _config.ScrcpyFlacCompressionLevel = 5;
             }
 
+            if (int.TryParse(TxtPauseClearDelayMinutes.Text.Trim(), out var pauseDelay))
+            {
+                _config.SmtcPauseClearDelayMinutes = Math.Max(0, pauseDelay);
+            }
+            else
+            {
+                _config.SmtcPauseClearDelayMinutes = 3;
+            }
+
             // Parse and store hotkey settings (allows hex 0x.., decimal, single letters or common names)
             _config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
             _config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
@@ -717,6 +727,15 @@ namespace musicpresense
                 config.ScrcpyFlacCompressionLevel = 5;
             }
 
+            if (int.TryParse(TxtPauseClearDelayMinutes.Text.Trim(), out var pauseDelay))
+            {
+                config.SmtcPauseClearDelayMinutes = Math.Max(0, pauseDelay);
+            }
+            else
+            {
+                config.SmtcPauseClearDelayMinutes = 3;
+            }
+
             config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
             config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
             config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
@@ -762,6 +781,7 @@ namespace musicpresense
             if (!string.Equals(left.ScrcpyAudioBitrate ?? string.Empty, right.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)) return false;
             if (left.ScrcpyAudioBuffer != right.ScrcpyAudioBuffer) return false;
             if (left.ScrcpyFlacCompressionLevel != right.ScrcpyFlacCompressionLevel) return false;
+            if (left.SmtcPauseClearDelayMinutes != right.SmtcPauseClearDelayMinutes) return false;
             if (left.HotkeyVolumeUpKey != right.HotkeyVolumeUpKey) return false;
             if (left.HotkeyVolumeDownKey != right.HotkeyVolumeDownKey) return false;
             if (left.HotkeyToggleScrcpyKey != right.HotkeyToggleScrcpyKey) return false;
@@ -804,6 +824,7 @@ namespace musicpresense
                 ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
                 ScrcpyFlacCompressionLevel = source.ScrcpyFlacCompressionLevel,
                 ScrcpyAvailableAudioCodecs = source.ScrcpyAvailableAudioCodecs?.ToList() ?? new List<string>(),
+                SmtcPauseClearDelayMinutes = source.SmtcPauseClearDelayMinutes,
                 HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
                 HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
                 HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,

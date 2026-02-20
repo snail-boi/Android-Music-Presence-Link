@@ -32,6 +32,7 @@ namespace musicpresense
         public int ScrcpyAudioBuffer { get; set; } = 50;
         public int ScrcpyFlacCompressionLevel { get; set; } = 5;
         public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
+        public int SmtcPauseClearDelayMinutes { get; set; } = 3;
 
         // Configurable hotkeys (virtual key codes) and modifier.
         // Modifier flags for RegisterHotKey: MOD_ALT=0x0001, MOD_CONTROL=0x0002, MOD_SHIFT=0x0004
@@ -143,6 +144,9 @@ namespace musicpresense
             config.ScrcpyAvailableAudioCodecs ??= new List<string>();
             if (config.ScrcpyAvailableAudioCodecs.Count == 0)
                 config.ScrcpyAvailableAudioCodecs.Add("raw");
+
+            if (config.SmtcPauseClearDelayMinutes < 0)
+                config.SmtcPauseClearDelayMinutes = 0;
 
             // Ensure hotkey values are reasonable
             if (config.HotkeyVolumeUpKey < 0 || config.HotkeyVolumeUpKey > 0xFF)
