@@ -245,6 +245,7 @@ namespace musicpresense
 
             ChkDebugMode.IsChecked = _config.DebugMode;
             ChkDarkMode.IsChecked = _config.UseDarkMode;
+            ChkOpenInTaskbar.IsChecked = _config.OpenInTaskbar;
             UpdateThemeToggleText(_config.UseDarkMode);
 
             TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
@@ -429,6 +430,7 @@ namespace musicpresense
 
             _config.DebugMode = ChkDebugMode.IsChecked == true;
             _config.UseDarkMode = ChkDarkMode.IsChecked == true;
+            _config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
 
             var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
             _config.ScrcpyAudioCodec = selectedCodec;

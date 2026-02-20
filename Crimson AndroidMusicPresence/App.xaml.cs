@@ -46,7 +46,15 @@ namespace musicpresense
             ApplyTheme(Config.UseDarkMode);
 
             _settingsWindow = new MainWindow();
-            _settingsWindow.Hide();
+            if (Config.OpenInTaskbar)
+            {
+                _settingsWindow.Hide();
+            }
+            else
+            {
+                _settingsWindow.Show();
+                _settingsWindow.Activate();
+            }
 
             _presenceService = new MusicPresenceService(Dispatcher, Config);
             _presenceService.Start();
