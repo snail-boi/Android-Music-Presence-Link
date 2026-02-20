@@ -22,6 +22,7 @@ namespace musicpresense
     public partial class MainWindow : Window
     {
         private MusicConfig _config;
+        private MusicConfig _savedConfig;
         private bool _isInitializing = true;
         private bool _allowClose;
         private readonly ObservableCollection<AppPackageItem> _appPackages = new();
@@ -35,6 +36,7 @@ namespace musicpresense
             InitializeComponent();
 
             _config = App.Config;
+            _savedConfig = CloneConfig(_config);
             InitializeUpdateIntervalUI();
             InitializeAudioCodecUI();
             ApplyConfigToUI();
@@ -106,6 +108,31 @@ namespace musicpresense
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
         {
             if (_allowClose) return;
+
+            if (HasUnsavedChanges())
+            {
+                var result = MessageBox.Show(
+                    "there are unsaved changes, do you wish to save them?",
+                    "Unsaved changes",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    SaveConfigFromUi(true);
+                }
+                else if (result == MessageBoxResult.No)
+                {
+                    RevertUnsavedChanges();
+                }
+            }
+
             e.Cancel = true;
             Hide();
         }
@@ -407,6 +434,11 @@ namespace musicpresense
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
+            SaveConfigFromUi(true);
+        }
+
+        private void SaveConfigFromUi(bool showConfirmation)
+        {
             _config.SelectedDeviceUSB = TxtUsbSerial.Text.Trim();
             _config.SelectedDeviceWiFi = TxtWifi.Text.Trim();
             _config.SelectedDeviceName = TxtDeviceName.Text.Trim();
@@ -529,8 +561,12 @@ namespace musicpresense
 
             MusicConfigManager.Save(_config);
             (Application.Current as App)?.UpdateConfig(_config);
+            _savedConfig = CloneConfig(_config);
 
-            MessageBox.Show("Music presence settings saved.", "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (showConfirmation)
+            {
+                MessageBox.Show("Music presence settings saved.", "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
 
         private static int GetTypicalBitrate(string codec)
@@ -581,6 +617,200 @@ namespace musicpresense
                 : Visibility.Collapsed;
         }
 
+        private void UpdateSavedSnapshot()
+        {
+            _savedConfig = CloneConfig(_config);
+        }
+
+        private void RevertUnsavedChanges()
+        {
+            _config = CloneConfig(_savedConfig);
+            (Application.Current as App)?.UpdateConfig(_config);
+            InitializeAudioCodecUI();
+            ApplyConfigToUI();
+        }
+
+        private bool HasUnsavedChanges()
+        {
+            var currentConfig = BuildConfigFromUi();
+            return !AreConfigsEqual(currentConfig, _savedConfig);
+        }
+
+        private MusicConfig BuildConfigFromUi()
+        {
+            var config = CloneConfig(_config);
+
+            config.SelectedDeviceUSB = TxtUsbSerial.Text.Trim();
+            config.SelectedDeviceWiFi = TxtWifi.Text.Trim();
+            config.SelectedDeviceName = TxtDeviceName.Text.Trim();
+            config.MusicRemoteRoot = TxtRemoteRoot.Text.Trim();
+
+            if (_appPackages.Count > 0)
+            {
+                config.AllowedApps = _appPackages
+                    .Where(item => item.IsSelected)
+                    .Select(item => item.PackageName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            else
+            {
+                config.AllowedApps = _config.AllowedApps?.ToList() ?? new List<string>();
+            }
+
+            if (config.AllowedApps.Count == 0)
+            {
+                config.AllowedApps.Add("in.krosbits.musicolet");
+            }
+
+            if (!_isInitializing && CmbUpdateInterval.SelectedIndex >= 0)
+            {
+                config.UpdateIntervalMode = (UpdateIntervalMode)(CmbUpdateInterval.SelectedIndex + 1);
+            }
+
+            config.DebugMode = ChkDebugMode.IsChecked == true;
+            config.UseDarkMode = ChkDarkMode.IsChecked == true;
+            config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
+
+            var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
+            config.ScrcpyAudioCodec = selectedCodec;
+
+            if (selectedCodec.Equals("raw", StringComparison.OrdinalIgnoreCase))
+            {
+                config.ScrcpyAudioBitrate = string.Empty;
+            }
+            else
+            {
+                var bitrateText = TxtAudioBitrate.Text.Trim();
+                if (string.IsNullOrEmpty(bitrateText))
+                {
+                    config.ScrcpyAudioBitrate = string.Empty;
+                }
+                else if (int.TryParse(bitrateText, out var bitrateValue))
+                {
+                    if (bitrateValue < 1)
+                        bitrateValue = 1;
+
+                    config.ScrcpyAudioBitrate = bitrateValue > 0 ? bitrateValue.ToString() : string.Empty;
+                }
+                else
+                {
+                    config.ScrcpyAudioBitrate = string.Empty;
+                }
+            }
+
+            if (int.TryParse(TxtAudioBuffer.Text.Trim(), out var bufferValue) && bufferValue > 0)
+            {
+                config.ScrcpyAudioBuffer = Math.Max(1, bufferValue);
+            }
+            else
+            {
+                config.ScrcpyAudioBuffer = 50;
+            }
+
+            if (int.TryParse(TxtFlacCompressionLevel.Text.Trim(), out var flacLevel))
+            {
+                config.ScrcpyFlacCompressionLevel = Math.Clamp(flacLevel, 1, 8);
+            }
+            else
+            {
+                config.ScrcpyFlacCompressionLevel = 5;
+            }
+
+            config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
+            config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
+            config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
+
+            try
+            {
+                if (CmbHotkeyModifier.SelectedItem is System.Windows.Controls.ComboBoxItem cbi && cbi.Tag != null)
+                {
+                    if (int.TryParse(cbi.Tag.ToString()?.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var mod))
+                    {
+                        config.HotkeyModifier = mod;
+                    }
+                }
+            }
+            catch { }
+
+            return config;
+        }
+
+        private static bool AreConfigsEqual(MusicConfig left, MusicConfig right)
+        {
+            if (left == null || right == null) return false;
+
+            bool PathsEqual(PathsConfig? a, PathsConfig? b)
+            {
+                if (a == null || b == null) return a == b;
+                return string.Equals(a.Adb, b.Adb, StringComparison.Ordinal)
+                    && string.Equals(a.FfmpegPath, b.FfmpegPath, StringComparison.Ordinal)
+                    && string.Equals(a.Scrcpy, b.Scrcpy, StringComparison.Ordinal)
+                    && string.Equals(a.CoverCachePath, b.CoverCachePath, StringComparison.Ordinal);
+            }
+
+            if (!PathsEqual(left.Paths, right.Paths)) return false;
+            if (!string.Equals(left.SelectedDeviceUSB, right.SelectedDeviceUSB, StringComparison.Ordinal)) return false;
+            if (!string.Equals(left.SelectedDeviceWiFi, right.SelectedDeviceWiFi, StringComparison.Ordinal)) return false;
+            if (!string.Equals(left.SelectedDeviceName, right.SelectedDeviceName, StringComparison.Ordinal)) return false;
+            if (!string.Equals(left.MusicRemoteRoot, right.MusicRemoteRoot, StringComparison.Ordinal)) return false;
+            if (left.UpdateIntervalMode != right.UpdateIntervalMode) return false;
+            if (left.DebugMode != right.DebugMode) return false;
+            if (left.UseDarkMode != right.UseDarkMode) return false;
+            if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
+            if (!string.Equals(left.ScrcpyAudioCodec, right.ScrcpyAudioCodec, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(left.ScrcpyAudioBitrate ?? string.Empty, right.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)) return false;
+            if (left.ScrcpyAudioBuffer != right.ScrcpyAudioBuffer) return false;
+            if (left.ScrcpyFlacCompressionLevel != right.ScrcpyFlacCompressionLevel) return false;
+            if (left.HotkeyVolumeUpKey != right.HotkeyVolumeUpKey) return false;
+            if (left.HotkeyVolumeDownKey != right.HotkeyVolumeDownKey) return false;
+            if (left.HotkeyToggleScrcpyKey != right.HotkeyToggleScrcpyKey) return false;
+            if (left.HotkeyModifier != right.HotkeyModifier) return false;
+
+            var allowedLeft = new HashSet<string>(left.AllowedApps ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            var allowedRight = new HashSet<string>(right.AllowedApps ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            if (!allowedLeft.SetEquals(allowedRight)) return false;
+
+            var codecsLeft = new HashSet<string>(left.ScrcpyAvailableAudioCodecs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            var codecsRight = new HashSet<string>(right.ScrcpyAvailableAudioCodecs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            if (!codecsLeft.SetEquals(codecsRight)) return false;
+
+            return true;
+        }
+
+        private static MusicConfig CloneConfig(MusicConfig source)
+        {
+            var paths = source.Paths ?? new PathsConfig();
+            return new MusicConfig
+            {
+                Paths = new PathsConfig
+                {
+                    Adb = paths.Adb,
+                    FfmpegPath = paths.FfmpegPath,
+                    Scrcpy = paths.Scrcpy,
+                    CoverCachePath = paths.CoverCachePath
+                },
+                SelectedDeviceUSB = source.SelectedDeviceUSB,
+                SelectedDeviceWiFi = source.SelectedDeviceWiFi,
+                SelectedDeviceName = source.SelectedDeviceName,
+                MusicRemoteRoot = source.MusicRemoteRoot,
+                AllowedApps = source.AllowedApps?.ToList() ?? new List<string>(),
+                UpdateIntervalMode = source.UpdateIntervalMode,
+                DebugMode = source.DebugMode,
+                UseDarkMode = source.UseDarkMode,
+                OpenInTaskbar = source.OpenInTaskbar,
+                ScrcpyAudioCodec = source.ScrcpyAudioCodec,
+                ScrcpyAudioBitrate = source.ScrcpyAudioBitrate ?? string.Empty,
+                ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
+                ScrcpyFlacCompressionLevel = source.ScrcpyFlacCompressionLevel,
+                ScrcpyAvailableAudioCodecs = source.ScrcpyAvailableAudioCodecs?.ToList() ?? new List<string>(),
+                HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
+                HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
+                HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,
+                HotkeyModifier = source.HotkeyModifier
+            };
+        }
+
         private async Task LoadScrcpyCodecsAsync()
         {
             if (_isLoadingCodecs)
@@ -619,6 +849,7 @@ namespace musicpresense
 
                     _config.ScrcpyAvailableAudioCodecs = codecs.ToList();
                     MusicConfigManager.Save(_config);
+                    UpdateSavedSnapshot();
 
                     SelectCodecFromConfig();
                     UpdateCodecDependentFields();
