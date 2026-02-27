@@ -118,7 +118,7 @@ namespace musicpresense
                         _wifiReconnectPromptShown = false;
                         return;
                     }
-                    if (MainWindow.isWifiEnabled == true)
+                    if (_config.IsWifiEnabled == true)
                     {
                         await RecoverWirelessConnectionAsync().ConfigureAwait(false);
                     }

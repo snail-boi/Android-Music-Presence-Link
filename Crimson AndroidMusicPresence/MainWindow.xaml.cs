@@ -30,7 +30,6 @@ namespace musicpresense
         private readonly ObservableCollection<string> _audioCodecs = new();
         private bool _isLoadingCodecs;
         private bool _isAutoGathering;
-        public static bool isWifiEnabled = false;
 
         public MainWindow()
         {
@@ -171,11 +170,11 @@ namespace musicpresense
             var ip = "none";
             if (MessageBox.Show("do you want to enable WiFi","May be incompatible with certain networks",MessageBoxButton.YesNo,MessageBoxImage.Question) == MessageBoxResult.No)
             {
-                isWifiEnabled = false;
+                _config.IsWifiEnabled = false;
             }
             else
             {
-                isWifiEnabled = true;
+                _config.IsWifiEnabled = true;
                 port = await GetWifiPortAsync(usbSerial);
                 ip = await GetDeviceWifiIpAsync(usbSerial);
 
@@ -183,7 +182,7 @@ namespace musicpresense
 
             if (!string.IsNullOrWhiteSpace(ip))
             {
-                if (isWifiEnabled = true)
+                if (_config.IsWifiEnabled == true)
                 {
                     TxtWifi.Text = $"{ip}:{port}";
                 }

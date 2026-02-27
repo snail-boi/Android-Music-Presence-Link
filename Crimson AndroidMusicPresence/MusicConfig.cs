@@ -22,7 +22,7 @@ namespace musicpresense
         public string SelectedDeviceWiFi { get; set; } = string.Empty;
         public string SelectedDeviceName { get; set; } = string.Empty;
         public string MusicRemoteRoot { get; set; } = string.Empty;
-        public List<string> AllowedApps { get; set; } = new List<string> { "in.krosbits.musicolet" };
+        public List<string> AllowedApps { get; set; } = new List<string> { };
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Medium;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = false;
@@ -32,7 +32,8 @@ namespace musicpresense
         public int ScrcpyAudioBuffer { get; set; } = 50;
         public int ScrcpyFlacCompressionLevel { get; set; } = 5;
         public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
-        public int SmtcPauseClearDelayMinutes { get; set; } = 3;
+        public int SmtcPauseClearDelayMinutes { get; set; } = 5;
+        public bool IsWifiEnabled { get; set; } = false;
 
         // Configurable hotkeys (virtual key codes) and modifier.
         // Modifier flags for RegisterHotKey: MOD_ALT=0x0001, MOD_CONTROL=0x0002, MOD_SHIFT=0x0004
@@ -94,7 +95,6 @@ namespace musicpresense
                 }
 
                 var fresh = new MusicConfig();
-                TryImportFromMainConfig(fresh);
                 return NormalizeConfig(fresh);
             }
             catch
@@ -163,48 +163,6 @@ namespace musicpresense
             return config;
         }
 
-        private static void TryImportFromMainConfig(MusicConfig target)
-        {
-            try
-            {
-                var folder = Path.GetDirectoryName(ConfigPath);
-                if (string.IsNullOrEmpty(folder)) return;
 
-                var mainConfigPath = Path.Combine(folder, "config.json");
-                if (!File.Exists(mainConfigPath))
-                {
-                    var altPath = Path.Combine(folder, "Config.json");
-                    if (File.Exists(altPath)) mainConfigPath = altPath;
-                }
-
-                if (!File.Exists(mainConfigPath)) return;
-
-                using var doc = JsonDocument.Parse(File.ReadAllText(mainConfigPath));
-                var root = doc.RootElement;
-
-                if (root.TryGetProperty("Paths", out var paths))
-                {
-                    if (paths.TryGetProperty("Adb", out var adb)) target.Paths.Adb = adb.GetString() ?? target.Paths.Adb;
-                    if (paths.TryGetProperty("FfmpegPath", out var ffmpeg)) target.Paths.FfmpegPath = ffmpeg.GetString() ?? target.Paths.FfmpegPath;
-                    if (paths.TryGetProperty("CoverCachePath", out var cache)) target.Paths.CoverCachePath = cache.GetString() ?? target.Paths.CoverCachePath;
-                    if (paths.TryGetProperty("Scrcpy", out var scrcpy)) target.Paths.Scrcpy = scrcpy.GetString() ?? target.Paths.Scrcpy;
-                    else if (paths.TryGetProperty("ScrcpyPath", out var scrcpyPath)) target.Paths.Scrcpy = scrcpyPath.GetString() ?? target.Paths.Scrcpy;
-                }
-
-                if (root.TryGetProperty("SelectedDeviceUSB", out var usb)) target.SelectedDeviceUSB = usb.GetString() ?? string.Empty;
-                if (root.TryGetProperty("SelectedDeviceWiFi", out var wifi)) target.SelectedDeviceWiFi = wifi.GetString() ?? string.Empty;
-                if (root.TryGetProperty("SelectedDeviceName", out var name)) target.SelectedDeviceName = name.GetString() ?? string.Empty;
-
-                if (root.TryGetProperty("SpecialOptions", out var specials) &&
-                    specials.TryGetProperty("MusicRemoteRoot", out var remoteRoot))
-                {
-                    target.MusicRemoteRoot = remoteRoot.GetString() ?? string.Empty;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debugger.show("Failed to import main config: " + ex.Message);
-            }
-        }
     }
 }
