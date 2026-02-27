@@ -19,6 +19,27 @@ namespace musicpresense
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
+
+    /*
+        things to add:
+        in the settings show what is playing textwise just in case
+        change the taskbar icon under different circumstances
+            Green: active song and device connected via USB
+            blue: active song and device connected via WiFi
+            yellow: no active song and device connected via USB
+            orange: no active song and device connected via WiFi
+            purple: Wifi connection possible but needs a reconnect via USB to start again
+            red: no device connected
+            
+
+        make the taskbar UI look better
+            example colored dots that also display connection status
+            show whether an audio link is active and what settings it's using
+            general button styling with icons
+            show current song in the taskbar's menu
+            
+        (don't know if possible) make those old windows XP style poppups pointing to the taskbar when connection status changes
+    */
     public partial class MainWindow : Window
     {
         private MusicConfig _config;
