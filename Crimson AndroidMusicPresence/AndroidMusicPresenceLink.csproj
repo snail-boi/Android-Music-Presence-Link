@@ -14,7 +14,34 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Tray_Icons\Tray_Active_USB.ico" />
+    <None Remove="Tray_Icons\Tray_Active_WiFi.ico" />
+    <None Remove="Tray_Icons\Tray_Inactive_USB.ico" />
+    <None Remove="Tray_Icons\Tray_Inactive_WiFi.ico" />
+    <None Remove="Tray_Icons\Tray_NoDevice.ico" />
+    <None Remove="Tray_Icons\Tray_WiFi_Noport.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Android_logo_2019(1).ico" />
+    <Content Include="Tray_Icons\Tray_Active_USB.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_Active_WiFi.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_Inactive_USB.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_Inactive_WiFi.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_NoDevice.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_WiFi_Noport.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
