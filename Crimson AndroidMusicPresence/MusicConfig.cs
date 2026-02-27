@@ -27,6 +27,7 @@ namespace musicpresense
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
         public bool OpenInTaskbar { get; set; } = false;
+        public bool StartWithWindows { get; set; } = false;
         public string ScrcpyAudioCodec { get; set; } = "raw";
         public string ScrcpyAudioBitrate { get; set; } = string.Empty;
         public int ScrcpyAudioBuffer { get; set; } = 50;

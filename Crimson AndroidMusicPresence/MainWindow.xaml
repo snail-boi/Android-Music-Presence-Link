@@ -280,11 +280,11 @@
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="140" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Text="Update Interval:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
-                        <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" Margin="0,0,140,0" />
+                        <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" />
                     </Grid>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -295,6 +295,7 @@
 
                     <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,0" />
                     <CheckBox x:Name="ChkOpenInTaskbar" Content="Open in taskbar" Margin="0,8,0,0" />
+                    <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,8,0,0" />
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <CheckBox x:Name="ChkDarkMode" Content="Use dark mode" VerticalAlignment="Center" Visibility="Collapsed" />
                         <Button x:Name="BtnToggleTheme" Content="Switch" Width="110" Margin="12,0,0,0" />

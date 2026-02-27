@@ -358,6 +358,7 @@ namespace musicpresense
             ChkDebugMode.IsChecked = _config.DebugMode;
             ChkDarkMode.IsChecked = _config.UseDarkMode;
             ChkOpenInTaskbar.IsChecked = _config.OpenInTaskbar;
+            ChkStartWithWindows.IsChecked = _config.StartWithWindows;
             UpdateThemeToggleText(_config.UseDarkMode);
 
             TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
@@ -549,6 +550,7 @@ namespace musicpresense
             _config.DebugMode = ChkDebugMode.IsChecked == true;
             _config.UseDarkMode = ChkDarkMode.IsChecked == true;
             _config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
+            _config.StartWithWindows = ChkStartWithWindows.IsChecked == true;
 
             var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
             _config.ScrcpyAudioCodec = selectedCodec;
@@ -766,6 +768,7 @@ namespace musicpresense
             config.DebugMode = ChkDebugMode.IsChecked == true;
             config.UseDarkMode = ChkDarkMode.IsChecked == true;
             config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
+            config.StartWithWindows = ChkStartWithWindows.IsChecked == true;
 
             var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
             config.ScrcpyAudioCodec = selectedCodec;
@@ -862,6 +865,7 @@ namespace musicpresense
             if (left.DebugMode != right.DebugMode) return false;
             if (left.UseDarkMode != right.UseDarkMode) return false;
             if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
+            if (left.StartWithWindows != right.StartWithWindows) return false;
             if (!string.Equals(left.ScrcpyAudioCodec, right.ScrcpyAudioCodec, StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(left.ScrcpyAudioBitrate ?? string.Empty, right.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)) return false;
             if (left.ScrcpyAudioBuffer != right.ScrcpyAudioBuffer) return false;
@@ -904,6 +908,7 @@ namespace musicpresense
                 DebugMode = source.DebugMode,
                 UseDarkMode = source.UseDarkMode,
                 OpenInTaskbar = source.OpenInTaskbar,
+                StartWithWindows = source.StartWithWindows,
                 ScrcpyAudioCodec = source.ScrcpyAudioCodec,
                 ScrcpyAudioBitrate = source.ScrcpyAudioBitrate ?? string.Empty,
                 ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,

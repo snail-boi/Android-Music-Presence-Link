@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
@@ -24,6 +25,7 @@ namespace musicpresense
         private MainWindow? _settingsWindow;
         private Process? _scrcpyProcess;
         private HwndSource? _hotkeySource;
+        private const string StartupRunValueName = "AndroidMusicPresenceLink";
 
         private const int HotkeyIdVolumeUp = 1;
         private const int HotkeyIdVolumeDown = 2;
@@ -44,6 +46,7 @@ namespace musicpresense
             base.OnStartup(e);
 
             Config = MusicConfigManager.Load();
+            ApplyStartupRegistration(Config.StartWithWindows);
             Debugger.IsEnabled = Config.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
             ApplyTheme(Config.UseDarkMode);
@@ -117,6 +120,7 @@ namespace musicpresense
         internal void UpdateConfig(MusicConfig config)
         {
             Config = config;
+            ApplyStartupRegistration(config.StartWithWindows);
             Debugger.IsEnabled = Config.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
             ApplyTheme(config.UseDarkMode);
@@ -131,6 +135,36 @@ namespace musicpresense
                 InitializeHotkeys();
             }
             catch { }
+        }
+
+        private static void ApplyStartupRegistration(bool enable)
+        {
+            try
+            {
+                using var runKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+                if (runKey == null)
+                    return;
+
+                if (!enable)
+                {
+                    runKey.DeleteValue(StartupRunValueName, false);
+                    return;
+                }
+
+                var exePath = Environment.ProcessPath;
+                if (string.IsNullOrWhiteSpace(exePath))
+                {
+                    exePath = Assembly.GetEntryAssembly()?.Location;
+                }
+
+                if (string.IsNullOrWhiteSpace(exePath))
+                    return;
+
+                runKey.SetValue(StartupRunValueName, $"\"{exePath}\"");
+            }
+            catch
+            {
+            }
         }
 
         internal void ApplyTheme(bool useDarkMode)
