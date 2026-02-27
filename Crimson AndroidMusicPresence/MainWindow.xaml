@@ -212,6 +212,39 @@
                 </StackPanel>
             </Expander>
 
+            <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                <StackPanel>
+                    <TextBlock Text="Enter virtual-key codes (letters, function keys or common names). Choose modifier below." TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Modifier:" Width="140" VerticalAlignment="Center" />
+                        <ComboBox x:Name="CmbHotkeyModifier" Width="220" SelectionChanged="CmbHotkeyModifier_SelectionChanged">
+                            <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
+                            <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
+                            <ComboBoxItem Tag="0x0001">Alt</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Volume Up key:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtHotkeyVolumeUp" Width="220" />
+                        <Button x:Name="BtnRecordHotkeyVolumeUp" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyVolumeUp_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Volume Down key:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtHotkeyVolumeDown" Width="220" />
+                        <Button x:Name="BtnRecordHotkeyVolumeDown" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyVolumeDown_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                        <TextBlock Text="Toggle Scrcpy key:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtHotkeyToggleScrcpy" Width="220" />
+                        <Button x:Name="BtnRecordHotkeyToggleScrcpy" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleScrcpy_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
+
             <Expander Header="Scrcpy Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
@@ -265,39 +298,6 @@
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <CheckBox x:Name="ChkDarkMode" Content="Use dark mode" VerticalAlignment="Center" Visibility="Collapsed" />
                         <Button x:Name="BtnToggleTheme" Content="Switch" Width="110" Margin="12,0,0,0" />
-                    </StackPanel>
-                </StackPanel>
-            </Expander>
-
-            <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
-                <StackPanel>
-                    <TextBlock Text="Enter virtual-key codes (letters, function keys or common names). Choose modifier below." TextWrapping="Wrap" Margin="0,0,0,8" />
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Modifier:" Width="140" VerticalAlignment="Center" />
-                        <ComboBox x:Name="CmbHotkeyModifier" Width="220" SelectionChanged="CmbHotkeyModifier_SelectionChanged">
-                            <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
-                            <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
-                            <ComboBoxItem Tag="0x0001">Alt</ComboBoxItem>
-                        </ComboBox>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <TextBlock Text="Volume Up key:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtHotkeyVolumeUp" Width="220" />
-                        <Button x:Name="BtnRecordHotkeyVolumeUp" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyVolumeUp_Click" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <TextBlock Text="Volume Down key:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtHotkeyVolumeDown" Width="220" />
-                        <Button x:Name="BtnRecordHotkeyVolumeDown" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyVolumeDown_Click" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
-                        <TextBlock Text="Toggle Scrcpy key:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtHotkeyToggleScrcpy" Width="220" />
-                        <Button x:Name="BtnRecordHotkeyToggleScrcpy" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleScrcpy_Click" />
                     </StackPanel>
                 </StackPanel>
             </Expander>
