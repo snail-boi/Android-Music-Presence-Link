@@ -340,6 +340,10 @@ namespace musicpresense
                                     return;
                                 }
                             }
+                            else if (_config.SmtcPauseClearDelayMinutes == 0)
+                            {
+                                Debugger.show("not clearing value 0 is no timeout");
+                            }
 
                             if (_smtcPausedCleared)
                                 return;
