@@ -29,8 +29,8 @@
             <TextBlock x:Name="PromptText" Text="Enter Name:" Foreground="White" Margin="0,0,0,10" TextWrapping="Wrap"/>
             <TextBox x:Name="TxtInput" Background="#222" Foreground="White" BorderBrush="#444" Padding="5" Margin="0,0,0,15"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Cancel" Click="BtnCancel_Click" Background="#444"/>
-                <Button Content="OK" Click="BtnOk_Click" IsDefault="True"/>
+                <Button Content="Cancel" Click="BtnCancel_Click" Background="#444" Width="50"/>
+                <Button Content="OK" Click="BtnOk_Click" IsDefault="True" Width="50" Height="20"/>
             </StackPanel>
         </StackPanel>
     </Grid>

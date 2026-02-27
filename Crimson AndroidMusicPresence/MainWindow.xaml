@@ -4,9 +4,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Music Presence Settings" Height="540" Width="640" WindowStartupLocation="CenterScreen"
+        Title="Music Presence Settings" MinWidth="530" MinHeight="425"
         Background="{DynamicResource ThemeBackgroundBrush}"
-        Foreground="{DynamicResource ThemeForegroundBrush}">
+        Foreground="{DynamicResource ThemeForegroundBrush}" ResizeMode="CanResizeWithGrip" >
     <Window.Resources>
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />

@@ -30,6 +30,34 @@ namespace musicpresense
         private readonly ObservableCollection<string> _audioCodecs = new();
         private bool _isLoadingCodecs;
         private bool _isAutoGathering;
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            Config.Load();
+
+            Width = Config.Current.WindowWidth;
+            Height = Config.Current.WindowHeight;
+            Top = Config.Current.WindowTop;
+            Left = Config.Current.WindowLeft;
+            WindowState = Config.Current.WindowState;
+        }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            base.OnClosing(e);
+
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+
+            Config.Current.WindowState = WindowState;
+            Config.Current.WindowWidth = RestoreBounds.Width;
+            Config.Current.WindowHeight = RestoreBounds.Height;
+            Config.Current.WindowTop = RestoreBounds.Top;
+            Config.Current.WindowLeft = RestoreBounds.Left;
+
+            Config.Save();
+        }
 
         public MainWindow()
         {
