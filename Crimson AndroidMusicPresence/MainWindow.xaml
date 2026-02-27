@@ -272,7 +272,7 @@
                 </StackPanel>
             </Expander>
 
-            <Expander Header="Update &amp; Debug" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+            <Expander Header="other" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
                     <Grid Margin="0,0,0,12">
                         <Grid.RowDefinitions>
@@ -284,7 +284,7 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Text="Update Interval:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
-                        <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" />
+                        <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" Margin="0,0,140,0" />
                     </Grid>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
