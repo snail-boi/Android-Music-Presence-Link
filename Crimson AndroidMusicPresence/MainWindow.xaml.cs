@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Crimson_AndroidMusicPresence;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -12,7 +13,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using Microsoft.VisualBasic;
 
 namespace musicpresense
 {
@@ -30,6 +30,7 @@ namespace musicpresense
         private readonly ObservableCollection<string> _audioCodecs = new();
         private bool _isLoadingCodecs;
         private bool _isAutoGathering;
+        public static bool isWifiEnabled = false;
 
         public MainWindow()
         {
@@ -166,12 +167,31 @@ namespace musicpresense
             }
 
             TxtUsbSerial.Text = usbSerial;
+            var port = 0;
+            var ip = "none";
+            if (MessageBox.Show("do you want to enable WiFi","May be incompatible with certain networks",MessageBoxButton.YesNo,MessageBoxImage.Question) == MessageBoxResult.No)
+            {
+                isWifiEnabled = false;
+            }
+            else
+            {
+                isWifiEnabled = true;
+                port = await GetWifiPortAsync(usbSerial);
+                ip = await GetDeviceWifiIpAsync(usbSerial);
 
-            var port = await GetWifiPortAsync(usbSerial);
-            var ip = await GetDeviceWifiIpAsync(usbSerial);
+            }
+
             if (!string.IsNullOrWhiteSpace(ip))
             {
-                TxtWifi.Text = $"{ip}:{port}";
+                if (isWifiEnabled = true)
+                {
+                    TxtWifi.Text = $"{ip}:{port}";
+                }
+                else
+                {
+                    TxtWifi.Text = "";
+                }
+
             }
             else
             {
@@ -179,7 +199,19 @@ namespace musicpresense
             }
 
             var deviceNamePrompt = string.IsNullOrWhiteSpace(TxtDeviceName.Text) ? "" : TxtDeviceName.Text.Trim();
-            var deviceName = Interaction.InputBox("Enter a name for this device:", "Device Name", deviceNamePrompt);
+
+            var nameDialog = new NameInputDialogue("Enter a name for this device:", "Device Name")
+            {
+                Owner = this
+            };
+
+            if (nameDialog.ShowDialog() != true)
+            {
+                return;
+            }
+            var deviceName = nameDialog.InputText; ;
+
+
             if (!string.IsNullOrWhiteSpace(deviceName))
             {
                 TxtDeviceName.Text = deviceName.Trim();

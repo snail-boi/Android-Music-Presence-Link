@@ -118,8 +118,10 @@ namespace musicpresense
                         _wifiReconnectPromptShown = false;
                         return;
                     }
-
-                    await RecoverWirelessConnectionAsync().ConfigureAwait(false);
+                    if (MainWindow.isWifiEnabled == true)
+                    {
+                        await RecoverWirelessConnectionAsync().ConfigureAwait(false);
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(_currentDevice))
