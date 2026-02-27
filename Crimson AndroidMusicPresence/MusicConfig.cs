@@ -25,7 +25,7 @@ namespace musicpresense
         public List<string> AllowedApps { get; set; } = new List<string> { };
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Medium;
         public bool DebugMode { get; set; } = false;
-        public bool UseDarkMode { get; set; } = false;
+        public bool UseDarkMode { get; set; } = true;
         public bool OpenInTaskbar { get; set; } = false;
         public string ScrcpyAudioCodec { get; set; } = "raw";
         public string ScrcpyAudioBitrate { get; set; } = string.Empty;
