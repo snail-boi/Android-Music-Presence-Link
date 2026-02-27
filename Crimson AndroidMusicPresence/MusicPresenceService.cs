@@ -22,14 +22,21 @@ namespace musicpresense
         private DateTimeOffset? _pausedSince;
         private string? _pausedSignature;
         private bool _smtcPausedCleared;
+        private bool _currentDeviceIsUsb;
+        private bool _wifiNeedsUsbReconnect;
+        private string? _lastNowPlayingTitle;
+        private string? _lastNowPlayingArtist;
+        private string? _lastNowPlayingAlbum;
 
         internal string CurrentDevice => _currentDevice;
+        internal event Action<TrayIconState>? TrayStateChanged;
+        internal event Action<string?, string?, string?>? NowPlayingChanged;
 
         public MusicPresenceService(Dispatcher dispatcher, MusicConfig config)
         {
             _dispatcher = dispatcher;
             _config = config;
-            _mediaController = new MediaController(dispatcher, () => _currentDevice, UpdateCurrentSongAsync, config);
+            _mediaController = new MediaController(dispatcher, () => _currentDevice, async () => { await UpdateCurrentSongAsync().ConfigureAwait(false); }, config);
             _mediaController.Initialize();
 
             _timer = new DispatcherTimer
@@ -44,6 +51,7 @@ namespace musicpresense
             if (_timer.Interval.TotalSeconds > 0)
                 _timer.Start();
 
+            NotifyTrayState(TrayIconState.NoDevice);
             _ = TickAsync();
         }
 
@@ -71,8 +79,18 @@ namespace musicpresense
             try
             {
                 await DetectDeviceAsync().ConfigureAwait(false);
+
+                bool hasActiveSong = false;
                 if (!string.IsNullOrEmpty(_currentDevice))
-                    await UpdateCurrentSongAsync().ConfigureAwait(false);
+                {
+                    hasActiveSong = await UpdateCurrentSongAsync().ConfigureAwait(false);
+                }
+                else
+                {
+                    NotifyNowPlaying(null, null, null);
+                }
+
+                NotifyTrayState(BuildTrayState(hasActiveSong));
             }
             catch (Exception ex)
             {
@@ -91,14 +109,63 @@ namespace musicpresense
                 var devices = await AdbHelper.RunAdbCaptureAsync("devices");
                 var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-                if (!string.IsNullOrEmpty(_config.SelectedDeviceUSB))
+                string connectedUsb = string.Empty;
+                if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB))
                 {
-                    bool usbConnected = deviceList.Any(l => l.StartsWith(_config.SelectedDeviceUSB) && l.EndsWith("device"));
-                    if (usbConnected)
+                    bool selectedUsbConnected = deviceList.Any(l => l.StartsWith(_config.SelectedDeviceUSB) && l.EndsWith("device"));
+                    if (selectedUsbConnected)
                     {
-                        _currentDevice = _config.SelectedDeviceUSB;
-                        return;
+                        connectedUsb = _config.SelectedDeviceUSB;
                     }
+                }
+
+                if (string.IsNullOrWhiteSpace(connectedUsb))
+                {
+                    foreach (var entry in deviceList)
+                    {
+                        if (!entry.EndsWith("device"))
+                            continue;
+
+                        var serial = entry.Split('\t', ' ').FirstOrDefault();
+                        if (string.IsNullOrWhiteSpace(serial))
+                            continue;
+
+                        if (!serial.Contains(':'))
+                        {
+                            connectedUsb = serial;
+                            break;
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(connectedUsb))
+                {
+                    _currentDevice = connectedUsb;
+                    _currentDeviceIsUsb = true;
+
+                    bool wifiConfigured = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None";
+                    bool wifiConnected = wifiConfigured && deviceList.Any(l => l.StartsWith(_config.SelectedDeviceWiFi) && l.EndsWith("device"));
+
+                    if (wifiConfigured && !wifiConnected && _config.IsWifiEnabled == true)
+                    {
+                        _wifiNeedsUsbReconnect = true;
+                        await RecoverWirelessConnectionAsync().ConfigureAwait(false);
+
+                        if (!string.IsNullOrEmpty(_currentDevice))
+                        {
+                            _currentDeviceIsUsb = !_currentDevice.Contains(':');
+                            if (!_currentDeviceIsUsb)
+                            {
+                                _wifiNeedsUsbReconnect = false;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _wifiNeedsUsbReconnect = false;
+                    }
+
+                    return;
                 }
 
                 if (!string.IsNullOrEmpty(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None")
@@ -115,12 +182,21 @@ namespace musicpresense
                     if (wifiConnected)
                     {
                         _currentDevice = _config.SelectedDeviceWiFi;
+                        _currentDeviceIsUsb = false;
                         _wifiReconnectPromptShown = false;
+                        _wifiNeedsUsbReconnect = false;
                         return;
                     }
+
                     if (_config.IsWifiEnabled == true)
                     {
+                        _wifiNeedsUsbReconnect = true;
                         await RecoverWirelessConnectionAsync().ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(_currentDevice))
+                        {
+                            _currentDeviceIsUsb = !_currentDevice.Contains(':');
+                            return;
+                        }
                     }
                 }
 
@@ -128,6 +204,15 @@ namespace musicpresense
                 {
                     _currentDevice = string.Empty;
                     _mediaController.Clear();
+                    NotifyNowPlaying(null, null, null);
+                }
+
+                _currentDeviceIsUsb = false;
+                if (!_wifiNeedsUsbReconnect)
+                {
+                    _wifiNeedsUsbReconnect = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
+                        && _config.SelectedDeviceWiFi != "None"
+                        && _config.IsWifiEnabled == true;
                 }
             }
             catch (Exception ex)
@@ -166,13 +251,16 @@ namespace musicpresense
 
                 _config.SelectedDeviceWiFi = newWifi;
                 MusicConfigManager.Save(_config);
-                (Application.Current as App)?.UpdateConfig(_config);
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    (Application.Current as App)?.UpdateConfig(_config);
+                });
                 _wifiReconnectPromptShown = false;
 
                 await _dispatcher.InvokeAsync(() =>
                 {
                     MessageBox.Show(
-                        $"Wireless device has been re-setup and saved as {newWifi}.",
+                        $"Wireless device has been re-setup and saved as {newWifi}.\n\nIf you want to continue using USB, disconnect and reconnect the cable now (USB may stay unavailable right after Wi-Fi setup).",
                         "Wireless Reconnected",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
@@ -226,12 +314,14 @@ namespace musicpresense
             await AdbHelper.RunAdbCaptureAsync($"connect {ip}:{port}"). ConfigureAwait(false);
             await Task.Delay(750).ConfigureAwait(false);
 
-            var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
+            var devices = await AdbHelper.RunAdbCaptureAsync("devices"). ConfigureAwait(false);
             var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var wifiId = $"{ip}:{port}";
             if (deviceList.Any(l => l.StartsWith(wifiId) && l.EndsWith("device")))
             {
                 _currentDevice = wifiId;
+                _currentDeviceIsUsb = false;
+                _wifiNeedsUsbReconnect = false;
                 return wifiId;
             }
 
@@ -262,14 +352,14 @@ namespace musicpresense
             return match.Success ? match.Groups["ip"].Value : string.Empty;
         }
 
-        private async Task UpdateCurrentSongAsync()
+        private async Task<bool> UpdateCurrentSongAsync()
         {
             try
             {
-                if (string.IsNullOrEmpty(_currentDevice)) return;
+                if (string.IsNullOrEmpty(_currentDevice)) return false;
 
                 string output = await AdbHelper.RunAdbCaptureAsync($"-s {_currentDevice} shell dumpsys media_session");
-                if (string.IsNullOrWhiteSpace(output)) return;
+                if (string.IsNullOrWhiteSpace(output)) return false;
 
                 var allowedApps = new HashSet<string>(
                     _config.AllowedApps?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim())
@@ -317,6 +407,8 @@ namespace musicpresense
 
                     if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
                     {
+                        NotifyNowPlaying(artist, title, album);
+
                         if (!isPlaying)
                         {
                             var signature = $"{title}\n{artist}\n{album}";
@@ -337,7 +429,7 @@ namespace musicpresense
                                         _smtcPausedCleared = true;
                                     }
 
-                                    return;
+                                    return false;
                                 }
                             }
                             else if (_config.SmtcPauseClearDelayMinutes == 0)
@@ -346,7 +438,7 @@ namespace musicpresense
                             }
 
                             if (_smtcPausedCleared)
-                                return;
+                                return false;
                         }
                         else
                         {
@@ -356,13 +448,66 @@ namespace musicpresense
                         }
 
                         await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying).ConfigureAwait(false);
-                        return;
+                        return isPlaying;
                     }
                 }
+
+                NotifyNowPlaying(null, null, null);
+                return false;
             }
             catch (Exception ex)
             {
                 Debugger.show("UpdateCurrentSongAsync failed: " + ex.Message);
+                return false;
+            }
+        }
+
+        private void NotifyNowPlaying(string? artist, string? title, string? album)
+        {
+            if (string.Equals(_lastNowPlayingArtist, artist, StringComparison.Ordinal)
+                && string.Equals(_lastNowPlayingTitle, title, StringComparison.Ordinal)
+                && string.Equals(_lastNowPlayingAlbum, album, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastNowPlayingArtist = artist;
+            _lastNowPlayingTitle = title;
+            _lastNowPlayingAlbum = album;
+
+            try
+            {
+                NowPlayingChanged?.Invoke(artist, title, album);
+            }
+            catch
+            {
+            }
+        }
+
+        private TrayIconState BuildTrayState(bool hasActiveSong)
+        {
+            if (!string.IsNullOrEmpty(_currentDevice))
+            {
+                if (_currentDeviceIsUsb)
+                    return hasActiveSong ? TrayIconState.ActiveUsb : TrayIconState.InactiveUsb;
+
+                return hasActiveSong ? TrayIconState.ActiveWifi : TrayIconState.InactiveWifi;
+            }
+
+            if (_wifiNeedsUsbReconnect)
+                return TrayIconState.NeedsUsbReconnect;
+
+            return TrayIconState.NoDevice;
+        }
+
+        private void NotifyTrayState(TrayIconState state)
+        {
+            try
+            {
+                TrayStateChanged?.Invoke(state);
+            }
+            catch
+            {
             }
         }
 

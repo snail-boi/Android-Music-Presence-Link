@@ -16,9 +16,9 @@
   <ItemGroup>
     <None Remove="Tray_Icons\Tray_Active_USB.ico" />
     <None Remove="Tray_Icons\Tray_Active_WiFi.ico" />
-    <None Remove="Tray_Icons\Tray_Inactive_USB.ico" />
-    <None Remove="Tray_Icons\Tray_Inactive_WiFi.ico" />
     <None Remove="Tray_Icons\Tray_NoDevice.ico" />
+    <None Remove="Tray_Icons\Tray_Scrcpy_USB.ico" />
+    <None Remove="Tray_Icons\Tray_Scrcpy_WiFi.ico" />
     <None Remove="Tray_Icons\Tray_WiFi_Noport.ico" />
   </ItemGroup>
 
@@ -30,13 +30,13 @@
     <Content Include="Tray_Icons\Tray_Active_WiFi.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Tray_Icons\Tray_Inactive_USB.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Tray_Icons\Tray_Inactive_WiFi.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Tray_Icons\Tray_NoDevice.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_Scrcpy_USB.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_Scrcpy_WiFi.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Tray_Icons\Tray_WiFi_Noport.ico">

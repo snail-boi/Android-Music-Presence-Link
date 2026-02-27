@@ -36,6 +36,9 @@ namespace musicpresense
 
         private static readonly string version = "1.0.4.1";
 
+        private bool _isScrcpyRunning;
+        private TrayIconState _lastTrayState = TrayIconState.NoDevice;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -57,14 +60,60 @@ namespace musicpresense
             }
 
             _presenceService = new MusicPresenceService(Dispatcher, Config);
+            _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication, Config.UseDarkMode);
+            _presenceService.TrayStateChanged += OnTrayStateChanged;
+            _presenceService.NowPlayingChanged += OnNowPlayingChanged;
             _presenceService.Start();
-
-            _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication);
+            UpdateTrayAudioSettings();
 
             InitializeHotkeys();
 
             _ = Updater.CheckForUpdateAsync(version);
         }
+
+        private void OnNowPlayingChanged(string? artist, string? title, string? album)
+        {
+            if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+                return;
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                _trayIconManager?.SetNowPlaying(artist, title, album);
+            });
+        }
+
+        private void OnTrayStateChanged(TrayIconState state)
+        {
+            _lastTrayState = state;
+
+            if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+                return;
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                ApplyTrayState();
+            });
+        }
+
+        private void ApplyTrayState()
+        {
+            var state = _lastTrayState;
+
+            if (_isScrcpyRunning)
+            {
+                state = state switch
+                {
+                    TrayIconState.ActiveUsb => TrayIconState.ActiveUsbScrcpy,
+                    TrayIconState.InactiveUsb => TrayIconState.InactiveUsbScrcpy,
+                    TrayIconState.ActiveWifi => TrayIconState.ActiveWifiScrcpy,
+                    TrayIconState.InactiveWifi => TrayIconState.InactiveWifiScrcpy,
+                    _ => state
+                };
+            }
+
+            _trayIconManager?.SetState(state);
+        }
+
         internal void UpdateConfig(MusicConfig config)
         {
             Config = config;
@@ -72,6 +121,9 @@ namespace musicpresense
             AdbHelper.AdbPath = Config.Paths.Adb;
             ApplyTheme(config.UseDarkMode);
             _presenceService?.UpdateConfig(config);
+            _settingsWindow?.SyncRuntimeConfig(config);
+            _trayIconManager?.SetDarkMode(config.UseDarkMode);
+            UpdateTrayAudioSettings();
             // Reinitialize hotkeys to reflect updated configuration
             try
             {
@@ -91,6 +143,7 @@ namespace musicpresense
             Resources["ThemeAccentBrush"] = CreateBrush(useDarkMode ? "#3E7BFF" : "#2D6CDF");
             Resources["ThemeAccentHoverBrush"] = CreateBrush(useDarkMode ? "#5A8BFF" : "#3E7BFF");
             Resources["ThemeAccentPressedBrush"] = CreateBrush(useDarkMode ? "#275ED6" : "#1F5DD1");
+            _trayIconManager?.SetDarkMode(useDarkMode);
         }
 
         private static SolidColorBrush CreateBrush(string color)
@@ -203,18 +256,27 @@ namespace musicpresense
                 if (_scrcpyProcess == null)
                 {
                     MessageBox.Show("scrcpy failed to start.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _isScrcpyRunning = false;
                     _trayIconManager?.SetScrcpyRunning(false);
+                    UpdateTrayAudioSettings();
+                    ApplyTrayState();
                     return;
                 }
 
                 _scrcpyProcess.EnableRaisingEvents = true;
                 _scrcpyProcess.Exited += ScrcpyProcessExited;
+                _isScrcpyRunning = true;
                 _trayIconManager?.SetScrcpyRunning(true);
+                UpdateTrayAudioSettings();
+                ApplyTrayState();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"scrcpy launch failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _isScrcpyRunning = false;
                 _trayIconManager?.SetScrcpyRunning(false);
+                UpdateTrayAudioSettings();
+                ApplyTrayState();
             }
         }
 
@@ -222,7 +284,10 @@ namespace musicpresense
         {
             var process = _scrcpyProcess;
             _scrcpyProcess = null;
+            _isScrcpyRunning = false;
             _trayIconManager?.SetScrcpyRunning(false);
+            UpdateTrayAudioSettings();
+            ApplyTrayState();
 
             if (process == null)
                 return;
@@ -263,6 +328,7 @@ namespace musicpresense
             {
                 _scrcpyProcess?.Dispose();
                 _scrcpyProcess = null;
+                _isScrcpyRunning = false;
                 return;
             }
 
@@ -270,7 +336,10 @@ namespace musicpresense
             {
                 _scrcpyProcess?.Dispose();
                 _scrcpyProcess = null;
+                _isScrcpyRunning = false;
                 _trayIconManager?.SetScrcpyRunning(false);
+                UpdateTrayAudioSettings();
+                ApplyTrayState();
             });
         }
 
@@ -288,7 +357,9 @@ namespace musicpresense
         {
             var process = _scrcpyProcess;
             _scrcpyProcess = null;
+            _isScrcpyRunning = false;
             _trayIconManager?.SetScrcpyRunning(false);
+            UpdateTrayAudioSettings();
 
             if (process == null)
                 return;
@@ -328,6 +399,15 @@ namespace musicpresense
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, Config.HotkeyModifier, Config.HotkeyVolumeUpKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, Config.HotkeyModifier, Config.HotkeyVolumeDownKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.HotkeyModifier, Config.HotkeyToggleScrcpyKey); } catch { }
+        }
+
+        private void UpdateTrayAudioSettings()
+        {
+            var codec = string.IsNullOrWhiteSpace(Config.ScrcpyAudioCodec) ? "raw" : Config.ScrcpyAudioCodec.Trim();
+            var bitrate = Config.ScrcpyAudioBitrate ?? string.Empty;
+            var buffer = Config.ScrcpyAudioBuffer > 0 ? Config.ScrcpyAudioBuffer : 50;
+            _trayIconManager?.SetAudioSettings(codec, bitrate, buffer);
+            _trayIconManager?.SetScrcpyRunning(_isScrcpyRunning);
         }
 
         private void DisposeHotkeys()

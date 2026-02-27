@@ -21,23 +21,16 @@ namespace musicpresense
     /// </summary>
 
     /*
-        things to add:
-        in the settings show what is playing textwise just in case
-        change the taskbar icon under different circumstances
-            Green: active song and device connected via USB
-            blue: active song and device connected via WiFi
-            yellow: no active song and device connected via USB
-            orange: no active song and device connected via WiFi
-            purple: Wifi connection possible but needs a reconnect via USB to start again
-            red: no device connected
+
             
 
         make the taskbar UI look better
-            example colored dots that also display connection status
-            show whether an audio link is active and what settings it's using
-            general button styling with icons
-            show current song in the taskbar's menu
-            
+            colored dots same colors as the .ICO and next to it the connection status in text
+            under it show whether an audio link is active and what settings it's using such as bitrate encoder buffer etc
+            add a cogwheal icon next to the settings button
+            show current song in the taskbar's menu in the form of "Now Playing: Artist - Title" and under it "Album"
+            also give the tray menu dark mode support
+
         (don't know if possible) make those old windows XP style poppups pointing to the taskbar when connection status changes
     */
     public partial class MainWindow : Window
@@ -106,6 +99,18 @@ namespace musicpresense
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
             _isInitializing = false;
+        }
+
+        internal void SyncRuntimeConfig(MusicConfig config)
+        {
+            _config = config;
+            _savedConfig = CloneConfig(config);
+
+            if (TxtWifi != null)
+                TxtWifi.Text = _config.SelectedDeviceWiFi ?? string.Empty;
+
+            if (TxtUsbSerial != null)
+                TxtUsbSerial.Text = _config.SelectedDeviceUSB ?? string.Empty;
         }
 
         private void BtnClearCoverCache_Click(object sender, RoutedEventArgs e)
@@ -257,7 +262,7 @@ namespace musicpresense
             {
                 return;
             }
-            var deviceName = nameDialog.InputText; ;
+            var deviceName = nameDialog.InputText;;
 
 
             if (!string.IsNullOrWhiteSpace(deviceName))
@@ -597,7 +602,7 @@ namespace musicpresense
                     {
                         bufferValue = 2000;
                         TxtAudioBuffer.Text = bufferValue.ToString();
-                    }
+                      }
                 }
 
                 _config.ScrcpyAudioBuffer = Math.Max(1, bufferValue);
