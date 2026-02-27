@@ -30,7 +30,7 @@
             <TextBox x:Name="TxtInput" Background="#222" Foreground="White" BorderBrush="#444" Padding="5" Margin="0,0,0,15"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Cancel" Click="BtnCancel_Click" Background="#444"/>
-                <Button Content="OK" Click="BtnOk_Click"/>
+                <Button Content="OK" Click="BtnOk_Click" IsDefault="True"/>
             </StackPanel>
         </StackPanel>
     </Grid>
