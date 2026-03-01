@@ -21,8 +21,25 @@ namespace musicpresense
     /// </summary>
 
     /*
+        idees for future features:
+        Now Playing Notifications
+        •	Show Windows toast notifications when the track changes on the Android device.
+        •	Option to display album art and playback controls in the notification.
 
+        Audio Link Quality Presets
+        •	Preset profiles for audio link (e.g., “Low Latency”, “High Quality”, “Data Saver”) that adjust codec, bitrate, and buffer settings.
             
+
+
+
+        big maybe:
+        Playback History & Statistics
+        •	Maintain a local history of played tracks, with play counts and last played time.
+        •	Option to export history to CSV or view stats in the UI.
+
+        Theming & UI Customization
+        •	More theme options (accent color, font size, compact/expanded layouts).
+        •	Option to minimize to tray with a right-click menu for quick actions.
     */
     public partial class MainWindow : Window
     {
