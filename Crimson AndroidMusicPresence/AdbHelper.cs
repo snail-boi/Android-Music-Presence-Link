@@ -1,60 +1,58 @@
-using System.IO;
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace musicpresense
 {
     public static class AdbHelper
     {
-        public static string AdbPath { get; set; } = string.Empty;
+        private const string DefaultSessionKey = "__default__";
+        private static readonly ConcurrentDictionary<string, AdbShellSession> ShellSessions = new();
+        private static readonly object SessionSync = new();
+        private static readonly Regex ShellArgsRegex = new(@"^\s*(?:-s\s+(?<serial>\S+)\s+)?shell\s+(?<command>[\s\S]+?)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        public static Task RunAdbAsync(string args)
+        private static string _adbPath = string.Empty;
+        public static string AdbPath
         {
-            return Task.Run(() =>
+            get => _adbPath;
+            set
             {
-                if (string.IsNullOrWhiteSpace(AdbPath) || !File.Exists(AdbPath))
-                {
-                    Debugger.show("ADB path not set or missing: " + AdbPath);
+                var newPath = value ?? string.Empty;
+                if (string.Equals(_adbPath, newPath, StringComparison.Ordinal))
                     return;
-                }
 
-                var psi = new ProcessStartInfo(AdbPath, args)
-                {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                _adbPath = newPath;
+                DisposeAllShellSessions();
+            }
+        }
 
-                try
-                {
-                    using var proc = Process.Start(psi);
-                    proc?.WaitForExit();
-                }
-                catch (Exception ex)
-                {
-                    Debugger.show("ADB error: " + ex.Message);
-                }
-            });
+        public static async Task RunAdbAsync(string args)
+        {
+            if (!IsAdbConfigured())
+                return;
+
+            if (TryParseShellCommand(args, out var serial, out var shellCommand))
+            {
+                await ExecuteShellCommandAsync(serial, shellCommand, captureOutput: false).ConfigureAwait(false);
+                return;
+            }
+
+            await RunAdbProcessAsync(args, captureOutput: false).ConfigureAwait(false);
         }
 
         public static void StopServer()
         {
-            if (string.IsNullOrWhiteSpace(AdbPath) || !File.Exists(AdbPath))
+            if (!IsAdbConfigured(showError: false))
                 return;
 
             try
             {
-                var psi = new ProcessStartInfo(AdbPath, "kill-server")
-                {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var proc = Process.Start(psi);
+                DisposeAllShellSessions();
+                RunAdbProcessAsync("kill-server", captureOutput: false).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -62,41 +60,309 @@ namespace musicpresense
             }
         }
 
-        public static Task<string> RunAdbCaptureAsync(string args)
+        public static async Task<string> RunAdbCaptureAsync(string args)
         {
-            return Task.Run(() =>
+            if (!IsAdbConfigured())
+                return string.Empty;
+
+            if (TryParseShellCommand(args, out var serial, out var shellCommand))
             {
-                if (string.IsNullOrWhiteSpace(AdbPath) || !File.Exists(AdbPath))
+                return await ExecuteShellCommandAsync(serial, shellCommand, captureOutput: true).ConfigureAwait(false);
+            }
+
+            return await RunAdbProcessAsync(args, captureOutput: true).ConfigureAwait(false);
+        }
+
+        private static bool IsAdbConfigured(bool showError = true)
+        {
+            var ok = !string.IsNullOrWhiteSpace(AdbPath) && File.Exists(AdbPath);
+            if (!ok && showError)
+            {
+                Debugger.show("ADB path not set or missing: " + AdbPath);
+            }
+
+            return ok;
+        }
+
+        private static bool TryParseShellCommand(string args, out string serial, out string shellCommand)
+        {
+            serial = string.Empty;
+            shellCommand = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(args))
+                return false;
+
+            var match = ShellArgsRegex.Match(args);
+            if (!match.Success)
+                return false;
+
+            serial = match.Groups["serial"].Value.Trim();
+            shellCommand = match.Groups["command"].Value.Trim();
+            return !string.IsNullOrWhiteSpace(shellCommand);
+        }
+
+        private static async Task<string> ExecuteShellCommandAsync(string serial, string shellCommand, bool captureOutput)
+        {
+            var key = string.IsNullOrWhiteSpace(serial) ? DefaultSessionKey : serial.Trim();
+
+            try
+            {
+                var session = ShellSessions.GetOrAdd(key, _ => new AdbShellSession(AdbPath, serial));
+                if (!session.IsCompatibleWith(AdbPath, serial))
                 {
-                    Debugger.show("ADB path not set or missing: " + AdbHelper.AdbPath);
-                    return string.Empty;
+                    if (ShellSessions.TryRemove(key, out var removed))
+                    {
+                        removed.Dispose();
+                    }
+
+                    session = ShellSessions.GetOrAdd(key, _ => new AdbShellSession(AdbPath, serial));
                 }
 
-                var psi = new ProcessStartInfo(AdbPath, args)
+                return await session.ExecuteAsync(shellCommand, captureOutput).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("ADB shell error: " + ex.Message);
+                return string.Empty;
+            }
+        }
+
+        private static async Task<string> RunAdbProcessAsync(string args, bool captureOutput)
+        {
+            var psi = new ProcessStartInfo(AdbPath, args)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            try
+            {
+                using var process = Process.Start(psi);
+                if (process == null)
+                    return string.Empty;
+
+                if (captureOutput)
                 {
+                    var outputTask = process.StandardOutput.ReadToEndAsync();
+                    var errorTask = process.StandardError.ReadToEndAsync();
+                    await process.WaitForExitAsync().ConfigureAwait(false);
+
+                    var output = await outputTask.ConfigureAwait(false);
+                    var error = await errorTask.ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(error))
+                    {
+                        Debugger.show("ADB error: " + error.Trim());
+                    }
+
+                    return output;
+                }
+
+                _ = process.StandardOutput.ReadToEndAsync();
+                _ = process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync().ConfigureAwait(false);
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("ADB error: " + ex.Message);
+                return string.Empty;
+            }
+        }
+
+        private static void DisposeAllShellSessions()
+        {
+            lock (SessionSync)
+            {
+                foreach (var pair in ShellSessions)
+                {
+                    try
+                    {
+                        pair.Value.Dispose();
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                ShellSessions.Clear();
+            }
+        }
+
+        private sealed class AdbShellSession : IDisposable
+        {
+            private readonly string _adbPath;
+            private readonly string _serial;
+            private readonly SemaphoreSlim _sessionLock = new(1, 1);
+
+            private Process? _process;
+            private StreamWriter? _stdin;
+            private StreamReader? _stdout;
+            private bool _disposed;
+            private int _commandCounter;
+
+            public AdbShellSession(string adbPath, string serial)
+            {
+                _adbPath = adbPath;
+                _serial = serial?.Trim() ?? string.Empty;
+            }
+
+            public bool IsCompatibleWith(string adbPath, string serial)
+            {
+                return string.Equals(_adbPath, adbPath, StringComparison.Ordinal)
+                    && string.Equals(_serial, serial?.Trim() ?? string.Empty, StringComparison.Ordinal);
+            }
+
+            public async Task<string> ExecuteAsync(string shellCommand, bool captureOutput)
+            {
+                await _sessionLock.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    if (_disposed)
+                        return string.Empty;
+
+                    EnsureStarted();
+                    if (_process == null || _stdin == null || _stdout == null)
+                        return string.Empty;
+
+                    var commandNumber = ++_commandCounter;
+                    Debugger.show($"ADB shell session pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}, cmd#{commandNumber}");
+
+                    var marker = "__ADB_HELPER_DONE__" + Guid.NewGuid().ToString("N");
+                    var lineToSend = shellCommand + "; echo " + marker + ":$?";
+
+                    await _stdin.WriteLineAsync(lineToSend).ConfigureAwait(false);
+                    await _stdin.FlushAsync().ConfigureAwait(false);
+
+                    StringBuilder? output = captureOutput ? new StringBuilder() : null;
+
+                    while (true)
+                    {
+                        var line = await _stdout.ReadLineAsync().ConfigureAwait(false);
+                        if (line == null)
+                        {
+                            Restart();
+                            return output?.ToString() ?? string.Empty;
+                        }
+
+                        if (line.StartsWith(marker + ":", StringComparison.Ordinal))
+                        {
+                            break;
+                        }
+
+                        if (captureOutput)
+                        {
+                            output!.AppendLine(line);
+                        }
+                    }
+
+                    return output?.ToString() ?? string.Empty;
+                }
+                catch (Exception ex)
+                {
+                    Debugger.show("ADB shell session failed: " + ex.Message);
+                    Restart();
+                    return string.Empty;
+                }
+                finally
+                {
+                    _sessionLock.Release();
+                }
+            }
+
+            private void EnsureStarted()
+            {
+                if (_process != null && !_process.HasExited)
+                    return;
+
+                Restart();
+
+                var args = string.IsNullOrWhiteSpace(_serial)
+                    ? "shell"
+                    : $"-s {_serial} shell";
+
+                var psi = new ProcessStartInfo(_adbPath, args)
+                {
+                    RedirectStandardInput = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden,
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 };
 
+                _process = Process.Start(psi);
+                if (_process == null)
+                {
+                    return;
+                }
+
+                _commandCounter = 0;
+                Debugger.show($"ADB shell session started pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}");
+
+                _process.ErrorDataReceived += (_, e) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(e.Data))
+                    {
+                        Debugger.show("ADB shell stderr: " + e.Data);
+                    }
+                };
+                _process.BeginErrorReadLine();
+
+                _stdin = _process.StandardInput;
+                _stdout = _process.StandardOutput;
+            }
+
+            private void Restart()
+            {
                 try
                 {
-                    using var proc = Process.Start(psi);
-                    if (proc == null) return string.Empty;
+                    if (_process != null)
+                    {
+                        if (!_process.HasExited)
+                        {
+                            try
+                            {
+                                _stdin?.WriteLine("exit");
+                                _stdin?.Flush();
+                            }
+                            catch
+                            {
+                            }
 
-                    string output = proc.StandardOutput.ReadToEnd();
-                    proc.WaitForExit();
-                    return output;
+                            if (!_process.WaitForExit(500))
+                            {
+                                _process.Kill(true);
+                            }
+                        }
+
+                        Debugger.show($"ADB shell session ended pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}");
+                        _process.Dispose();
+                    }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Debugger.show("ADB error: " + ex.Message);
-                    return string.Empty;
                 }
-            });
+                finally
+                {
+                    _process = null;
+                    _stdin = null;
+                    _stdout = null;
+                }
+            }
+
+            public void Dispose()
+            {
+                _disposed = true;
+                Restart();
+                _sessionLock.Dispose();
+            }
         }
     }
 }
