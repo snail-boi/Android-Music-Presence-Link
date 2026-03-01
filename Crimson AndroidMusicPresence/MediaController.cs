@@ -179,7 +179,7 @@ namespace musicpresense
 
         public bool IsPaused { get; private set; }
 
-        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying)
+        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch)
         {
             try
             {
@@ -195,9 +195,20 @@ namespace musicpresense
 
                 lastSMTCTitle = title;
 
-                var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
-                TimeSpan? duration = result.Duration;
-                var meta = result.Metadata;
+                TimeSpan? duration = null;
+                CoverCacheManager.MediaMetadata? meta = null;
+
+                if (enableCoverSearch)
+                {
+                    var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
+                    duration = result.Duration;
+                    meta = result.Metadata;
+                }
+                else
+                {
+                    Debugger.show("Cover art search disabled for current app.");
+                    await SetDefaultImage().ConfigureAwait(false);
+                }
 
                 if (meta != null)
                 {

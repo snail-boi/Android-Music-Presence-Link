@@ -202,10 +202,55 @@
                         <Button x:Name="BtnRefreshApps" Content="Refresh Apps" Width="120" />
                         <TextBlock x:Name="TxtAppsStatus" Margin="12,4,0,0" VerticalAlignment="Center" />
                     </StackPanel>
-                    <ListBox x:Name="LstAllowedApps" Height="180" Margin="0,0,0,0" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="120" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Package" FontWeight="Bold" />
+                        <TextBlock Grid.Column="1" Text="Enable Presence" FontWeight="Bold" HorizontalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="Enable Cover" FontWeight="Bold" HorizontalAlignment="Center" />
+                    </Grid>
+                    <ListBox x:Name="LstAllowedApps"
+                             Height="180"
+                             Margin="0,0,0,0"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             HorizontalContentAlignment="Stretch">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <CheckBox Content="{Binding PackageName}" IsChecked="{Binding IsSelected}" />
+                                <Grid Margin="0,2,0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="190" />
+                                        <ColumnDefinition Width="70" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding PackageName}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding PackageName}" />
+
+                                    <CheckBox Grid.Column="1"
+                                              Content=""
+                                              IsChecked="{Binding IsSelected}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+
+                                    <CheckBox Grid.Column="2"
+                                              Content=""
+                                              IsChecked="{Binding IsCoverSearchEnabled}"
+                                              IsEnabled="{Binding IsSelected}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                                </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

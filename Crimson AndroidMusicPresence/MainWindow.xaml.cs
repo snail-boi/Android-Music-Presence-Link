@@ -23,15 +23,6 @@ namespace musicpresense
     /*
 
             
-
-        make the taskbar UI look better
-            colored dots same colors as the .ICO and next to it the connection status in text
-            under it show whether an audio link is active and what settings it's using such as bitrate encoder buffer etc
-            add a cogwheal icon next to the settings button
-            show current song in the taskbar's menu in the form of "Now Playing: Artist - Title" and under it "Album"
-            also give the tray menu dark mode support
-
-        (don't know if possible) make those old windows XP style poppups pointing to the taskbar when connection status changes
     */
     public partial class MainWindow : Window
     {
@@ -429,13 +420,30 @@ namespace musicpresense
 
         private void ApplyAllowedAppsSelection()
         {
-            if (_appPackages.Count == 0 || _config.AllowedApps == null)
+            if (_appPackages.Count == 0)
                 return;
 
-            var allowed = new HashSet<string>(_config.AllowedApps, StringComparer.OrdinalIgnoreCase);
+            var eligible = new Dictionary<string, EligibleAppConfig>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in _config.EligibleApps ?? new List<EligibleAppConfig>())
+            {
+                if (string.IsNullOrWhiteSpace(item.PackageName))
+                    continue;
+
+                eligible[item.PackageName.Trim()] = item;
+            }
+
             foreach (var item in _appPackages)
             {
-                item.IsSelected = allowed.Contains(item.PackageName);
+                if (eligible.TryGetValue(item.PackageName, out var appConfig))
+                {
+                    item.IsSelected = appConfig.IsEnabled;
+                    item.IsCoverSearchEnabled = appConfig.EnableCoverSearch;
+                }
+                else
+                {
+                    item.IsSelected = false;
+                    item.IsCoverSearchEnabled = false;
+                }
             }
         }
 
@@ -461,14 +469,45 @@ namespace musicpresense
                     .OrderBy(l => l)
                     .ToList();
 
-                var allowed = new HashSet<string>(_config.AllowedApps ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+                var eligible = (_config.EligibleApps ?? new List<EligibleAppConfig>())
+                    .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
+                    .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => new EligibleAppConfig
+                        {
+                            PackageName = g.Key,
+                            IsEnabled = g.Any(x => x.IsEnabled),
+                            EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                        },
+                        StringComparer.OrdinalIgnoreCase);
+
+                foreach (var cfgPkg in eligible.Keys)
+                {
+                    if (!packages.Contains(cfgPkg, StringComparer.OrdinalIgnoreCase))
+                    {
+                        packages.Add(cfgPkg);
+                    }
+                }
+
+                packages = packages
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(p => p)
+                    .ToList();
 
                 await Dispatcher.InvokeAsync(() =>
                 {
                     _appPackages.Clear();
                     foreach (var pkg in packages)
                     {
-                        _appPackages.Add(new AppPackageItem(pkg, allowed.Contains(pkg)));
+                        if (eligible.TryGetValue(pkg, out var appConfig))
+                        {
+                            _appPackages.Add(new AppPackageItem(pkg, appConfig.IsEnabled, appConfig.EnableCoverSearch));
+                        }
+                        else
+                        {
+                            _appPackages.Add(new AppPackageItem(pkg, false, false));
+                        }
                     }
 
                     TxtAppsStatus.Text = $"{_appPackages.Count} apps";
@@ -531,9 +570,36 @@ namespace musicpresense
             _config.SelectedDeviceName = TxtDeviceName.Text.Trim();
             _config.MusicRemoteRoot = TxtRemoteRoot.Text.Trim();
 
-            _config.AllowedApps = _appPackages
-                .Where(item => item.IsSelected)
-                .Select(item => item.PackageName)
+            _config.EligibleApps = _appPackages
+                .Select(item => new EligibleAppConfig
+                {
+                    PackageName = item.PackageName,
+                    IsEnabled = item.IsSelected,
+                    EnableCoverSearch = item.IsSelected && item.IsCoverSearchEnabled
+                })
+                .Where(item => !string.IsNullOrWhiteSpace(item.PackageName))
+                .GroupBy(item => item.PackageName, StringComparer.OrdinalIgnoreCase)
+                .Select(g => new EligibleAppConfig
+                {
+                    PackageName = g.Key,
+                    IsEnabled = g.Any(x => x.IsEnabled),
+                    EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                })
+                .ToList();
+
+            if (!_config.EligibleApps.Any(a => a.IsEnabled))
+            {
+                _config.EligibleApps.Add(new EligibleAppConfig
+                {
+                    PackageName = "in.krosbits.musicolet",
+                    IsEnabled = true,
+                    EnableCoverSearch = true
+                });
+            }
+
+            _config.AllowedApps = _config.EligibleApps
+                .Where(a => a.IsEnabled)
+                .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -744,25 +810,52 @@ namespace musicpresense
 
             if (_appPackages.Count > 0)
             {
-                config.AllowedApps = _appPackages
-                    .Where(item => item.IsSelected)
-                    .Select(item => item.PackageName)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                config.EligibleApps = _appPackages
+                    .Select(item => new EligibleAppConfig
+                    {
+                        PackageName = item.PackageName,
+                        IsEnabled = item.IsSelected,
+                        EnableCoverSearch = item.IsSelected && item.IsCoverSearchEnabled
+                    })
+                    .Where(item => !string.IsNullOrWhiteSpace(item.PackageName))
+                    .GroupBy(item => item.PackageName, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => new EligibleAppConfig
+                    {
+                        PackageName = g.Key,
+                        IsEnabled = g.Any(x => x.IsEnabled),
+                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                    })
                     .ToList();
             }
             else
             {
-                config.AllowedApps = _config.AllowedApps?.ToList() ?? new List<string>();
+                config.EligibleApps = _config.EligibleApps?.Select(a => new EligibleAppConfig
+                {
+                    PackageName = a.PackageName,
+                    IsEnabled = a.IsEnabled,
+                    EnableCoverSearch = a.EnableCoverSearch
+                }).ToList() ?? new List<EligibleAppConfig>();
             }
+
+            if (!config.EligibleApps.Any(a => a.IsEnabled))
+            {
+                config.EligibleApps.Add(new EligibleAppConfig
+                {
+                    PackageName = "in.krosbits.musicolet",
+                    IsEnabled = true,
+                    EnableCoverSearch = true
+                });
+            }
+
+            config.AllowedApps = config.EligibleApps
+                .Where(a => a.IsEnabled)
+                .Select(a => a.PackageName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             if (config.AllowedApps.Count == 0)
             {
                 config.AllowedApps.Add("in.krosbits.musicolet");
-            }
-
-            if (!_isInitializing && CmbUpdateInterval.SelectedIndex >= 0)
-            {
-                config.UpdateIntervalMode = (UpdateIntervalMode)(CmbUpdateInterval.SelectedIndex + 1);
             }
 
             config.DebugMode = ChkDebugMode.IsChecked == true;
@@ -876,9 +969,46 @@ namespace musicpresense
             if (left.HotkeyToggleScrcpyKey != right.HotkeyToggleScrcpyKey) return false;
             if (left.HotkeyModifier != right.HotkeyModifier) return false;
 
-            var allowedLeft = new HashSet<string>(left.AllowedApps ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-            var allowedRight = new HashSet<string>(right.AllowedApps ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-            if (!allowedLeft.SetEquals(allowedRight)) return false;
+            var eligibleLeft = (left.EligibleApps ?? new List<EligibleAppConfig>())
+                .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
+                .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new EligibleAppConfig
+                    {
+                        PackageName = g.Key,
+                        IsEnabled = g.Any(x => x.IsEnabled),
+                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                    },
+                    StringComparer.OrdinalIgnoreCase);
+
+            var eligibleRight = (right.EligibleApps ?? new List<EligibleAppConfig>())
+                .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
+                .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new EligibleAppConfig
+                    {
+                        PackageName = g.Key,
+                        IsEnabled = g.Any(x => x.IsEnabled),
+                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                    },
+                    StringComparer.OrdinalIgnoreCase);
+
+            if (eligibleLeft.Count != eligibleRight.Count)
+                return false;
+
+            foreach (var pair in eligibleLeft)
+            {
+                if (!eligibleRight.TryGetValue(pair.Key, out var rightItem))
+                    return false;
+
+                if (pair.Value.IsEnabled != rightItem.IsEnabled)
+                    return false;
+
+                if (pair.Value.EnableCoverSearch != rightItem.EnableCoverSearch)
+                    return false;
+            }
 
             var codecsLeft = new HashSet<string>(left.ScrcpyAvailableAudioCodecs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
             var codecsRight = new HashSet<string>(right.ScrcpyAvailableAudioCodecs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
@@ -904,6 +1034,12 @@ namespace musicpresense
                 SelectedDeviceName = source.SelectedDeviceName,
                 MusicRemoteRoot = source.MusicRemoteRoot,
                 AllowedApps = source.AllowedApps?.ToList() ?? new List<string>(),
+                EligibleApps = source.EligibleApps?.Select(a => new EligibleAppConfig
+                {
+                    PackageName = a.PackageName,
+                    IsEnabled = a.IsEnabled,
+                    EnableCoverSearch = a.EnableCoverSearch
+                }).ToList() ?? new List<EligibleAppConfig>(),
                 UpdateIntervalMode = source.UpdateIntervalMode,
                 DebugMode = source.DebugMode,
                 UseDarkMode = source.UseDarkMode,
@@ -1091,10 +1227,23 @@ namespace musicpresense
                 }
             }
 
-            public AppPackageItem(string packageName, bool isSelected)
+            private bool _isCoverSearchEnabled;
+            public bool IsCoverSearchEnabled
+            {
+                get => _isCoverSearchEnabled;
+                set
+                {
+                    if (_isCoverSearchEnabled == value) return;
+                    _isCoverSearchEnabled = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCoverSearchEnabled)));
+                }
+            }
+
+            public AppPackageItem(string packageName, bool isSelected, bool isCoverSearchEnabled)
             {
                 PackageName = packageName;
                 _isSelected = isSelected;
+                _isCoverSearchEnabled = isCoverSearchEnabled;
             }
         }
     }

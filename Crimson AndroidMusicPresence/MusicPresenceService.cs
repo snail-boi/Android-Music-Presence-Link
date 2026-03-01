@@ -361,10 +361,18 @@ namespace musicpresense
                 string output = await AdbHelper.RunAdbCaptureAsync($"-s {_currentDevice} shell dumpsys media_session");
                 if (string.IsNullOrWhiteSpace(output)) return false;
 
-                var allowedApps = new HashSet<string>(
-                    _config.AllowedApps?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim())
-                    ?? Enumerable.Empty<string>(),
-                    StringComparer.OrdinalIgnoreCase);
+                var eligibleApps = (_config.EligibleApps ?? new List<EligibleAppConfig>())
+                    .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
+                    .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => new EligibleAppConfig
+                        {
+                            PackageName = g.Key,
+                            IsEnabled = g.Any(x => x.IsEnabled),
+                            EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                        },
+                        StringComparer.OrdinalIgnoreCase);
 
                 var sessionBlocks = output.Split(new[] { "queueTitle=" }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -373,14 +381,18 @@ namespace musicpresense
                     if (!block.Contains("active=true"))
                         continue;
 
+                    bool enableCoverSearchForApp = false;
+
                     var pkgMatch = Regex.Match(block, @"package=([^\s]+)");
                     if (pkgMatch.Success)
                     {
                         var pkg = pkgMatch.Groups[1].Value.Trim();
-                        if (allowedApps.Count > 0 && !allowedApps.Contains(pkg))
+                        if (!eligibleApps.TryGetValue(pkg, out var appSettings) || !appSettings.IsEnabled)
                             continue;
+
+                        enableCoverSearchForApp = appSettings.EnableCoverSearch;
                     }
-                    else if (allowedApps.Count > 0)
+                    else
                     {
                         continue;
                     }
@@ -447,7 +459,7 @@ namespace musicpresense
                             _smtcPausedCleared = false;
                         }
 
-                        await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying).ConfigureAwait(false);
+                        await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp).ConfigureAwait(false);
                         return isPlaying;
                     }
                 }

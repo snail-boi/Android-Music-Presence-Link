@@ -15,6 +15,13 @@ namespace musicpresense
         None = 5
     }
 
+    public sealed class EligibleAppConfig
+    {
+        public string PackageName { get; set; } = string.Empty;
+        public bool IsEnabled { get; set; } = true;
+        public bool EnableCoverSearch { get; set; } = true;
+    }
+
     public class MusicConfig
     {
         public PathsConfig Paths { get; set; } = new PathsConfig();
@@ -23,6 +30,7 @@ namespace musicpresense
         public string SelectedDeviceName { get; set; } = string.Empty;
         public string MusicRemoteRoot { get; set; } = string.Empty;
         public List<string> AllowedApps { get; set; } = new List<string> { };
+        public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Medium;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
@@ -100,7 +108,7 @@ namespace musicpresense
             }
             catch
             {
-                return new MusicConfig();
+                return NormalizeConfig(new MusicConfig());
             }
         }
 
@@ -124,9 +132,63 @@ namespace musicpresense
         {
             config.Paths ??= new PathsConfig();
             config.AllowedApps ??= new List<string>();
+            config.EligibleApps ??= new List<EligibleAppConfig>();
 
-            if (config.AllowedApps.Count == 0)
-                config.AllowedApps.Add("in.krosbits.musicolet");
+            if (config.EligibleApps.Count == 0 && config.AllowedApps.Count > 0)
+            {
+                config.EligibleApps = config.AllowedApps
+                    .Where(a => !string.IsNullOrWhiteSpace(a))
+                    .Select(a => a.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Select(a => new EligibleAppConfig
+                    {
+                        PackageName = a,
+                        IsEnabled = true,
+                        EnableCoverSearch = true
+                    })
+                    .ToList();
+            }
+
+            if (config.EligibleApps.Count == 0)
+            {
+                config.EligibleApps.Add(new EligibleAppConfig
+                {
+                    PackageName = "in.krosbits.musicolet",
+                    IsEnabled = true,
+                    EnableCoverSearch = true
+                });
+            }
+
+            config.EligibleApps = config.EligibleApps
+                .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
+                .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g =>
+                {
+                    var first = g.First();
+                    return new EligibleAppConfig
+                    {
+                        PackageName = g.Key,
+                        IsEnabled = g.Any(x => x.IsEnabled),
+                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                    };
+                })
+                .ToList();
+
+            if (!config.EligibleApps.Any(a => a.IsEnabled))
+            {
+                config.EligibleApps.Add(new EligibleAppConfig
+                {
+                    PackageName = "in.krosbits.musicolet",
+                    IsEnabled = true,
+                    EnableCoverSearch = true
+                });
+            }
+
+            config.AllowedApps = config.EligibleApps
+                .Where(a => a.IsEnabled)
+                .Select(a => a.PackageName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             if (string.IsNullOrWhiteSpace(config.ScrcpyAudioCodec))
                 config.ScrcpyAudioCodec = "raw";
