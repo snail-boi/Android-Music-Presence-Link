@@ -11,6 +11,7 @@ namespace musicpresense
     public static class AdbHelper
     {
         private const string DefaultSessionKey = "__default__";
+        private static readonly TimeSpan SessionIdleTimeout = TimeSpan.FromSeconds(20);
         private static readonly ConcurrentDictionary<string, AdbShellSession> ShellSessions = new();
         private static readonly object SessionSync = new();
         private static readonly Regex ShellArgsRegex = new(@"^\s*(?:-s\s+(?<serial>\S+)\s+)?shell\s+(?<command>[\s\S]+?)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -107,6 +108,7 @@ namespace musicpresense
 
             try
             {
+                CleanupIdleShellSessions();
                 var session = ShellSessions.GetOrAdd(key, _ => new AdbShellSession(AdbPath, serial));
                 if (!session.IsCompatibleWith(AdbPath, serial))
                 {
@@ -174,6 +176,18 @@ namespace musicpresense
             }
         }
 
+        private static void CleanupIdleShellSessions()
+        {
+            foreach (var pair in ShellSessions)
+            {
+                var session = pair.Value;
+                if (!session.TryDisposeIfIdle(SessionIdleTimeout))
+                    continue;
+
+                ShellSessions.TryRemove(pair.Key, out _);
+            }
+        }
+
         private static void DisposeAllShellSessions()
         {
             lock (SessionSync)
@@ -204,6 +218,7 @@ namespace musicpresense
             private StreamReader? _stdout;
             private bool _disposed;
             private int _commandCounter;
+            private DateTime _lastUsedUtc = DateTime.UtcNow;
 
             public AdbShellSession(string adbPath, string serial)
             {
@@ -225,6 +240,7 @@ namespace musicpresense
                     if (_disposed)
                         return string.Empty;
 
+                    _lastUsedUtc = DateTime.UtcNow;
                     EnsureStarted();
                     if (_process == null || _stdin == null || _stdout == null)
                         return string.Empty;
@@ -270,7 +286,39 @@ namespace musicpresense
                 }
                 finally
                 {
+                    _lastUsedUtc = DateTime.UtcNow;
                     _sessionLock.Release();
+                }
+            }
+
+            public bool TryDisposeIfIdle(TimeSpan idleTimeout)
+            {
+                if (_disposed)
+                    return true;
+
+                if (_process == null || _process.HasExited)
+                    return true;
+
+                if (DateTime.UtcNow - _lastUsedUtc < idleTimeout)
+                    return false;
+
+                if (!_sessionLock.Wait(0))
+                    return false;
+
+                try
+                {
+                    if (DateTime.UtcNow - _lastUsedUtc < idleTimeout)
+                        return false;
+
+                    Dispose();
+                    return true;
+                }
+                finally
+                {
+                    if (!_disposed)
+                    {
+                        _sessionLock.Release();
+                    }
                 }
             }
 
