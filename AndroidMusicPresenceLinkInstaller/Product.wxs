@@ -174,7 +174,7 @@
 						</Component>
 
 						<Component Id="LogoPngComponent" Guid="0f7ca46c-acde-4656-af2f-e394076db7f0" NeverOverwrite="yes" Permanent="yes">
-							<File Id="LogoPng" Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Resources\logo.png" />
+							<File Id="LogoPng" Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Resources\Musiclogo.png" />
 							<RegistryValue Root="HKCU" Key="Software\AndroidMusicPresenceLink\Resources"
 									   Name="LogoPng" Type="string" Value="1" KeyPath="yes" />
 						</Component>

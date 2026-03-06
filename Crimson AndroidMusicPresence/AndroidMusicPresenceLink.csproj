@@ -44,10 +44,6 @@
     </Content>
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="..\Version.txt" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
 	</ItemGroup>
