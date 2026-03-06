@@ -208,14 +208,14 @@ namespace musicpresense
 
             var (text, color) = state switch
             {
-                TrayIconState.ActiveUsb => ("Connection: USB connected (active)", Color.FromArgb(52, 201, 84)),
-                TrayIconState.InactiveUsb => ("Connection: USB connected (idle)", Color.FromArgb(52, 201, 84)),
-                TrayIconState.ActiveUsbScrcpy => ("Connection: USB connected + Audio Link", Color.FromArgb(52, 201, 84)),
-                TrayIconState.InactiveUsbScrcpy => ("Connection: USB connected + Audio Link", Color.FromArgb(52, 201, 84)),
-                TrayIconState.ActiveWifi => ("Connection: Wi-Fi connected (active)", Color.FromArgb(0, 122, 255)),
-                TrayIconState.InactiveWifi => ("Connection: Wi-Fi connected (idle)", Color.FromArgb(0, 122, 255)),
-                TrayIconState.ActiveWifiScrcpy => ("Connection: Wi-Fi connected + Audio Link", Color.FromArgb(0, 122, 255)),
-                TrayIconState.InactiveWifiScrcpy => ("Connection: Wi-Fi connected + Audio Link", Color.FromArgb(0, 122, 255)),
+                TrayIconState.ActiveUsb => ("Connection: USB connected", Color.FromArgb(52, 201, 84)),
+                TrayIconState.InactiveUsb => ("Connection: USB connected", Color.FromArgb(52, 201, 84)),
+                TrayIconState.ActiveUsbScrcpy => ("Connection: USB connected", Color.FromArgb(52, 201, 84)),
+                TrayIconState.InactiveUsbScrcpy => ("Connection: USB connected", Color.FromArgb(52, 201, 84)),
+                TrayIconState.ActiveWifi => ("Connection: Wi-Fi connected", Color.FromArgb(0, 122, 255)),
+                TrayIconState.InactiveWifi => ("Connection: Wi-Fi connected", Color.FromArgb(0, 122, 255)),
+                TrayIconState.ActiveWifiScrcpy => ("Connection: Wi-Fi connected", Color.FromArgb(0, 122, 255)),
+                TrayIconState.InactiveWifiScrcpy => ("Connection: Wi-Fi connected", Color.FromArgb(0, 122, 255)),
                 TrayIconState.NeedsUsbReconnect => ("Connection: Wi-Fi port lost", Color.FromArgb(175, 82, 222)),
                 _ => ("Connection: No device connected", Color.FromArgb(255, 59, 48))
             };
