@@ -26,12 +26,6 @@ namespace musicpresense
         •	Show Windows toast notifications when the track changes on the Android device.
         •	Option to display album art and playback controls in the notification.
 
-        Audio Link Quality Presets
-        •	Preset profiles for audio link (e.g., “Low Latency”, “High Quality”, “Data Saver”) that adjust codec, bitrate, and buffer settings.
-            
-
-
-
         big maybe:
         Playback History & Statistics
         •	Maintain a local history of played tracks, with play counts and last played time.
@@ -87,7 +81,7 @@ namespace musicpresense
 
             _config = App.Config;
             _savedConfig = CloneConfig(_config);
-            InitializeUpdateIntervalUI();
+            InitializeCmbBoxes();
             InitializeAudioCodecUI();
             ApplyConfigToUI();
 
@@ -321,7 +315,8 @@ namespace musicpresense
             return match.Success ? match.Groups["ip"].Value : string.Empty;
         }
 
-        private void InitializeUpdateIntervalUI()
+
+        private void InitializeCmbBoxes()
         {
             CmbUpdateInterval.ItemsSource = new[]
             {
@@ -331,6 +326,53 @@ namespace musicpresense
                 "Slow (30s)",
                 "No automatic update"
             };
+            CmbQualityPresets.ItemsSource = new[]
+{
+                "Data Saver (for slow internet)",
+                "Default Quality (good for general audio)",
+                "High Quality (good for streaming music)",
+                "Lossless (highest quality lower data use)",
+                "Max Quality (I payed for the whole WiFi)"
+            };
+        }
+
+        private void CmbQualityPresets_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CmbQualityPresets.SelectedItem is string selected)
+            {
+                UpdateAudioSettings(selected);
+            }
+        }
+
+        private void UpdateAudioSettings(string selected)
+        {
+            switch (selected)
+            {
+
+                case "Data Saver (for slow internet)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "64";
+                    TxtAudioBuffer.Text = "120";
+                    break;
+                case "Default Quality (good for general audio)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "128";
+                    TxtAudioBuffer.Text = "100";
+                    break;
+                case "High Quality (good for streaming music)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "256";
+                    TxtAudioBuffer.Text = "80";
+                    break;
+                case "Lossless (highest quality lower data use)":
+                    LstAudioCodecs.SelectedItem = "flac";
+                    TxtAudioBuffer.Text = "80";
+                    TxtFlacCompressionLevel.Text = "2";
+                    break;
+                case "Max Quality (I payed for the whole WiFi)":
+                    LstAudioCodecs.SelectedItem = "raw";
+                    break;
+            }
         }
 
         private void InitializeAudioCodecUI()
@@ -790,8 +832,13 @@ namespace musicpresense
         private void UpdateCodecDependentFields()
         {
             var codec = LstAudioCodecs.SelectedItem as string ?? "raw";
-            bool isRaw = codec.Equals("raw", StringComparison.OrdinalIgnoreCase);
-            PanelAudioBitrate.Visibility = isRaw ? Visibility.Collapsed : Visibility.Visible;
+
+            // Show bitrate only for codecs that use it (not raw, not flac)
+            bool showBitrate = !codec.Equals("raw", StringComparison.OrdinalIgnoreCase)
+                               && !codec.Equals("flac", StringComparison.OrdinalIgnoreCase);
+            PanelAudioBitrate.Visibility = showBitrate ? Visibility.Visible : Visibility.Collapsed;
+
+            // Show FLAC compression only for flac
             PanelFlacCompression.Visibility = codec.Equals("flac", StringComparison.OrdinalIgnoreCase)
                 ? Visibility.Visible
                 : Visibility.Collapsed;

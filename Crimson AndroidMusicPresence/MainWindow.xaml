@@ -292,6 +292,10 @@
 
             <Expander Header="Scrcpy Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="Quality Presets:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
+                        <ComboBox x:Name="CmbQualityPresets" Grid.Row="0" Grid.Column="1" Width="220" Margin="25,0,0,0" SelectionChanged="CmbQualityPresets_SelectionChanged"/>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <Button x:Name="BtnListCodecs" Content="List codecs" Width="120" />
                         <TextBlock x:Name="TxtCodecStatus" Margin="12,4,0,0" VerticalAlignment="Center" />
