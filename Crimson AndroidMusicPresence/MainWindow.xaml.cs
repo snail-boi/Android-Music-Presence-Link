@@ -46,6 +46,8 @@ namespace musicpresense
         private readonly ObservableCollection<string> _audioCodecs = new();
         private bool _isLoadingCodecs;
         private bool _isAutoGathering;
+
+        #region window position saving
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
@@ -74,6 +76,7 @@ namespace musicpresense
 
             Config.Save();
         }
+        #endregion
 
         public MainWindow()
         {
@@ -115,6 +118,8 @@ namespace musicpresense
                 TxtUsbSerial.Text = _config.SelectedDeviceUSB ?? string.Empty;
         }
 
+
+        #region this should technically be in the CoverCacheManager but fuck doing buttons like that
         private void BtnClearCoverCache_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -128,71 +133,13 @@ namespace musicpresense
                 MessageBox.Show($"Failed to clear cover cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        #endregion
 
-        private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)
-        {
-            var device = await GetCurrentDeviceForAppsAsync();
-            if (string.IsNullOrWhiteSpace(device))
-            {
-                MessageBox.Show("No device connected.", "Device Required", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
 
-            var picker = new RemoteFolderPicker(device)
-            {
-                Owner = this
-            };
+        internal void AllowClose() => _allowClose = true; //huh
 
-            if (picker.ShowDialog() == true)
-            {
-                TxtRemoteRoot.Text = picker.SelectedFolder;
-            }
-        }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-        {
-            _ = LoadInstalledAppsAsync();
-        }
-
-        private void BtnRefreshApps_Click(object sender, RoutedEventArgs e)
-        {
-            _ = LoadInstalledAppsAsync();
-        }
-
-        internal void AllowClose() => _allowClose = true;
-
-        private void MainWindow_Closing(object? sender, CancelEventArgs e)
-        {
-            if (_allowClose) return;
-
-            if (HasUnsavedChanges())
-            {
-                var result = MessageBox.Show(
-                    "there are unsaved changes, do you wish to save them?",
-                    "Unsaved changes",
-                    MessageBoxButton.YesNoCancel,
-                    MessageBoxImage.Warning);
-
-                if (result == MessageBoxResult.Cancel)
-                {
-                    e.Cancel = true;
-                    return;
-                }
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    SaveConfigFromUi(true);
-                }
-                else if (result == MessageBoxResult.No)
-                {
-                    RevertUnsavedChanges();
-                }
-            }
-
-            e.Cancel = true;
-            Hide();
-        }
-
+        #region grab device info
         private async void BtnAutoGather_Click(object sender, RoutedEventArgs e)
         {
             if (_isAutoGathering)
@@ -315,7 +262,40 @@ namespace musicpresense
             return match.Success ? match.Groups["ip"].Value : string.Empty;
         }
 
+        private async Task<string> GetCurrentDeviceForAppsAsync()
+        {
+            string device = string.Empty;
 
+            var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
+            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            bool IsDeviceConnected(string id) => deviceList.Any(l => l.StartsWith(id) && l.EndsWith("device"));
+
+            if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB) && IsDeviceConnected(_config.SelectedDeviceUSB))
+            {
+                device = _config.SelectedDeviceUSB;
+            }
+            else if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None")
+            {
+                if (!IsDeviceConnected(_config.SelectedDeviceWiFi))
+                {
+                    await AdbHelper.RunAdbCaptureAsync($"connect {_config.SelectedDeviceWiFi}").ConfigureAwait(false);
+                    devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
+                    deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                }
+
+                if (IsDeviceConnected(_config.SelectedDeviceWiFi))
+                {
+                    device = _config.SelectedDeviceWiFi;
+                }
+            }
+
+            return device;
+        }
+        #endregion
+
+
+        #region combobox init
         private void InitializeCmbBoxes()
         {
             CmbUpdateInterval.ItemsSource = new[]
@@ -336,45 +316,6 @@ namespace musicpresense
             };
         }
 
-        private void CmbQualityPresets_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (CmbQualityPresets.SelectedItem is string selected)
-            {
-                UpdateAudioSettings(selected);
-            }
-        }
-
-        private void UpdateAudioSettings(string selected)
-        {
-            switch (selected)
-            {
-
-                case "Data Saver (for slow internet)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "64";
-                    TxtAudioBuffer.Text = "120";
-                    break;
-                case "Default Quality (good for general audio)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "128";
-                    TxtAudioBuffer.Text = "100";
-                    break;
-                case "High Quality (good for streaming music)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "256";
-                    TxtAudioBuffer.Text = "80";
-                    break;
-                case "Lossless (highest quality lower data use)":
-                    LstAudioCodecs.SelectedItem = "flac";
-                    TxtAudioBuffer.Text = "80";
-                    TxtFlacCompressionLevel.Text = "2";
-                    break;
-                case "Max Quality (I payed for the whole WiFi)":
-                    LstAudioCodecs.SelectedItem = "raw";
-                    break;
-            }
-        }
-
         private void InitializeAudioCodecUI()
         {
             _audioCodecs.Clear();
@@ -392,56 +333,10 @@ namespace musicpresense
             }
         }
 
-        private void ApplyConfigToUI()
-        {
-            TxtUsbSerial.Text = _config.SelectedDeviceUSB;
-            TxtWifi.Text = _config.SelectedDeviceWiFi;
-            TxtDeviceName.Text = _config.SelectedDeviceName;
-            TxtRemoteRoot.Text = _config.MusicRemoteRoot;
+        #endregion
 
-            ApplyAllowedAppsSelection();
 
-            int mode = (int)_config.UpdateIntervalMode;
-            if (mode < 1 || mode > 5) mode = 3;
-            CmbUpdateInterval.SelectedIndex = mode - 1;
-
-            ChkDebugMode.IsChecked = _config.DebugMode;
-            ChkDarkMode.IsChecked = _config.UseDarkMode;
-            ChkOpenInTaskbar.IsChecked = _config.OpenInTaskbar;
-            ChkStartWithWindows.IsChecked = _config.StartWithWindows;
-            UpdateThemeToggleText(_config.UseDarkMode);
-
-            TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
-            TxtAudioBuffer.Text = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
-            TxtFlacCompressionLevel.Text = _config.ScrcpyFlacCompressionLevel.ToString();
-            TxtPauseClearDelayMinutes.Text = _config.SmtcPauseClearDelayMinutes.ToString();
-
-            SelectCodecFromConfig();
-            UpdateCodecDependentFields();
-
-            // Populate hotkey fields with hex representation
-            try { TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
-            try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
-            try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
-
-            // Set modifier combobox to current config
-            try
-            {
-                foreach (var item in CmbHotkeyModifier.Items)
-                {
-                    if (item is System.Windows.Controls.ComboBoxItem cbi && cbi.Tag != null)
-                    {
-                        if (int.TryParse(cbi.Tag.ToString()?.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var mod) && mod == _config.HotkeyModifier)
-                        {
-                            CmbHotkeyModifier.SelectedItem = cbi;
-                            break;
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
-
+        #region darkmode lightmode stuff
         private void ChkDarkMode_CheckedChanged(object sender, RoutedEventArgs e)
         {
             if (_isInitializing)
@@ -464,19 +359,18 @@ namespace musicpresense
 
             BtnToggleTheme.Content = useDarkMode ? "Switch to Light" : "Switch to Dark";
         }
+        #endregion
 
-        private void SelectCodecFromConfig()
+
+        #region applist stuff
+        private void BtnRefreshApps_Click(object sender, RoutedEventArgs e)
         {
-            var codec = string.IsNullOrWhiteSpace(_config.ScrcpyAudioCodec) ? "raw" : _config.ScrcpyAudioCodec.Trim();
-            if (!_audioCodecs.Any(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase)))
-            {
-                codec = "raw";
-            }
-
-            var selected = _audioCodecs.FirstOrDefault(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase));
-            LstAudioCodecs.SelectedItem = selected ?? _audioCodecs.FirstOrDefault();
+            _ = LoadInstalledAppsAsync();
         }
-
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            _ = LoadInstalledAppsAsync();
+        }
         private void ApplyAllowedAppsSelection()
         {
             if (_appPackages.Count == 0)
@@ -586,37 +480,10 @@ namespace musicpresense
             }
         }
 
-        private async Task<string> GetCurrentDeviceForAppsAsync()
-        {
-            string device = string.Empty;
+        #endregion
 
-            var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
-            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-            bool IsDeviceConnected(string id) => deviceList.Any(l => l.StartsWith(id) && l.EndsWith("device"));
-
-            if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB) && IsDeviceConnected(_config.SelectedDeviceUSB))
-            {
-                device = _config.SelectedDeviceUSB;
-            }
-            else if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None")
-            {
-                if (!IsDeviceConnected(_config.SelectedDeviceWiFi))
-                {
-                    await AdbHelper.RunAdbCaptureAsync($"connect {_config.SelectedDeviceWiFi}").ConfigureAwait(false);
-                    devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
-                    deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                }
-
-                if (IsDeviceConnected(_config.SelectedDeviceWiFi))
-                {
-                    device = _config.SelectedDeviceWiFi;
-                }
-            }
-
-            return device;
-        }
-
+        #region saving stuff
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             SaveConfigFromUi(true);
@@ -729,7 +596,7 @@ namespace musicpresense
                     {
                         bufferValue = 2000;
                         TxtAudioBuffer.Text = bufferValue.ToString();
-                      }
+                    }
                 }
 
                 _config.ScrcpyAudioBuffer = Math.Max(1, bufferValue);
@@ -790,7 +657,6 @@ namespace musicpresense
                 MessageBox.Show("Music presence settings saved.", "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
-
         private static int GetTypicalBitrate(string codec)
         {
             return codec.ToLowerInvariant() switch
@@ -817,32 +683,11 @@ namespace musicpresense
             return $"The selected bitrate ({bitrateValue} kbps) is extremely high and usually unnecessary.\n\n" +
                    $"Encoder info: {guidance}\n\n" +
                    "Do you want to keep this value?";
+
+
+
         }
 
-        private void BtnListCodecs_Click(object sender, RoutedEventArgs e)
-        {
-            _ = LoadScrcpyCodecsAsync();
-        }
-
-        private void LstAudioCodecs_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            UpdateCodecDependentFields();
-        }
-
-        private void UpdateCodecDependentFields()
-        {
-            var codec = LstAudioCodecs.SelectedItem as string ?? "raw";
-
-            // Show bitrate only for codecs that use it (not raw, not flac)
-            bool showBitrate = !codec.Equals("raw", StringComparison.OrdinalIgnoreCase)
-                               && !codec.Equals("flac", StringComparison.OrdinalIgnoreCase);
-            PanelAudioBitrate.Visibility = showBitrate ? Visibility.Visible : Visibility.Collapsed;
-
-            // Show FLAC compression only for flac
-            PanelFlacCompression.Visibility = codec.Equals("flac", StringComparison.OrdinalIgnoreCase)
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        }
 
         private void UpdateSavedSnapshot()
         {
@@ -1122,6 +967,171 @@ namespace musicpresense
             };
         }
 
+        private void ApplyConfigToUI()
+        {
+            TxtUsbSerial.Text = _config.SelectedDeviceUSB;
+            TxtWifi.Text = _config.SelectedDeviceWiFi;
+            TxtDeviceName.Text = _config.SelectedDeviceName;
+            TxtRemoteRoot.Text = _config.MusicRemoteRoot;
+
+            ApplyAllowedAppsSelection();
+
+            int mode = (int)_config.UpdateIntervalMode;
+            if (mode < 1 || mode > 5) mode = 3;
+            CmbUpdateInterval.SelectedIndex = mode - 1;
+
+            ChkDebugMode.IsChecked = _config.DebugMode;
+            ChkDarkMode.IsChecked = _config.UseDarkMode;
+            ChkOpenInTaskbar.IsChecked = _config.OpenInTaskbar;
+            ChkStartWithWindows.IsChecked = _config.StartWithWindows;
+            UpdateThemeToggleText(_config.UseDarkMode);
+
+            TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
+            TxtAudioBuffer.Text = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
+            TxtFlacCompressionLevel.Text = _config.ScrcpyFlacCompressionLevel.ToString();
+            TxtPauseClearDelayMinutes.Text = _config.SmtcPauseClearDelayMinutes.ToString();
+
+            SelectCodecFromConfig();
+            UpdateCodecDependentFields();
+
+            // Populate hotkey fields with hex representation
+            try { TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
+            try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
+            try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
+
+            // Set modifier combobox to current config
+            try
+            {
+                foreach (var item in CmbHotkeyModifier.Items)
+                {
+                    if (item is System.Windows.Controls.ComboBoxItem cbi && cbi.Tag != null)
+                    {
+                        if (int.TryParse(cbi.Tag.ToString()?.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var mod) && mod == _config.HotkeyModifier)
+                        {
+                            CmbHotkeyModifier.SelectedItem = cbi;
+                            break;
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void MainWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            if (_allowClose) return;
+
+            if (HasUnsavedChanges())
+            {
+                var result = MessageBox.Show(
+                    "there are unsaved changes, do you wish to save them?",
+                    "Unsaved changes",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    SaveConfigFromUi(true);
+                }
+                else if (result == MessageBoxResult.No)
+                {
+                    RevertUnsavedChanges();
+                }
+            }
+
+            e.Cancel = true;
+            Hide();
+        }
+        #endregion
+
+
+        #region codec stuff
+        private void BtnListCodecs_Click(object sender, RoutedEventArgs e)
+        {
+            _ = LoadScrcpyCodecsAsync();
+        }
+
+        private void LstAudioCodecs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateCodecDependentFields();
+        }
+
+        private void UpdateCodecDependentFields()
+        {
+            var codec = LstAudioCodecs.SelectedItem as string ?? "raw";
+
+            // Show bitrate only for codecs that use it (not raw, not flac)
+            bool showBitrate = !codec.Equals("raw", StringComparison.OrdinalIgnoreCase)
+                               && !codec.Equals("flac", StringComparison.OrdinalIgnoreCase);
+            PanelAudioBitrate.Visibility = showBitrate ? Visibility.Visible : Visibility.Collapsed;
+
+            // Show FLAC compression only for flac
+            PanelFlacCompression.Visibility = codec.Equals("flac", StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+
+        private void UpdateAudioSettings(string selected)
+        {
+            switch (selected)
+            {
+
+                case "Data Saver (for slow internet)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "64";
+                    TxtAudioBuffer.Text = "120";
+                    break;
+                case "Default Quality (good for general audio)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "128";
+                    TxtAudioBuffer.Text = "100";
+                    break;
+                case "High Quality (good for streaming music)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "256";
+                    TxtAudioBuffer.Text = "80";
+                    break;
+                case "Lossless (highest quality lower data use)":
+                    LstAudioCodecs.SelectedItem = "flac";
+                    TxtAudioBuffer.Text = "80";
+                    TxtFlacCompressionLevel.Text = "2";
+                    break;
+                case "Max Quality (I payed for the whole WiFi)":
+                    LstAudioCodecs.SelectedItem = "raw";
+                    break;
+            }
+        }
+
+        private void SelectCodecFromConfig()
+        {
+            var codec = string.IsNullOrWhiteSpace(_config.ScrcpyAudioCodec) ? "raw" : _config.ScrcpyAudioCodec.Trim();
+            if (!_audioCodecs.Any(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase)))
+            {
+                codec = "raw";
+            }
+
+            var selected = _audioCodecs.FirstOrDefault(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase));
+            LstAudioCodecs.SelectedItem = selected ?? _audioCodecs.FirstOrDefault();
+        }
+
+        private void CmbQualityPresets_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CmbQualityPresets.SelectedItem is string selected)
+            {
+                UpdateAudioSettings(selected);
+            }
+        }
+        #endregion
+
+
+        #region Scrcpy stuff
         private async Task LoadScrcpyCodecsAsync()
         {
             if (_isLoadingCodecs)
@@ -1244,7 +1254,29 @@ namespace musicpresense
                 .ThenBy(c => c)
                 .ToList();
         }
+        #endregion
 
+
+        #region Misc
+        private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)
+        {
+            var device = await GetCurrentDeviceForAppsAsync();
+            if (string.IsNullOrWhiteSpace(device))
+            {
+                MessageBox.Show("No device connected.", "Device Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var picker = new RemoteFolderPicker(device)
+            {
+                Owner = this
+            };
+
+            if (picker.ShowDialog() == true)
+            {
+                TxtRemoteRoot.Text = picker.SelectedFolder;
+            }
+        }
         private void Expander_Expanded(object sender, RoutedEventArgs e)
         {
             if (sender is not Expander expander)
@@ -1310,5 +1342,7 @@ namespace musicpresense
                 _isCoverSearchEnabled = isCoverSearchEnabled;
             }
         }
+        #endregion
+
     }
 }
