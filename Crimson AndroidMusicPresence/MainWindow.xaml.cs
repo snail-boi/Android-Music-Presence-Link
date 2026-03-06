@@ -23,17 +23,17 @@ namespace musicpresense
     /*
         idees for future features:
         Now Playing Notifications
-        •	Show Windows toast notifications when the track changes on the Android device.
-        •	Option to display album art and playback controls in the notification.
+        •   Show Windows toast notifications when the track changes on the Android device.
+        •   Option to display album art and playback controls in the notification.
 
         big maybe:
         Playback History & Statistics
-        •	Maintain a local history of played tracks, with play counts and last played time.
-        •	Option to export history to CSV or view stats in the UI.
+        •   Maintain a local history of played tracks, with play counts and last played time.
+        •   Option to export history to CSV or view stats in the UI.
 
         Theming & UI Customization
-        •	More theme options (accent color, font size, compact/expanded layouts).
-        •	Option to minimize to tray with a right-click menu for quick actions.
+        •   More theme options (accent color, font size, compact/expanded layouts).
+        •   Option to minimize to tray with a right-click menu for quick actions.
     */
     public partial class MainWindow : Window
     {
@@ -47,7 +47,7 @@ namespace musicpresense
         private bool _isLoadingCodecs;
         private bool _isAutoGathering;
 
-        #region window position saving
+        #region Window Lifecycle & State
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
@@ -76,8 +76,43 @@ namespace musicpresense
 
             Config.Save();
         }
+
+        private void MainWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            if (_allowClose) return;
+
+            if (HasUnsavedChanges())
+            {
+                var result = MessageBox.Show(
+                    "there are unsaved changes, do you wish to save them?",
+                    "Unsaved changes",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    SaveConfigFromUi(true);
+                }
+                else if (result == MessageBoxResult.No)
+                {
+                    RevertUnsavedChanges();
+                }
+            }
+
+            e.Cancel = true;
+            Hide();
+        }
+
+        internal void AllowClose() => _allowClose = true;
         #endregion
 
+        #region Initialization & UI Setup
         public MainWindow()
         {
             InitializeComponent();
@@ -106,40 +141,93 @@ namespace musicpresense
             _isInitializing = false;
         }
 
-        internal void SyncRuntimeConfig(MusicConfig config)
+        private void InitializeCmbBoxes()
         {
-            _config = config;
-            _savedConfig = CloneConfig(config);
-
-            if (TxtWifi != null)
-                TxtWifi.Text = _config.SelectedDeviceWiFi ?? string.Empty;
-
-            if (TxtUsbSerial != null)
-                TxtUsbSerial.Text = _config.SelectedDeviceUSB ?? string.Empty;
+            CmbUpdateInterval.ItemsSource = new[]
+            {
+                "Extreme (1s)",
+                "Fast (5s)",
+                "Medium (15s)",
+                "Slow (30s)",
+                "No automatic update"
+            };
+            CmbQualityPresets.ItemsSource = new[]
+            {
+                "Data Saver (for slow internet)",
+                "Default Quality (good for general audio)",
+                "High Quality (good for streaming music)",
+                "Lossless (highest quality lower data use)",
+                "Max Quality (I payed for the whole WiFi)"
+            };
         }
 
-
-        #region this should technically be in the CoverCacheManager but fuck doing buttons like that
-        private void BtnClearCoverCache_Click(object sender, RoutedEventArgs e)
+        private void InitializeAudioCodecUI()
         {
+            _audioCodecs.Clear();
+            if (_config.ScrcpyAvailableAudioCodecs != null && _config.ScrcpyAvailableAudioCodecs.Count > 0)
+            {
+                foreach (var codec in _config.ScrcpyAvailableAudioCodecs.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    _audioCodecs.Add(codec.ToLowerInvariant());
+                }
+            }
+
+            if (!_audioCodecs.Any(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase)))
+            {
+                _audioCodecs.Insert(0, "raw");
+            }
+        }
+
+        private void ApplyConfigToUI()
+        {
+            TxtUsbSerial.Text = _config.SelectedDeviceUSB;
+            TxtWifi.Text = _config.SelectedDeviceWiFi;
+            TxtDeviceName.Text = _config.SelectedDeviceName;
+            TxtRemoteRoot.Text = _config.MusicRemoteRoot;
+
+            ApplyAllowedAppsSelection();
+
+            int mode = (int)_config.UpdateIntervalMode;
+            if (mode < 1 || mode > 5) mode = 3;
+            CmbUpdateInterval.SelectedIndex = mode - 1;
+
+            ChkDebugMode.IsChecked = _config.DebugMode;
+            ChkDarkMode.IsChecked = _config.UseDarkMode;
+            ChkOpenInTaskbar.IsChecked = _config.OpenInTaskbar;
+            ChkStartWithWindows.IsChecked = _config.StartWithWindows;
+            UpdateThemeToggleText(_config.UseDarkMode);
+
+            TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
+            TxtAudioBuffer.Text = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
+            TxtFlacCompressionLevel.Text = _config.ScrcpyFlacCompressionLevel.ToString();
+            TxtPauseClearDelayMinutes.Text = _config.SmtcPauseClearDelayMinutes.ToString();
+
+            SelectCodecFromConfig();
+            UpdateCodecDependentFields();
+
+            try { TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
+            try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
+            try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
+
             try
             {
-                var manager = new CoverCacheManager(_config.Paths.FfmpegPath, _config.Paths.CoverCachePath);
-                manager.ClearCache();
-                MessageBox.Show("Cover cache cleared.", "Cover Cache", MessageBoxButton.OK, MessageBoxImage.Information);
+                foreach (var item in CmbHotkeyModifier.Items)
+                {
+                    if (item is System.Windows.Controls.ComboBoxItem cbi && cbi.Tag != null)
+                    {
+                        if (int.TryParse(cbi.Tag.ToString()?.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var mod) && mod == _config.HotkeyModifier)
+                        {
+                            CmbHotkeyModifier.SelectedItem = cbi;
+                            break;
+                        }
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to clear cover cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            catch { }
         }
         #endregion
 
-
-        internal void AllowClose() => _allowClose = true; //huh
-
-
-        #region grab device info
+        #region Device Info & Connection
         private async void BtnAutoGather_Click(object sender, RoutedEventArgs e)
         {
             if (_isAutoGathering)
@@ -294,75 +382,7 @@ namespace musicpresense
         }
         #endregion
 
-
-        #region combobox init
-        private void InitializeCmbBoxes()
-        {
-            CmbUpdateInterval.ItemsSource = new[]
-            {
-                "Extreme (1s)",
-                "Fast (5s)",
-                "Medium (15s)",
-                "Slow (30s)",
-                "No automatic update"
-            };
-            CmbQualityPresets.ItemsSource = new[]
-{
-                "Data Saver (for slow internet)",
-                "Default Quality (good for general audio)",
-                "High Quality (good for streaming music)",
-                "Lossless (highest quality lower data use)",
-                "Max Quality (I payed for the whole WiFi)"
-            };
-        }
-
-        private void InitializeAudioCodecUI()
-        {
-            _audioCodecs.Clear();
-            if (_config.ScrcpyAvailableAudioCodecs != null && _config.ScrcpyAvailableAudioCodecs.Count > 0)
-            {
-                foreach (var codec in _config.ScrcpyAvailableAudioCodecs.Distinct(StringComparer.OrdinalIgnoreCase))
-                {
-                    _audioCodecs.Add(codec.ToLowerInvariant());
-                }
-            }
-
-            if (!_audioCodecs.Any(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase)))
-            {
-                _audioCodecs.Insert(0, "raw");
-            }
-        }
-
-        #endregion
-
-
-        #region darkmode lightmode stuff
-        private void ChkDarkMode_CheckedChanged(object sender, RoutedEventArgs e)
-        {
-            if (_isInitializing)
-                return;
-
-            var useDarkMode = ChkDarkMode.IsChecked == true;
-            (Application.Current as App)?.ApplyTheme(useDarkMode);
-            UpdateThemeToggleText(useDarkMode);
-        }
-
-        private void BtnToggleTheme_Click(object sender, RoutedEventArgs e)
-        {
-            ChkDarkMode.IsChecked = !(ChkDarkMode.IsChecked == true);
-        }
-
-        private void UpdateThemeToggleText(bool useDarkMode)
-        {
-            if (BtnToggleTheme == null)
-                return;
-
-            BtnToggleTheme.Content = useDarkMode ? "Switch to Light" : "Switch to Dark";
-        }
-        #endregion
-
-
-        #region applist stuff
+        #region App List Management
         private void BtnRefreshApps_Click(object sender, RoutedEventArgs e)
         {
             _ = LoadInstalledAppsAsync();
@@ -479,11 +499,207 @@ namespace musicpresense
                 _isLoadingApps = false;
             }
         }
-
         #endregion
 
+        #region Audio Codec Management
+        private void BtnListCodecs_Click(object sender, RoutedEventArgs e)
+        {
+            _ = LoadScrcpyCodecsAsync();
+        }
 
-        #region saving stuff
+        private void LstAudioCodecs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateCodecDependentFields();
+        }
+
+        private void UpdateCodecDependentFields()
+        {
+            var codec = LstAudioCodecs.SelectedItem as string ?? "raw";
+
+            bool showBitrate = !codec.Equals("raw", StringComparison.OrdinalIgnoreCase)
+                               && !codec.Equals("flac", StringComparison.OrdinalIgnoreCase);
+            PanelAudioBitrate.Visibility = showBitrate ? Visibility.Visible : Visibility.Collapsed;
+
+            PanelFlacCompression.Visibility = codec.Equals("flac", StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void UpdateAudioSettings(string selected)
+        {
+            switch (selected)
+            {
+                case "Data Saver (for slow internet)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "64";
+                    TxtAudioBuffer.Text = "120";
+                    break;
+                case "Default Quality (good for general audio)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "128";
+                    TxtAudioBuffer.Text = "100";
+                    break;
+                case "High Quality (good for streaming music)":
+                    LstAudioCodecs.SelectedItem = "opus";
+                    TxtAudioBitrate.Text = "256";
+                    TxtAudioBuffer.Text = "80";
+                    break;
+                case "Lossless (highest quality lower data use)":
+                    LstAudioCodecs.SelectedItem = "flac";
+                    TxtAudioBuffer.Text = "80";
+                    TxtFlacCompressionLevel.Text = "2";
+                    break;
+                case "Max Quality (I payed for the whole WiFi)":
+                    LstAudioCodecs.SelectedItem = "raw";
+                    break;
+            }
+        }
+
+        private void SelectCodecFromConfig()
+        {
+            var codec = string.IsNullOrWhiteSpace(_config.ScrcpyAudioCodec) ? "raw" : _config.ScrcpyAudioCodec.Trim();
+            if (!_audioCodecs.Any(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase)))
+            {
+                codec = "raw";
+            }
+
+            var selected = _audioCodecs.FirstOrDefault(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase));
+            LstAudioCodecs.SelectedItem = selected ?? _audioCodecs.FirstOrDefault();
+        }
+
+        private void CmbQualityPresets_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CmbQualityPresets.SelectedItem is string selected)
+            {
+                UpdateAudioSettings(selected);
+            }
+        }
+
+        private async Task LoadScrcpyCodecsAsync()
+        {
+            if (_isLoadingCodecs)
+                return;
+
+            _isLoadingCodecs = true;
+            TxtCodecStatus.Text = "Loading...";
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_config.Paths.Scrcpy) || !File.Exists(_config.Paths.Scrcpy))
+                {
+                    TxtCodecStatus.Text = "scrcpy.exe not found.";
+                    return;
+                }
+
+                var device = await GetCurrentDeviceForAppsAsync().ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(device))
+                {
+                    await Dispatcher.InvokeAsync(() => TxtCodecStatus.Text = "No device connected.");
+                    return;
+                }
+
+                Debugger.show("Listing scrcpy encoders...");
+                var output = await Task.Run(() => RunScrcpyListEncoders(_config.Paths.Scrcpy, device)).ConfigureAwait(false);
+                Debugger.show(string.IsNullOrWhiteSpace(output) ? "scrcpy encoder list returned no output." : "scrcpy encoder list received.");
+                var codecs = ParseScrcpyAudioCodecs(output);
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    _audioCodecs.Clear();
+                    foreach (var codec in codecs)
+                    {
+                        _audioCodecs.Add(codec);
+                    }
+
+                    _config.ScrcpyAvailableAudioCodecs = codecs.ToList();
+                    MusicConfigManager.Save(_config);
+                    UpdateSavedSnapshot();
+
+                    SelectCodecFromConfig();
+                    UpdateCodecDependentFields();
+                    TxtCodecStatus.Text = $"{_audioCodecs.Count} codecs";
+                });
+            }
+            catch (Exception ex)
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    TxtCodecStatus.Text = "Failed to list codecs.";
+                    MessageBox.Show($"Failed to list scrcpy codecs: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+            }
+            finally
+            {
+                _isLoadingCodecs = false;
+            }
+        }
+
+        private static string RunScrcpyListEncoders(string scrcpyPath, string device)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = scrcpyPath,
+                Arguments = $"-s {device} --list-encoders",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            try
+            {
+                using var proc = Process.Start(psi);
+                if (proc == null)
+                {
+                    return string.Empty;
+                }
+
+                string output = proc.StandardOutput.ReadToEnd();
+                string error = proc.StandardError.ReadToEnd();
+                proc.WaitForExit();
+                return output + Environment.NewLine + error;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("scrcpy list encoders failed: " + ex.Message);
+                return string.Empty;
+            }
+        }
+
+        private static List<string> ParseScrcpyAudioCodecs(string output)
+        {
+            var codecs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "raw"
+            };
+
+            if (!string.IsNullOrWhiteSpace(output))
+            {
+                foreach (var line in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!line.Contains("--audio-codec=", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var match = Regex.Match(line, "--audio-codec=([a-z0-9]+)", RegexOptions.IgnoreCase);
+                    if (match.Success)
+                    {
+                        codecs.Add(match.Groups[1].Value.ToLowerInvariant());
+                    }
+                }
+            }
+
+            Debugger.show($"Parsed scrcpy audio codecs: {string.Join(", ", codecs.OrderBy(c => c))}");
+
+            return codecs
+                .OrderBy(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(c => c)
+                .ToList();
+        }
+        #endregion
+
+        #region Configuration & Saving
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             SaveConfigFromUi(true);
@@ -657,6 +873,7 @@ namespace musicpresense
                 MessageBox.Show("Music presence settings saved.", "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
+
         private static int GetTypicalBitrate(string codec)
         {
             return codec.ToLowerInvariant() switch
@@ -967,297 +1184,59 @@ namespace musicpresense
             };
         }
 
-        private void ApplyConfigToUI()
+        internal void SyncRuntimeConfig(MusicConfig config)
         {
-            TxtUsbSerial.Text = _config.SelectedDeviceUSB;
-            TxtWifi.Text = _config.SelectedDeviceWiFi;
-            TxtDeviceName.Text = _config.SelectedDeviceName;
-            TxtRemoteRoot.Text = _config.MusicRemoteRoot;
+            _config = config;
+            _savedConfig = CloneConfig(config);
 
-            ApplyAllowedAppsSelection();
+            if (TxtWifi != null)
+                TxtWifi.Text = _config.SelectedDeviceWiFi ?? string.Empty;
 
-            int mode = (int)_config.UpdateIntervalMode;
-            if (mode < 1 || mode > 5) mode = 3;
-            CmbUpdateInterval.SelectedIndex = mode - 1;
-
-            ChkDebugMode.IsChecked = _config.DebugMode;
-            ChkDarkMode.IsChecked = _config.UseDarkMode;
-            ChkOpenInTaskbar.IsChecked = _config.OpenInTaskbar;
-            ChkStartWithWindows.IsChecked = _config.StartWithWindows;
-            UpdateThemeToggleText(_config.UseDarkMode);
-
-            TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
-            TxtAudioBuffer.Text = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
-            TxtFlacCompressionLevel.Text = _config.ScrcpyFlacCompressionLevel.ToString();
-            TxtPauseClearDelayMinutes.Text = _config.SmtcPauseClearDelayMinutes.ToString();
-
-            SelectCodecFromConfig();
-            UpdateCodecDependentFields();
-
-            // Populate hotkey fields with hex representation
-            try { TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
-            try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
-            try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
-
-            // Set modifier combobox to current config
-            try
-            {
-                foreach (var item in CmbHotkeyModifier.Items)
-                {
-                    if (item is System.Windows.Controls.ComboBoxItem cbi && cbi.Tag != null)
-                    {
-                        if (int.TryParse(cbi.Tag.ToString()?.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out var mod) && mod == _config.HotkeyModifier)
-                        {
-                            CmbHotkeyModifier.SelectedItem = cbi;
-                            break;
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
-
-        private void MainWindow_Closing(object? sender, CancelEventArgs e)
-        {
-            if (_allowClose) return;
-
-            if (HasUnsavedChanges())
-            {
-                var result = MessageBox.Show(
-                    "there are unsaved changes, do you wish to save them?",
-                    "Unsaved changes",
-                    MessageBoxButton.YesNoCancel,
-                    MessageBoxImage.Warning);
-
-                if (result == MessageBoxResult.Cancel)
-                {
-                    e.Cancel = true;
-                    return;
-                }
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    SaveConfigFromUi(true);
-                }
-                else if (result == MessageBoxResult.No)
-                {
-                    RevertUnsavedChanges();
-                }
-            }
-
-            e.Cancel = true;
-            Hide();
+            if (TxtUsbSerial != null)
+                TxtUsbSerial.Text = _config.SelectedDeviceUSB ?? string.Empty;
         }
         #endregion
 
-
-        #region codec stuff
-        private void BtnListCodecs_Click(object sender, RoutedEventArgs e)
+        #region Theme & Appearance
+        private void ChkDarkMode_CheckedChanged(object sender, RoutedEventArgs e)
         {
-            _ = LoadScrcpyCodecsAsync();
-        }
-
-        private void LstAudioCodecs_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            UpdateCodecDependentFields();
-        }
-
-        private void UpdateCodecDependentFields()
-        {
-            var codec = LstAudioCodecs.SelectedItem as string ?? "raw";
-
-            // Show bitrate only for codecs that use it (not raw, not flac)
-            bool showBitrate = !codec.Equals("raw", StringComparison.OrdinalIgnoreCase)
-                               && !codec.Equals("flac", StringComparison.OrdinalIgnoreCase);
-            PanelAudioBitrate.Visibility = showBitrate ? Visibility.Visible : Visibility.Collapsed;
-
-            // Show FLAC compression only for flac
-            PanelFlacCompression.Visibility = codec.Equals("flac", StringComparison.OrdinalIgnoreCase)
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        }
-
-
-        private void UpdateAudioSettings(string selected)
-        {
-            switch (selected)
-            {
-
-                case "Data Saver (for slow internet)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "64";
-                    TxtAudioBuffer.Text = "120";
-                    break;
-                case "Default Quality (good for general audio)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "128";
-                    TxtAudioBuffer.Text = "100";
-                    break;
-                case "High Quality (good for streaming music)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "256";
-                    TxtAudioBuffer.Text = "80";
-                    break;
-                case "Lossless (highest quality lower data use)":
-                    LstAudioCodecs.SelectedItem = "flac";
-                    TxtAudioBuffer.Text = "80";
-                    TxtFlacCompressionLevel.Text = "2";
-                    break;
-                case "Max Quality (I payed for the whole WiFi)":
-                    LstAudioCodecs.SelectedItem = "raw";
-                    break;
-            }
-        }
-
-        private void SelectCodecFromConfig()
-        {
-            var codec = string.IsNullOrWhiteSpace(_config.ScrcpyAudioCodec) ? "raw" : _config.ScrcpyAudioCodec.Trim();
-            if (!_audioCodecs.Any(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase)))
-            {
-                codec = "raw";
-            }
-
-            var selected = _audioCodecs.FirstOrDefault(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase));
-            LstAudioCodecs.SelectedItem = selected ?? _audioCodecs.FirstOrDefault();
-        }
-
-        private void CmbQualityPresets_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (CmbQualityPresets.SelectedItem is string selected)
-            {
-                UpdateAudioSettings(selected);
-            }
-        }
-        #endregion
-
-
-        #region Scrcpy stuff
-        private async Task LoadScrcpyCodecsAsync()
-        {
-            if (_isLoadingCodecs)
+            if (_isInitializing)
                 return;
 
-            _isLoadingCodecs = true;
-            TxtCodecStatus.Text = "Loading...";
-
-            try
-            {
-                if (string.IsNullOrWhiteSpace(_config.Paths.Scrcpy) || !File.Exists(_config.Paths.Scrcpy))
-                {
-                    TxtCodecStatus.Text = "scrcpy.exe not found.";
-                    return;
-                }
-
-                var device = await GetCurrentDeviceForAppsAsync().ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(device))
-                {
-                    await Dispatcher.InvokeAsync(() => TxtCodecStatus.Text = "No device connected.");
-                    return;
-                }
-
-                Debugger.show("Listing scrcpy encoders...");
-                var output = await Task.Run(() => RunScrcpyListEncoders(_config.Paths.Scrcpy, device)).ConfigureAwait(false);
-                Debugger.show(string.IsNullOrWhiteSpace(output) ? "scrcpy encoder list returned no output." : "scrcpy encoder list received.");
-                var codecs = ParseScrcpyAudioCodecs(output);
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    _audioCodecs.Clear();
-                    foreach (var codec in codecs)
-                    {
-                        _audioCodecs.Add(codec);
-                    }
-
-                    _config.ScrcpyAvailableAudioCodecs = codecs.ToList();
-                    MusicConfigManager.Save(_config);
-                    UpdateSavedSnapshot();
-
-                    SelectCodecFromConfig();
-                    UpdateCodecDependentFields();
-                    TxtCodecStatus.Text = $"{_audioCodecs.Count} codecs";
-                });
-            }
-            catch (Exception ex)
-            {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    TxtCodecStatus.Text = "Failed to list codecs.";
-                    MessageBox.Show($"Failed to list scrcpy codecs: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                });
-            }
-            finally
-            {
-                _isLoadingCodecs = false;
-            }
+            var useDarkMode = ChkDarkMode.IsChecked == true;
+            (Application.Current as App)?.ApplyTheme(useDarkMode);
+            UpdateThemeToggleText(useDarkMode);
         }
 
-        private static string RunScrcpyListEncoders(string scrcpyPath, string device)
+        private void BtnToggleTheme_Click(object sender, RoutedEventArgs e)
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = scrcpyPath,
-                Arguments = $"-s {device} --list-encoders",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-
-            try
-            {
-                using var proc = Process.Start(psi);
-                if (proc == null)
-                {
-                    return string.Empty;
-                }
-
-                string output = proc.StandardOutput.ReadToEnd();
-                string error = proc.StandardError.ReadToEnd();
-                proc.WaitForExit();
-                return output + Environment.NewLine + error;
-            }
-            catch (Exception ex)
-            {
-                Debugger.show("scrcpy list encoders failed: " + ex.Message);
-                return string.Empty;
-            }
+            ChkDarkMode.IsChecked = !(ChkDarkMode.IsChecked == true);
         }
 
-        private static List<string> ParseScrcpyAudioCodecs(string output)
+        private void UpdateThemeToggleText(bool useDarkMode)
         {
-            var codecs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "raw"
-            };
+            if (BtnToggleTheme == null)
+                return;
 
-            if (!string.IsNullOrWhiteSpace(output))
-            {
-                foreach (var line in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (!line.Contains("--audio-codec=", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var match = Regex.Match(line, "--audio-codec=([a-z0-9]+)", RegexOptions.IgnoreCase);
-                    if (match.Success)
-                    {
-                        codecs.Add(match.Groups[1].Value.ToLowerInvariant());
-                    }
-                }
-            }
-
-            Debugger.show($"Parsed scrcpy audio codecs: {string.Join(", ", codecs.OrderBy(c => c))}");
-
-            return codecs
-                .OrderBy(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                .ThenBy(c => c)
-                .ToList();
+            BtnToggleTheme.Content = useDarkMode ? "Switch to Light" : "Switch to Dark";
         }
         #endregion
 
+        #region Miscellaneous
+        private void BtnClearCoverCache_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var manager = new CoverCacheManager(_config.Paths.FfmpegPath, _config.Paths.CoverCachePath);
+                manager.ClearCache();
+                MessageBox.Show("Cover cache cleared.", "Cover Cache", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to clear cover cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
-        #region Misc
         private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)
         {
             var device = await GetCurrentDeviceForAppsAsync();
@@ -1343,6 +1322,5 @@ namespace musicpresense
             }
         }
         #endregion
-
     }
 }
