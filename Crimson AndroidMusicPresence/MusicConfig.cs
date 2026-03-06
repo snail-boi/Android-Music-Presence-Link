@@ -29,8 +29,6 @@ namespace musicpresense
         public string SelectedDeviceWiFi { get; set; } = string.Empty;
         public string SelectedDeviceName { get; set; } = string.Empty;
         public string MusicRemoteRoot { get; set; } = string.Empty;
-        public List<string> AllowedApps { get; set; } = new List<string> { };
-        public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Medium;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
@@ -38,11 +36,14 @@ namespace musicpresense
         public bool StartWithWindows { get; set; } = false;
         public string ScrcpyAudioCodec { get; set; } = "raw";
         public string ScrcpyAudioBitrate { get; set; } = string.Empty;
-        public int ScrcpyAudioBuffer { get; set; } = 50;
-        public int ScrcpyFlacCompressionLevel { get; set; } = 5;
+        public int ScrcpyAudioBuffer { get; set; } = 80;
+        public int ScrcpyFlacCompressionLevel { get; set; } = 2;
         public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
         public int SmtcPauseClearDelayMinutes { get; set; } = 0;
         public bool IsWifiEnabled { get; set; } = false;
+        public List<string> AllowedApps { get; set; } = new List<string> { };
+        public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
+
 
         // Configurable hotkeys (virtual key codes) and modifier.
         // Modifier flags for RegisterHotKey: MOD_ALT=0x0001, MOD_CONTROL=0x0002, MOD_SHIFT=0x0004
