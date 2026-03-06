@@ -408,13 +408,15 @@ namespace musicpresense
                     string artist = metaMatch.Groups[2].Value.Trim();
                     string album = metaMatch.Groups[3].Value.Trim();
 
-                    var stateMatch = Regex.Match(block, @"state=PlaybackState\s*\{[^}]*state=(\w+)\((\d+)\),\s*position=(\d+)", RegexOptions.Singleline);
+                    var stateMatch = Regex.Match(block, @"state=PlaybackState\s*\{[^}]*state=(\w+)\((\d+)\),\s*position=(-?\d+)", RegexOptions.Singleline);
                     bool isPlaying = false;
+                    long adbPositionMs = 0;
 
                     if (stateMatch.Success)
                     {
                         string stateText = stateMatch.Groups[1].Value.Trim().ToUpper();
                         isPlaying = stateText == "PLAYING";
+                        _ = long.TryParse(stateMatch.Groups[3].Value, out adbPositionMs);
                     }
 
                     if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
@@ -459,7 +461,7 @@ namespace musicpresense
                             _smtcPausedCleared = false;
                         }
 
-                        await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp).ConfigureAwait(false);
+                        await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp, adbPositionMs, _timer.Interval).ConfigureAwait(false);
                         return isPlaying;
                     }
                 }

@@ -21,6 +21,10 @@ namespace musicpresense
         private readonly Func<string> getCurrentDevice;
         private readonly Func<Task> updateCurrentSongCallback;
         private string? lastSMTCTitle;
+        private string? lastTimelineTrackKey;
+        private long? lastAdbPositionMs;
+        private long realPositionMs;
+        private TimeSpan? lastTrackDuration;
 
         private CoverCacheManager cacheManager;
         private string remoteRoot;
@@ -179,7 +183,7 @@ namespace musicpresense
 
         public bool IsPaused { get; private set; }
 
-        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch)
+        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch, long adbPositionMs, TimeSpan updateCycleTime)
         {
             try
             {
@@ -187,27 +191,34 @@ namespace musicpresense
                 if (smtcControls != null)
                     smtcControls.PlaybackStatus = isPlaying ? MediaPlaybackStatus.Playing : MediaPlaybackStatus.Paused;
 
-                if (string.Equals(lastSMTCTitle, title, StringComparison.OrdinalIgnoreCase))
+                var trackKey = $"{title}\n{artist}\n{album}";
+                if (!string.Equals(lastTimelineTrackKey, trackKey, StringComparison.Ordinal))
                 {
-                    Debugger.show($"SMTC title '{title}' is same as last. Skipping update.");
-                    return;
+                    lastTimelineTrackKey = trackKey;
+                    lastAdbPositionMs = null;
+                    realPositionMs = 0;
+                    lastTrackDuration = null;
                 }
 
-                lastSMTCTitle = title;
+                bool metadataChanged = !string.Equals(lastSMTCTitle, trackKey, StringComparison.OrdinalIgnoreCase);
+                lastSMTCTitle = trackKey;
 
-                TimeSpan? duration = null;
+                TimeSpan? duration = lastTrackDuration;
                 CoverCacheManager.MediaMetadata? meta = null;
 
-                if (enableCoverSearch)
+                if (metadataChanged)
                 {
-                    var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
-                    duration = result.Duration;
-                    meta = result.Metadata;
-                }
-                else
-                {
-                    Debugger.show("Cover art search disabled for current app.");
-                    await SetDefaultImage().ConfigureAwait(false);
+                    if (enableCoverSearch)
+                    {
+                        var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
+                        duration = result.Duration ?? duration;
+                        meta = result.Metadata;
+                    }
+                    else
+                    {
+                        Debugger.show("Cover art search disabled for current app.");
+                        await SetDefaultImage().ConfigureAwait(false);
+                    }
                 }
 
                 if (meta != null)
@@ -217,6 +228,37 @@ namespace musicpresense
                     if (!string.IsNullOrWhiteSpace(meta.Album)) album = meta.Album;
                 }
 
+                if (duration.HasValue && duration.Value > TimeSpan.Zero)
+                    lastTrackDuration = duration;
+
+                long cycleMs = Math.Max(0, (long)updateCycleTime.TotalMilliseconds);
+                if (adbPositionMs >= 0)
+                {
+                    if (!lastAdbPositionMs.HasValue || adbPositionMs != lastAdbPositionMs.Value)
+                    {
+                        realPositionMs = adbPositionMs + cycleMs;
+                        lastAdbPositionMs = adbPositionMs;
+                    }
+                    else if (isPlaying)
+                    {
+                        realPositionMs += cycleMs;
+                    }
+                }
+
+                if (realPositionMs < 0)
+                    realPositionMs = 0;
+
+                if (lastTrackDuration.HasValue)
+                {
+                    var durationMs = (long)lastTrackDuration.Value.TotalMilliseconds;
+                    if (durationMs > 0 && realPositionMs >= durationMs)
+                    {
+                        realPositionMs = 0;
+                    }
+                }
+
+                var currentPosition = TimeSpan.FromMilliseconds(Math.Max(0, realPositionMs));
+
                 if (mediaPlayer == null || smtcDisplayUpdater == null)
                     return;
 
@@ -224,26 +266,34 @@ namespace musicpresense
                 {
                     try
                     {
-                        var musicProperties = smtcDisplayUpdater.MusicProperties;
-                        musicProperties.Title = title;
-                        musicProperties.Artist = artist;
-                        musicProperties.AlbumTitle = album;
-
-                        smtcDisplayUpdater.Update();
-
-                        if (duration.HasValue && smtcControls != null)
+                        if (metadataChanged)
                         {
-                            var timelineProps = new SystemMediaTransportControlsTimelineProperties
+                            var musicProperties = smtcDisplayUpdater.MusicProperties;
+                            musicProperties.Title = title;
+                            musicProperties.Artist = artist;
+                            musicProperties.AlbumTitle = album;
+
+                            smtcDisplayUpdater.Update();
+                        }
+
+                        if (lastTrackDuration.HasValue && smtcControls != null)
+                        {
+                            var trackDuration = lastTrackDuration.Value;
+                            var timelineProperties = new SystemMediaTransportControlsTimelineProperties
                             {
                                 StartTime = TimeSpan.Zero,
-                                EndTime = duration.Value,
+                                MinSeekTime = TimeSpan.Zero,
+                                Position = currentPosition,
+                                MaxSeekTime = trackDuration,
+                                EndTime = trackDuration
                             };
-                            smtcControls.UpdateTimelineProperties(timelineProps);
+
+                            smtcControls.UpdateTimelineProperties(timelineProperties);
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debugger.show($"Failed updating SMTC metadata on UI thread: {ex.Message}");
+                        Debugger.show($"Failed updating SMTC metadata/timeline on UI thread: {ex.Message}");
                     }
                 }).Task.ConfigureAwait(false);
             }
@@ -273,6 +323,10 @@ namespace musicpresense
                 smtcControls = null;
                 smtcDisplayUpdater = null;
                 lastSMTCTitle = null;
+                lastTimelineTrackKey = null;
+                lastAdbPositionMs = null;
+                realPositionMs = 0;
+                lastTrackDuration = null;
             }
             catch (Exception ex)
             {
