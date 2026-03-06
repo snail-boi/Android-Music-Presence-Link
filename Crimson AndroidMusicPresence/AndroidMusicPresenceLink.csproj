@@ -81,7 +81,7 @@
 	  <None Update="Resources\libusb-1.0.dll">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
-	  <None Update="Resources\logo.png">
+	  <None Update="Resources\Musiclogo.png">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	    <Pack>True</Pack>
 	    <PackagePath>\</PackagePath>

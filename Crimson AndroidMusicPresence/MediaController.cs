@@ -535,7 +535,7 @@ namespace musicpresense
             {
                 string defaultImagePath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "Snail", "Resources", "logo.png"
+                    "Snail", "Resources", "Musiclogo.png"
                 );
 
                 Debugger.show($"Setting default image from: {defaultImagePath}");
