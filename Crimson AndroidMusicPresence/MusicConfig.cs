@@ -29,6 +29,7 @@ namespace musicpresense
         public string SelectedDeviceWiFi { get; set; } = string.Empty;
         public string SelectedDeviceName { get; set; } = string.Empty;
         public string MusicRemoteRoot { get; set; } = string.Empty;
+        public List<string> MusicRemoteRoots { get; set; } = new List<string>();
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Medium;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
@@ -137,6 +138,7 @@ namespace musicpresense
             config.Paths ??= new PathsConfig();
             config.AllowedApps ??= new List<string>();
             config.EligibleApps ??= new List<EligibleAppConfig>();
+            config.MusicRemoteRoots ??= new List<string>();
 
             if (config.EligibleApps.Count == 0 && config.AllowedApps.Count > 0)
             {
@@ -193,6 +195,20 @@ namespace musicpresense
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            var normalizedRoots = config.MusicRemoteRoots
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (normalizedRoots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
+            {
+                normalizedRoots.Add(config.MusicRemoteRoot.Trim());
+            }
+
+            config.MusicRemoteRoots = normalizedRoots;
+            config.MusicRemoteRoot = normalizedRoots.FirstOrDefault() ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(config.ScrcpyAudioCodec))
                 config.ScrcpyAudioCodec = "raw";

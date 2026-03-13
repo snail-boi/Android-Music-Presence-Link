@@ -42,6 +42,7 @@ namespace musicpresense
         private bool _isInitializing = true;
         private bool _allowClose;
         private readonly ObservableCollection<AppPackageItem> _appPackages = new();
+        private readonly ObservableCollection<string> _remoteRoots = new();
         private bool _isLoadingApps;
         private readonly ObservableCollection<string> _audioCodecs = new();
         private bool _isLoadingCodecs;
@@ -125,6 +126,7 @@ namespace musicpresense
 
             LstAllowedApps.ItemsSource = _appPackages;
             LstAudioCodecs.ItemsSource = _audioCodecs;
+            LstRemoteRoots.ItemsSource = _remoteRoots;
 
             BtnSave.Click += BtnSave_Click;
             BtnRefreshApps.Click += BtnRefreshApps_Click;
@@ -183,7 +185,12 @@ namespace musicpresense
             TxtUsbSerial.Text = _config.SelectedDeviceUSB;
             TxtWifi.Text = _config.SelectedDeviceWiFi;
             TxtDeviceName.Text = _config.SelectedDeviceName;
-            TxtRemoteRoot.Text = _config.MusicRemoteRoot;
+
+            _remoteRoots.Clear();
+            foreach (var root in GetNormalizedRemoteRoots(_config))
+            {
+                _remoteRoots.Add(root);
+            }
 
             ApplyAllowedAppsSelection();
 
@@ -711,7 +718,12 @@ namespace musicpresense
             _config.SelectedDeviceUSB = TxtUsbSerial.Text.Trim();
             _config.SelectedDeviceWiFi = TxtWifi.Text.Trim();
             _config.SelectedDeviceName = TxtDeviceName.Text.Trim();
-            _config.MusicRemoteRoot = TxtRemoteRoot.Text.Trim();
+            _config.MusicRemoteRoots = _remoteRoots
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            _config.MusicRemoteRoot = _config.MusicRemoteRoots.FirstOrDefault() ?? string.Empty;
 
             _config.EligibleApps = _appPackages
                 .Select(item => new EligibleAppConfig
@@ -950,7 +962,12 @@ namespace musicpresense
             config.SelectedDeviceUSB = TxtUsbSerial.Text.Trim();
             config.SelectedDeviceWiFi = TxtWifi.Text.Trim();
             config.SelectedDeviceName = TxtDeviceName.Text.Trim();
-            config.MusicRemoteRoot = TxtRemoteRoot.Text.Trim();
+            config.MusicRemoteRoots = _remoteRoots
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            config.MusicRemoteRoot = config.MusicRemoteRoots.FirstOrDefault() ?? string.Empty;
 
             if (_appPackages.Count > 0)
             {
@@ -1115,7 +1132,22 @@ namespace musicpresense
             if (!string.Equals(left.SelectedDeviceUSB, right.SelectedDeviceUSB, StringComparison.Ordinal)) return false;
             if (!string.Equals(left.SelectedDeviceWiFi, right.SelectedDeviceWiFi, StringComparison.Ordinal)) return false;
             if (!string.Equals(left.SelectedDeviceName, right.SelectedDeviceName, StringComparison.Ordinal)) return false;
-            if (!string.Equals(left.MusicRemoteRoot, right.MusicRemoteRoot, StringComparison.Ordinal)) return false;
+
+            var leftRoots = (left.MusicRemoteRoots ?? new List<string>())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var rightRoots = (right.MusicRemoteRoots ?? new List<string>())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (!leftRoots.SequenceEqual(rightRoots, StringComparer.OrdinalIgnoreCase)) return false;
+
             if (left.UpdateIntervalMode != right.UpdateIntervalMode) return false;
             if (left.DebugMode != right.DebugMode) return false;
             if (left.UseDarkMode != right.UseDarkMode) return false;
@@ -1196,6 +1228,7 @@ namespace musicpresense
                 SelectedDeviceWiFi = source.SelectedDeviceWiFi,
                 SelectedDeviceName = source.SelectedDeviceName,
                 MusicRemoteRoot = source.MusicRemoteRoot,
+                MusicRemoteRoots = source.MusicRemoteRoots?.ToList() ?? new List<string>(),
                 CachClearInMB = source.CachClearInMB,
                 AllowedApps = source.AllowedApps?.ToList() ?? new List<string>(),
                 EligibleApps = source.EligibleApps?.Select(a => new EligibleAppConfig
@@ -1275,6 +1308,22 @@ namespace musicpresense
             }
         }
 
+        private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
+{
+    var roots = (config.MusicRemoteRoots ?? new List<string>())
+        .Where(p => !string.IsNullOrWhiteSpace(p))
+        .Select(p => p.Trim())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
+    {
+        roots.Add(config.MusicRemoteRoot.Trim());
+    }
+
+    return roots;
+}
+
         private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)
         {
             var device = await GetCurrentDeviceForAppsAsync();
@@ -1291,9 +1340,32 @@ namespace musicpresense
 
             if (picker.ShowDialog() == true)
             {
-                TxtRemoteRoot.Text = picker.SelectedFolder;
+                var selectedFolder = picker.SelectedFolder?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(selectedFolder))
+                    return;
+
+                if (_remoteRoots.Any(p => string.Equals(p, selectedFolder, StringComparison.OrdinalIgnoreCase)))
+                    return;
+
+                _remoteRoots.Add(selectedFolder);
             }
         }
+
+        private void BtnRemoveRemoteRoot_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button)
+                return;
+
+            if (button.Tag is not string root || string.IsNullOrWhiteSpace(root))
+                return;
+
+            var existing = _remoteRoots.FirstOrDefault(p => string.Equals(p, root, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                _remoteRoots.Remove(existing);
+            }
+        }
+
         private void Expander_Expanded(object sender, RoutedEventArgs e)
         {
             if (sender is not Expander expander)

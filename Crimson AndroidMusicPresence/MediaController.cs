@@ -27,7 +27,7 @@ namespace musicpresense
         private TimeSpan? lastTrackDuration;
 
         private CoverCacheManager cacheManager;
-        private string remoteRoot;
+        private List<string> remoteRoots = new();
 
         public MediaController(Dispatcher dispatcher, Func<string> getCurrentDevice, Func<Task> updateCurrentSongCallback, MusicConfig config)
         {
@@ -36,7 +36,7 @@ namespace musicpresense
             this.updateCurrentSongCallback = updateCurrentSongCallback;
 
             cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB);
-            remoteRoot = config.MusicRemoteRoot ?? string.Empty;
+            remoteRoots = GetNormalizedRemoteRoots(config);
         }
 
         public void UpdateConfig(MusicConfig config)
@@ -44,13 +44,29 @@ namespace musicpresense
             try
             {
                 cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB);
-                remoteRoot = config.MusicRemoteRoot ?? string.Empty;
-                Debugger.show("MediaController configuration updated. RemoteRoot='" + remoteRoot + "'");
+                remoteRoots = GetNormalizedRemoteRoots(config);
+                Debugger.show("MediaController configuration updated. RemoteRoots='" + string.Join(";", remoteRoots) + "'");
             }
             catch (Exception ex)
             {
                 Debugger.show("MediaController.UpdateConfig failed: " + ex.Message);
             }
+        }
+
+        private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
+        {
+            var roots = (config.MusicRemoteRoots ?? new List<string>())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
+            {
+                roots.Add(config.MusicRemoteRoot.Trim());
+            }
+
+            return roots;
         }
 
         public void Initialize()
@@ -371,7 +387,7 @@ namespace musicpresense
                 }
             }
 
-            string localRemoteRoot = remoteRoot;
+            var localRemoteRoots = remoteRoots.ToList();
             string[] audioExtensions = { ".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus" };
 
             try
@@ -386,25 +402,44 @@ namespace musicpresense
                     return (null, null);
                 }
 
-                var findOutput = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell find \"{localRemoteRoot}\" -type f");
-                if (string.IsNullOrWhiteSpace(findOutput))
+                if (localRemoteRoots.Count == 0)
                 {
-                    Debugger.show("No output from remote find");
+                    Debugger.show("No remote roots configured for cover lookup");
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null);
                 }
 
-                var lines = findOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 var allFiles = new List<string>();
-                foreach (var raw in lines)
+                foreach (var root in localRemoteRoots)
                 {
-                    var path = raw.Trim();
-                    if (string.IsNullOrEmpty(path)) continue;
-                    allFiles.Add(path);
+                    var escapedRoot = root.Replace("\"", "\\\"");
+                    var findOutput = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell find \"{escapedRoot}\" -type f");
+                    if (string.IsNullOrWhiteSpace(findOutput))
+                        continue;
+
+                    var lines = findOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var raw in lines)
+                    {
+                        var path = raw.Trim();
+                        if (string.IsNullOrEmpty(path) || !path.StartsWith("/"))
+                            continue;
+
+                        allFiles.Add(path);
+                    }
+                }
+
+                if (allFiles.Count == 0)
+                {
+                    Debugger.show("No files found in configured remote roots");
+                    await SetDefaultImage().ConfigureAwait(false);
+                    return (null, null);
                 }
 
                 var titleTokens = TokenizeForMatch(fileNameWithoutExtension).ToList();
-                var candidates = allFiles.Where(p => audioExtensions.Contains(Path.GetExtension(p).ToLowerInvariant())).ToList();
+                var candidates = allFiles
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Where(p => audioExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()))
+                    .ToList();
 
                 var matched = new List<string>();
                 foreach (var candidate in candidates)

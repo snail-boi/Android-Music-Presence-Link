@@ -183,15 +183,45 @@
                 <TextBox x:Name="TxtDeviceName" Grid.Row="2" Grid.Column="1" Margin="0,4" />
             </Grid>
 
-            <TextBlock Text="Music Remote Root" FontWeight="Bold" Margin="0,0,0,4" />
-            <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox x:Name="TxtRemoteRoot" Grid.Column="0" Margin="0,0,8,0" />
-                <Button x:Name="BtnPickRemoteRoot" Grid.Column="1" Content="Browse" Width="90" />
-            </Grid>
+            <TextBlock Text="Music Remote Folders" FontWeight="Bold" Margin="0,0,0,4" />
+            <StackPanel Margin="0,0,0,12">
+                <ListBox x:Name="LstRemoteRoots"
+                         Height="120"
+                         Margin="0,0,0,8"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         HorizontalContentAlignment="Stretch">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding}" />
+                                <Button Grid.Column="1"
+                                        Content="Remove"
+                                        Width="90"
+                                        Margin="8,0,0,0"
+                                        Tag="{Binding}"
+                                        Click="BtnRemoveRemoteRoot_Click" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="BtnPickRemoteRoot" Content="Add Folder" Width="110" />
+                </StackPanel>
+            </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                 <Button x:Name="BtnClearCoverCache" Content="Clear Cover Cache" Width="160" />
             </StackPanel>
