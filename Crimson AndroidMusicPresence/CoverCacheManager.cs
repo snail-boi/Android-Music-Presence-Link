@@ -17,7 +17,7 @@ namespace musicpresense
         private readonly string cachePath;
         private readonly string tempPath;
         private readonly string ffmpegPath;
-        private readonly long maxCacheBytes = 200L * 1024L * 1024L;
+        private long maxCacheBytes;
 
         private readonly string indexFile;
         private readonly string folderIndexFile;
@@ -27,8 +27,9 @@ namespace musicpresense
         private Dictionary<string, string> folderIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, DateTime> nocover = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
 
-        public CoverCacheManager(string ffmpegPath, string cachePath)
+        public CoverCacheManager(string ffmpegPath, string cachePath, int MaxCacheSizeInBytes)
         {
+            this.maxCacheBytes = MaxCacheSizeInBytes * 1024L * 1024L;
             this.ffmpegPath = ffmpegPath;
             this.cachePath = cachePath;
             this.tempPath = Path.Combine(cachePath, "temp");

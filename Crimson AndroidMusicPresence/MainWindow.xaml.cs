@@ -201,6 +201,7 @@ namespace musicpresense
             TxtAudioBuffer.Text = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
             TxtFlacCompressionLevel.Text = _config.ScrcpyFlacCompressionLevel.ToString();
             TxtPauseClearDelayMinutes.Text = _config.SmtcPauseClearDelayMinutes.ToString();
+            TxtCacheClear.Text = _config.CachClearInMB.ToString();
 
             SelectCodecFromConfig();
             UpdateCodecDependentFields();
@@ -759,8 +760,25 @@ namespace musicpresense
             _config.UseDarkMode = ChkDarkMode.IsChecked == true;
             _config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
             _config.StartWithWindows = ChkStartWithWindows.IsChecked == true;
+            if (int.TryParse(TxtCacheClear.Text.Trim(), out var CacheValue))
+            {
+                if (CacheValue < 10)
+                {
+                    CacheValue = 10;
+                    TxtCacheClear.Text = CacheValue.ToString();
+                }
 
-            var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
+
+                _config.CachClearInMB = CacheValue > 0 ? CacheValue : 10;
+            }
+            else
+            {
+                CacheValue = 10;
+                TxtCacheClear.Text = CacheValue.ToString();
+                _config.CachClearInMB = CacheValue > 0 ? CacheValue : 10;
+            }
+
+                var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
             _config.ScrcpyAudioCodec = selectedCodec;
 
             if (selectedCodec.Equals("raw", StringComparison.OrdinalIgnoreCase))
@@ -988,6 +1006,24 @@ namespace musicpresense
             config.UseDarkMode = ChkDarkMode.IsChecked == true;
             config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
             config.StartWithWindows = ChkStartWithWindows.IsChecked == true;
+            if (int.TryParse(TxtCacheClear.Text.Trim(), out var CacheValue))
+            {
+                if (CacheValue < 10)
+                {
+                    CacheValue = 10;
+                    TxtCacheClear.Text = CacheValue.ToString();
+                }
+
+
+                _config.CachClearInMB = CacheValue > 0 ? CacheValue : 10;
+            }
+            else
+            {
+                CacheValue = 10;
+                TxtCacheClear.Text = CacheValue.ToString();
+                _config.CachClearInMB = CacheValue > 0 ? CacheValue : 10;
+            }
+
 
             var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
             config.ScrcpyAudioCodec = selectedCodec;
@@ -1090,6 +1126,7 @@ namespace musicpresense
             if (left.ScrcpyAudioBuffer != right.ScrcpyAudioBuffer) return false;
             if (left.ScrcpyFlacCompressionLevel != right.ScrcpyFlacCompressionLevel) return false;
             if (left.SmtcPauseClearDelayMinutes != right.SmtcPauseClearDelayMinutes) return false;
+            if (left.CachClearInMB != right.CachClearInMB) return false;
             if (left.HotkeyVolumeUpKey != right.HotkeyVolumeUpKey) return false;
             if (left.HotkeyVolumeDownKey != right.HotkeyVolumeDownKey) return false;
             if (left.HotkeyToggleScrcpyKey != right.HotkeyToggleScrcpyKey) return false;
@@ -1159,6 +1196,7 @@ namespace musicpresense
                 SelectedDeviceWiFi = source.SelectedDeviceWiFi,
                 SelectedDeviceName = source.SelectedDeviceName,
                 MusicRemoteRoot = source.MusicRemoteRoot,
+                CachClearInMB = source.CachClearInMB,
                 AllowedApps = source.AllowedApps?.ToList() ?? new List<string>(),
                 EligibleApps = source.EligibleApps?.Select(a => new EligibleAppConfig
                 {
@@ -1227,7 +1265,7 @@ namespace musicpresense
         {
             try
             {
-                var manager = new CoverCacheManager(_config.Paths.FfmpegPath, _config.Paths.CoverCachePath);
+                var manager = new CoverCacheManager(_config.Paths.FfmpegPath, _config.Paths.CoverCachePath, _config.CachClearInMB);
                 manager.ClearCache();
                 MessageBox.Show("Cover cache cleared.", "Cover Cache", MessageBoxButton.OK, MessageBoxImage.Information);
             }
