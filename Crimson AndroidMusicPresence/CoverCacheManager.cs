@@ -190,8 +190,13 @@ namespace musicpresense
                         SaveIndex();
                         Debugger.show("Using folder-mapped cover for " + remoteFilePath);
                         var p = Path.Combine(cachePath, entry.FileName);
-                        return (p, entry.DurationSeconds > 0 ? (double?)entry.DurationSeconds : null, null);
+
+                        var songInfo = await PullSongInfoAsync(deviceId, remoteFilePath, key).ConfigureAwait(false);
+                        return (p, songInfo.DurationSeconds, songInfo.Metadata);
                     }
+
+                    folderIndex.Remove(folderKey);
+                    SaveFolderIndex();
                 }
 
                 if (index.TryGetValue(key, out var existing) && File.Exists(Path.Combine(cachePath, existing.FileName)))
@@ -291,6 +296,18 @@ namespace musicpresense
                                     if (File.Exists(tempImg))
                                     {
                                         Debugger.show("Pulled subfolder image: " + remoteCandidate + " -> " + tempImg);
+
+                                        if (IsCoverReferenceCandidate(name))
+                                        {
+                                            var referencedPath = await CacheFolderReferenceFromPulledImageAsync(deviceId, subfolderPath, remoteCandidate, tempImg).ConfigureAwait(false);
+                                            try { File.Delete(tempImg); } catch { }
+                                            if (!string.IsNullOrEmpty(referencedPath) && File.Exists(referencedPath))
+                                            {
+                                                Debugger.show("Cached subfolder cover reference for album folder: " + subfolderPath);
+                                                return (referencedPath, embeddedDuration, embeddedMetadata);
+                                            }
+                                        }
+
                                         string cachedFile = key + ".jpg";
                                         string cachedPath = Path.Combine(cachePath, cachedFile);
 
@@ -347,6 +364,18 @@ namespace musicpresense
                         if (File.Exists(tempImg))
                         {
                             Debugger.show("Pulled folder image: " + remoteCandidate + " -> " + tempImg);
+
+                            if (IsCoverReferenceCandidate(name))
+                            {
+                                var referencedPath = await CacheFolderReferenceFromPulledImageAsync(deviceId, folderPath, remoteCandidate, tempImg).ConfigureAwait(false);
+                                try { File.Delete(tempImg); } catch { }
+                                if (!string.IsNullOrEmpty(referencedPath) && File.Exists(referencedPath))
+                                {
+                                    Debugger.show("Cached folder cover reference for album folder: " + folderPath);
+                                    return (referencedPath, embeddedDuration, embeddedMetadata);
+                                }
+                            }
+
                             string cachedFile = key + ".jpg";
                             string cachedPath = Path.Combine(cachePath, cachedFile);
 
@@ -436,7 +465,6 @@ namespace musicpresense
                                         index[key] = entry;
                                         SaveIndex();
                                         EnforceCacheSizeLimit();
-                                        Debugger.show("Cached discovered folder image for file: " + remoteFilePath);
                                         try { File.Delete(tempImg); } catch { }
                                         return (cachedPath, embeddedDuration, embeddedMetadata);
                                     }
@@ -649,6 +677,87 @@ namespace musicpresense
             return folder + "/" + name;
         }
 
+        private static bool IsCoverReferenceCandidate(string fileName)
+        {
+            return fileName.Equals("cover.jpg", StringComparison.OrdinalIgnoreCase)
+                || fileName.Equals("cover.png", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<(double? DurationSeconds, MediaMetadata? Metadata)> PullSongInfoAsync(string deviceId, string remoteFilePath, string key)
+        {
+            try
+            {
+                string remoteExt = Path.GetExtension(remoteFilePath);
+                string tempPull = Path.Combine(tempPath, key + "_meta" + remoteExt);
+
+                await AdbHelper.RunAdbAsync($"-s {deviceId} pull \"{remoteFilePath}\" \"{tempPull}\"").ConfigureAwait(false);
+                if (!File.Exists(tempPull))
+                    return (null, null);
+
+                double? dur = null;
+                MediaMetadata? meta = null;
+                try { dur = await GetMediaDurationAsync(tempPull).ConfigureAwait(false); } catch { }
+                try { meta = await GetMediaMetadataAsync(tempPull).ConfigureAwait(false); } catch { }
+
+                try { File.Delete(tempPull); } catch { }
+                return (dur, meta);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("PullSongInfoAsync failed: " + ex.Message);
+                return (null, null);
+            }
+        }
+
+        private async Task<string?> CacheFolderReferenceFromPulledImageAsync(string deviceId, string albumFolderPath, string remoteImagePath, string tempImagePath)
+        {
+            try
+            {
+                if (!File.Exists(tempImagePath)) return null;
+
+                string imageKey = ComputeKey(deviceId, remoteImagePath);
+                string albumFolderKey = ComputeFolderKey(deviceId, albumFolderPath);
+                string cachedFile = imageKey + ".jpg";
+                string cachedPath = Path.Combine(cachePath, cachedFile);
+
+                if (!File.Exists(cachedPath))
+                {
+                    var pulledExt = Path.GetExtension(tempImagePath).ToLowerInvariant();
+                    if (new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" }.Contains(pulledExt))
+                    {
+                        try { File.Copy(tempImagePath, cachedPath, true); } catch { }
+                    }
+                    else
+                    {
+                        await RunFfmpegExtractAsync(tempImagePath, cachedPath).ConfigureAwait(false);
+                    }
+                }
+
+                if (!File.Exists(cachedPath)) return null;
+
+                var fi = new FileInfo(cachedPath);
+                index[imageKey] = new CacheEntry
+                {
+                    FileName = cachedFile,
+                    Size = fi.Length,
+                    LastAccessUtc = DateTime.UtcNow,
+                    FolderKey = albumFolderKey,
+                    DurationSeconds = 0
+                };
+
+                folderIndex[albumFolderKey] = imageKey;
+                SaveIndex();
+                SaveFolderIndex();
+                EnforceCacheSizeLimit();
+                return cachedPath;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("CacheFolderReferenceFromPulledImageAsync failed: " + ex.Message);
+                return null;
+            }
+        }
+
         private async Task<bool> RunFfmpegExtractAsync(string inputPath, string outputJpgPath)
         {
             try
@@ -805,7 +914,13 @@ namespace musicpresense
                     if (total <= maxCacheBytes) break;
                 }
 
+                var staleFolderMappings = folderIndex.Where(kv => !index.ContainsKey(kv.Value)).Select(kv => kv.Key).ToList();
+                foreach (var mapKey in staleFolderMappings)
+                    folderIndex.Remove(mapKey);
+
                 SaveIndex();
+                if (staleFolderMappings.Count > 0)
+                    SaveFolderIndex();
             }
             catch (Exception ex)
             {
