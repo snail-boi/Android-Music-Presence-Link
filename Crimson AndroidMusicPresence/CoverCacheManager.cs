@@ -124,6 +124,14 @@ namespace musicpresense
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
 
+        private static string ResolveCacheDeviceKey(string? configuredDeviceName, string deviceId)
+        {
+            if (!string.IsNullOrWhiteSpace(configuredDeviceName))
+                return configuredDeviceName.Trim();
+
+            return deviceId;
+        }
+
         private class CacheEntry
         {
             public string FileName { get; set; } = string.Empty;
@@ -170,15 +178,16 @@ namespace musicpresense
         internal sealed record MediaMetadata(string? Title, string? Artist, string? Album);
 
         // Returns tuple of cached image path (or null), optional duration, and optional metadata
-        public async Task<(string ImagePath, double? DurationSeconds, MediaMetadata? Metadata)> GetImagePathForNowPlayingAsync(string deviceId, string remoteFilePath)
+        public async Task<(string ImagePath, double? DurationSeconds, MediaMetadata? Metadata)> GetImagePathForNowPlayingAsync(string deviceId, string remoteFilePath, string? configuredDeviceName)
         {
             try
             {
                 if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(remoteFilePath)) return (null, null, null);
 
+                var cacheDeviceKey = ResolveCacheDeviceKey(configuredDeviceName, deviceId);
                 string folderPath = Path.GetDirectoryName(remoteFilePath)?.Replace("\\", "/") ?? string.Empty;
-                string key = ComputeKey(deviceId, remoteFilePath);
-                string folderKey = ComputeFolderKey(deviceId, folderPath);
+                string key = ComputeKey(cacheDeviceKey, remoteFilePath);
+                string folderKey = ComputeFolderKey(cacheDeviceKey, folderPath);
                 double? embeddedDuration = null;
                 MediaMetadata? embeddedMetadata = null;
 
@@ -299,7 +308,7 @@ namespace musicpresense
 
                                         if (IsCoverReferenceCandidate(name))
                                         {
-                                            var referencedPath = await CacheFolderReferenceFromPulledImageAsync(deviceId, subfolderPath, remoteCandidate, tempImg).ConfigureAwait(false);
+                                            var referencedPath = await CacheFolderReferenceFromPulledImageAsync(cacheDeviceKey, subfolderPath, remoteCandidate, tempImg).ConfigureAwait(false);
                                             try { File.Delete(tempImg); } catch { }
                                             if (!string.IsNullOrEmpty(referencedPath) && File.Exists(referencedPath))
                                             {
@@ -367,7 +376,7 @@ namespace musicpresense
 
                             if (IsCoverReferenceCandidate(name))
                             {
-                                var referencedPath = await CacheFolderReferenceFromPulledImageAsync(deviceId, folderPath, remoteCandidate, tempImg).ConfigureAwait(false);
+                                var referencedPath = await CacheFolderReferenceFromPulledImageAsync(cacheDeviceKey, folderPath, remoteCandidate, tempImg).ConfigureAwait(false);
                                 try { File.Delete(tempImg); } catch { }
                                 if (!string.IsNullOrEmpty(referencedPath) && File.Exists(referencedPath))
                                 {
@@ -709,14 +718,14 @@ namespace musicpresense
             }
         }
 
-        private async Task<string?> CacheFolderReferenceFromPulledImageAsync(string deviceId, string albumFolderPath, string remoteImagePath, string tempImagePath)
+        private async Task<string?> CacheFolderReferenceFromPulledImageAsync(string cacheDeviceKey, string albumFolderPath, string remoteImagePath, string tempImagePath)
         {
             try
             {
                 if (!File.Exists(tempImagePath)) return null;
 
-                string imageKey = ComputeKey(deviceId, remoteImagePath);
-                string albumFolderKey = ComputeFolderKey(deviceId, albumFolderPath);
+                string imageKey = ComputeKey(cacheDeviceKey, remoteImagePath);
+                string albumFolderKey = ComputeFolderKey(cacheDeviceKey, albumFolderPath);
                 string cachedFile = imageKey + ".jpg";
                 string cachedPath = Path.Combine(cachePath, cachedFile);
 

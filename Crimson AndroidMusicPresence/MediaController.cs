@@ -28,6 +28,7 @@ namespace musicpresense
 
         private CoverCacheManager cacheManager;
         private List<string> remoteRoots = new();
+        private string deviceName = string.Empty;
 
         public MediaController(Dispatcher dispatcher, Func<string> getCurrentDevice, Func<Task> updateCurrentSongCallback, MusicConfig config)
         {
@@ -37,6 +38,7 @@ namespace musicpresense
 
             cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB);
             remoteRoots = GetNormalizedRemoteRoots(config);
+            deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
         }
 
         public void UpdateConfig(MusicConfig config)
@@ -45,6 +47,7 @@ namespace musicpresense
             {
                 cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB);
                 remoteRoots = GetNormalizedRemoteRoots(config);
+                deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
                 Debugger.show("MediaController configuration updated. RemoteRoots='" + string.Join(";", remoteRoots) + "'");
             }
             catch (Exception ex)
@@ -516,7 +519,7 @@ namespace musicpresense
                 {
                     Debugger.show($"Processing remote file for cover art: {remotePath}");
 
-                    var result = await cacheManager.GetImagePathForNowPlayingAsync(device, remotePath).ConfigureAwait(false);
+                    var result = await cacheManager.GetImagePathForNowPlayingAsync(device, remotePath, deviceName).ConfigureAwait(false);
                     string imagePath = result.ImagePath;
                     double? durSeconds = result.DurationSeconds;
                     metadata = result.Metadata ?? metadata;
