@@ -412,15 +412,22 @@ namespace musicpresense
                     return (null, null);
                 }
 
+                Debugger.show($"Searching in remote roots: {string.Join("; ", localRemoteRoots)}");
+
                 var allFiles = new List<string>();
                 foreach (var root in localRemoteRoots)
                 {
                     var escapedRoot = root.Replace("\"", "\\\"");
+                    Debugger.show($"Scanning root: {root}");
                     var findOutput = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell find \"{escapedRoot}\" -type f");
                     if (string.IsNullOrWhiteSpace(findOutput))
+                    {
+                        Debugger.show($"  No files found in this root");
                         continue;
+                    }
 
                     var lines = findOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    Debugger.show($"  Found {lines.Length} files in this root");
                     foreach (var raw in lines)
                     {
                         var path = raw.Trim();
@@ -430,6 +437,8 @@ namespace musicpresense
                         allFiles.Add(path);
                     }
                 }
+
+                Debugger.show($"Total files found: {allFiles.Count}");
 
                 if (allFiles.Count == 0)
                 {
@@ -485,24 +494,42 @@ namespace musicpresense
                     {
                         var nameNoExt = Path.GetFileNameWithoutExtension(p);
                         int score = 0;
-                        if (!string.IsNullOrEmpty(titleStr) && nameNoExt.IndexOf(titleStr, StringComparison.OrdinalIgnoreCase) >= 0)
+                        var scoreBreakdown = new System.Text.StringBuilder();
+
+                        // Check for exact filename match first (highest priority)
+                        if (!string.IsNullOrEmpty(titleStr) && string.Equals(nameNoExt, titleStr, StringComparison.OrdinalIgnoreCase))
+                        {
+                            score += 1000;
+                            scoreBreakdown.Append("+1000(exact) ");
+                        }
+                        else if (!string.IsNullOrEmpty(titleStr) && nameNoExt.IndexOf(titleStr, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
                             score += 100;
+                            scoreBreakdown.Append("+100(title) ");
+                        }
 
                         var fileTokens = TokenizeForMatch(nameNoExt).ToList();
                         var tCount = titleTokens.Count;
                         if (tCount > 0)
                         {
                             int inter = fileTokens.Count(ft => titleTokens.Contains(ft));
-                            score += inter * 10;
+                            int tokenScore = inter * 10;
+                            score += tokenScore;
+                            scoreBreakdown.Append($"+{tokenScore}(tokens:{inter}) ");
                         }
 
                         if (!string.IsNullOrEmpty(artist) && p.IndexOf(artist, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
                             score += 50;
+                            scoreBreakdown.Append("+50(artist) ");
+                        }
 
                         int depth = p.Count(ch => ch == '/');
-                        score += Math.Min(depth, 10);
+                        int depthScore = Math.Min(depth, 10);
+                        score += depthScore;
+                        scoreBreakdown.Append($"+{depthScore}(depth:{depth})");
 
-                        return (path: p, score);
+                        return (path: p, score, breakdown: scoreBreakdown.ToString());
                     })
                     .OrderByDescending(x => x.score)
                     .ThenByDescending(x => x.path.Count(ch => ch == '/'))
@@ -511,6 +538,12 @@ namespace musicpresense
                 filesToProcess = ranked.Select(r => r.path).Take(20).ToList();
 
                 Debugger.show($"Files to process for cover art lookup (ranked): {filesToProcess.Count}");
+                for (int i = 0; i < ranked.Count; i++)
+                {
+                    var (path, score, breakdown) = ranked[i];
+                    string fileName = Path.GetFileName(path);
+                    Debugger.show($"  [{i + 1}] Score={score:D3} | {breakdown}| {fileName}");
+                }
 
                 TimeSpan? duration = null;
                 CoverCacheManager.MediaMetadata? metadata = null;
