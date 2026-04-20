@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using Windows.Media;
@@ -353,29 +352,92 @@ namespace musicpresense
             }
         }
 
-        private IEnumerable<string> TokenizeForMatch(string s)
+        /// <summary>
+        /// Normalizes a string for cross-comparison between media metadata and filenames on disk.
+        /// Many players report titles with characters that the filesystem cannot store, so saved
+        /// files use a substitute (or are stripped). We map all of those to a single space and
+        /// collapse runs, so a Contains() check works regardless of which side did the rewrite.
+        /// Also folds Unicode slash variants down to '/' first so the rest of the rules apply.
+        /// </summary>
+        private static string NormalizeForMatch(string input)
         {
-            if (string.IsNullOrWhiteSpace(s)) return Array.Empty<string>();
-            s = NormalizeSlashVariants(s);
-            var matches = Regex.Matches(s.ToLowerInvariant(), @"[\p{L}\p{N}]{3,}");
-            return matches.Select(m => m.Value).Distinct();
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+
+            // Fold Unicode slash variants to ASCII '/' so the next pass treats them uniformly.
+            var folded = input
+                .Replace('\u2215', '/')   // ∕  DIVISION SLASH
+                .Replace('\u2044', '/')   // ⁄  FRACTION SLASH
+                .Replace('\u29F8', '/')   // ⧸  BIG SOLIDUS
+                .Replace('\uFF0F', '/')   // /  FULLWIDTH SOLIDUS
+                .Replace('\u29F9', '\\')  // ⧹  BIG REVERSE SOLIDUS
+                .Replace('\uFF3C', '\\')  // \  FULLWIDTH REVERSE SOLIDUS
+                .Replace('\u201C', '"')   // "  LEFT DOUBLE QUOTATION MARK
+                .Replace('\u201D', '"')   // "  RIGHT DOUBLE QUOTATION MARK
+                .Replace('\uFF02', '"')   // "  FULLWIDTH QUOTATION MARK
+                .Replace('\u2018', '\'')  // '  LEFT SINGLE QUOTATION MARK
+                .Replace('\u2019', '\'')  // '  RIGHT SINGLE QUOTATION MARK
+                .Replace('\uFF07', '\'')  // '  FULLWIDTH APOSTROPHE
+                .Replace("\u2026", "...")  // …  HORIZONTAL ELLIPSIS -> three dots
+                .Replace('\uFF1A', ':')   // :  FULLWIDTH COLON
+                .Replace('\uFF5C', '|')   // |  FULLWIDTH VERTICAL LINE
+                .Replace('\uFF1F', '?')   // ?  FULLWIDTH QUESTION MARK
+                .Replace('\uFF0A', '*')   // *  FULLWIDTH ASTERISK
+                .Replace('\uFF1C', '<')   // <  FULLWIDTH LESS-THAN SIGN
+                .Replace('\uFF1E', '>');  // >  FULLWIDTH GREATER-THAN SIGN
+
+            // Replace every char Android/Windows filesystems can't store, plus stray whitespace,
+            // with a single space. We then collapse runs and trim, so "A: B" and "A  B" both
+            // normalize to "A B" and a Contains() check survives the substitution either side did.
+            var sb = new System.Text.StringBuilder(folded.Length);
+            foreach (var ch in folded)
+            {
+                bool unsafeChar = ch == '/' || ch == '\\' || ch == ':' || ch == '*' ||
+                                  ch == '?' || ch == '"' || ch == '<' || ch == '>' || ch == '|';
+                if (unsafeChar || char.IsWhiteSpace(ch) || char.IsControl(ch))
+                    sb.Append(' ');
+                else
+                    sb.Append(ch);
+            }
+
+            // Collapse multiple spaces into one.
+            var collapsed = new System.Text.StringBuilder(sb.Length);
+            bool prevSpace = false;
+            foreach (var ch in sb.ToString())
+            {
+                if (ch == ' ')
+                {
+                    if (!prevSpace) collapsed.Append(' ');
+                    prevSpace = true;
+                }
+                else
+                {
+                    collapsed.Append(ch);
+                    prevSpace = false;
+                }
+            }
+
+            return collapsed.ToString().Trim();
         }
 
-        private static string NormalizeSlashVariants(string input)
+        /// <summary>
+        /// Returns the size in bytes of a remote file via `stat -c %s`. Returns -1 on failure.
+        /// </summary>
+        private static async Task<long> GetRemoteFileSizeAsync(string device, string remotePath)
         {
-            if (string.IsNullOrEmpty(input)) return input;
-            return input.Replace('\u2215', '/')
-                        .Replace('\u2044', '/')
-                        .Replace('\uFF0F', '/');
-        }
-
-        private bool TokensMatchEnough(IEnumerable<string> titleTokens, IEnumerable<string> fileTokens)
-        {
-            var t = titleTokens.ToList();
-            var f = new HashSet<string>(fileTokens);
-            if (t.Count == 0) return false;
-            int match = t.Count(tok => f.Contains(tok));
-            return match >= Math.Max(1, t.Count / 2);
+            try
+            {
+                var escaped = remotePath.Replace("\"", "\\\"");
+                var output = await AdbHelper.RunAdbCaptureAsync(
+                    $"-s {device} shell stat -c %s \"{escaped}\"").ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(output)) return -1;
+                var trimmed = output.Trim().Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                return long.TryParse(trimmed, out var size) ? size : -1;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"GetRemoteFileSizeAsync failed for {remotePath}: {ex.Message}");
+                return -1;
+            }
         }
 
         private async Task<(TimeSpan? Duration, CoverCacheManager.MediaMetadata? Metadata)> SetSMTCImageAsync(string fileNameWithoutExtension, string artist)
@@ -447,102 +509,150 @@ namespace musicpresense
                     return (null, null);
                 }
 
-                var titleTokens = TokenizeForMatch(fileNameWithoutExtension).ToList();
+                // --- New simple matching & scoring ---
+                // Eligibility: filename Contains(title, IgnoreCase).
+                // Scoring:
+                //   extension bonus: .wav +150, .flac +100, .opus +80, .m4a +60, .ogg +40, other audio +20
+                //   artist contains in filename: +10
+                //   in subfolder (deeper than its remote root): +100
+                // Tiebreakers: largest file size, then first occurrence.
+                var titleStr = fileNameWithoutExtension ?? string.Empty;
+
+                int ExtensionScore(string ext) => ext switch
+                {
+                    ".wav" => 150,
+                    ".flac" => 100,
+                    ".opus" => 80,
+                    ".m4a" => 60,
+                    ".ogg" => 40,
+                    _ => 20, // any other audio file present in candidates
+                };
+
+                // Determine the depth of each remote root so we know when a file is "in a subfolder".
+                var rootDepths = localRemoteRoots
+                    .Select(r => r.TrimEnd('/'))
+                    .ToDictionary(r => r, r => r.Count(c => c == '/'), StringComparer.OrdinalIgnoreCase);
+
+                int DepthOfRootFor(string filePath)
+                {
+                    string? bestRoot = null;
+                    foreach (var root in rootDepths.Keys)
+                    {
+                        if (filePath.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase) ||
+                            filePath.Equals(root, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (bestRoot == null || root.Length > bestRoot.Length)
+                                bestRoot = root;
+                        }
+                    }
+                    return bestRoot != null ? rootDepths[bestRoot] : -1;
+                }
+
                 var candidates = allFiles
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Where(p => audioExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()))
                     .ToList();
 
-                var matched = new List<string>();
-                foreach (var candidate in candidates)
-                {
-                    var fn = Path.GetFileName(candidate);
-                    var nameNoExt = Path.GetFileNameWithoutExtension(fn);
-                    var fileTokens = TokenizeForMatch(nameNoExt);
+                // Eligibility: filename (without extension) must contain the title (case-insensitive).
+                // Both sides are normalized so unicode slash variants and FS-unsafe chars (which
+                // get replaced/stripped at save time) don't break the match. If we have no title at
+                // all we cannot match anything meaningfully.
+                string normTitle = NormalizeForMatch(titleStr);
+                string normArtist = NormalizeForMatch(artist ?? string.Empty);
 
-                    bool match = false;
-                    if (titleTokens.Any())
-                    {
-                        match = TokensMatchEnough(titleTokens, fileTokens);
-                    }
-                    else
-                    {
-                        match = nameNoExt.IndexOf(fileNameWithoutExtension, StringComparison.OrdinalIgnoreCase) >= 0;
-                    }
-
-                    if (match) matched.Add(candidate);
-                }
+                var matched = string.IsNullOrWhiteSpace(normTitle)
+                    ? new List<string>()
+                    : candidates
+                        .Where(p => NormalizeForMatch(Path.GetFileNameWithoutExtension(p))
+                            .IndexOf(normTitle, StringComparison.OrdinalIgnoreCase) >= 0)
+                        .ToList();
 
                 if (matched.Count == 0)
                 {
-                    Debugger.show("No candidates found on device for title token");
+                    Debugger.show($"No filename contains the title '{titleStr}' (normalized: '{normTitle}')");
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null);
                 }
 
-                var artistMatches = new List<string>();
-                if (!string.IsNullOrEmpty(artist) && matched.Count > 1)
-                {
-                    artistMatches = matched.Where(c => c.IndexOf(artist, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
-                }
-
-                var filesToProcess = artistMatches.Count > 0 ? artistMatches : matched;
-
-                var titleStr = fileNameWithoutExtension ?? string.Empty;
-                var ranked = filesToProcess
-                    .Select(p =>
+                var ranked = matched
+                    .Select((p, idx) =>
                     {
-                        var nameNoExt = Path.GetFileNameWithoutExtension(p);
+                        var ext = Path.GetExtension(p).ToLowerInvariant();
                         int score = 0;
-                        var scoreBreakdown = new System.Text.StringBuilder();
+                        var bd = new System.Text.StringBuilder();
 
-                        // Check for exact filename match first (highest priority)
-                        if (!string.IsNullOrEmpty(titleStr) && string.Equals(nameNoExt, titleStr, StringComparison.OrdinalIgnoreCase))
+                        int extScore = ExtensionScore(ext);
+                        score += extScore;
+                        bd.Append($"+{extScore}({ext}) ");
+
+                        if (!string.IsNullOrEmpty(normArtist) &&
+                            NormalizeForMatch(Path.GetFileName(p)).IndexOf(normArtist, StringComparison.OrdinalIgnoreCase) >= 0)
                         {
-                            score += 1000;
-                            scoreBreakdown.Append("+1000(exact) ");
+                            score += 10;
+                            bd.Append("+10(artist) ");
                         }
-                        else if (!string.IsNullOrEmpty(titleStr) && nameNoExt.IndexOf(titleStr, StringComparison.OrdinalIgnoreCase) >= 0)
+
+                        int rootDepth = DepthOfRootFor(p);
+                        int fileDepth = p.Count(c => c == '/');
+                        bool inSubfolder = rootDepth >= 0 && fileDepth > rootDepth + 1;
+                        if (inSubfolder)
                         {
                             score += 100;
-                            scoreBreakdown.Append("+100(title) ");
+                            bd.Append("+100(subfolder) ");
                         }
 
-                        var fileTokens = TokenizeForMatch(nameNoExt).ToList();
-                        var tCount = titleTokens.Count;
-                        if (tCount > 0)
-                        {
-                            int inter = fileTokens.Count(ft => titleTokens.Contains(ft));
-                            int tokenScore = inter * 10;
-                            score += tokenScore;
-                            scoreBreakdown.Append($"+{tokenScore}(tokens:{inter}) ");
-                        }
-
-                        if (!string.IsNullOrEmpty(artist) && p.IndexOf(artist, StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            score += 50;
-                            scoreBreakdown.Append("+50(artist) ");
-                        }
-
-                        int depth = p.Count(ch => ch == '/');
-                        int depthScore = Math.Min(depth, 10);
-                        score += depthScore;
-                        scoreBreakdown.Append($"+{depthScore}(depth:{depth})");
-
-                        return (path: p, score, breakdown: scoreBreakdown.ToString());
+                        return (path: p, score, breakdown: bd.ToString(), originalIndex: idx);
                     })
-                    .OrderByDescending(x => x.score)
-                    .ThenByDescending(x => x.path.Count(ch => ch == '/'))
                     .ToList();
 
-                filesToProcess = ranked.Select(r => r.path).Take(20).ToList();
+                // Resolve ties using file size (larger wins). We only call `stat` for paths that
+                // share the highest score, so we don't pay the cost when there's a clear winner.
+                int topScore = ranked.Max(r => r.score);
+                var topGroup = ranked.Where(r => r.score == topScore).ToList();
+
+                List<(string path, int score, string breakdown, int originalIndex, long size)> sized;
+                if (topGroup.Count > 1)
+                {
+                    Debugger.show($"Tie at score {topScore} between {topGroup.Count} files, comparing sizes");
+                    var sizeTasks = topGroup.Select(async r =>
+                    {
+                        long sz = await GetRemoteFileSizeAsync(device, r.path).ConfigureAwait(false);
+                        return (r.path, r.score, r.breakdown, r.originalIndex, size: sz);
+                    });
+                    sized = (await Task.WhenAll(sizeTasks).ConfigureAwait(false)).ToList();
+                }
+                else
+                {
+                    sized = topGroup.Select(r => (r.path, r.score, r.breakdown, r.originalIndex, size: -1L)).ToList();
+                }
+
+                var ordered = sized
+                    .OrderByDescending(x => x.size)       // largest first
+                    .ThenBy(x => x.originalIndex)         // then first occurrence
+                    .ToList();
+
+                // Build the final processing list: top-group ordered, then the rest by raw score
+                // as backup candidates (so cover lookup can keep trying if the winner has no art).
+                var rest = ranked
+                    .Where(r => r.score < topScore)
+                    .OrderByDescending(r => r.score)
+                    .ThenBy(r => r.originalIndex)
+                    .Select(r => r.path);
+
+                var filesToProcess = ordered.Select(o => o.path).Concat(rest).Take(20).ToList();
 
                 Debugger.show($"Files to process for cover art lookup (ranked): {filesToProcess.Count}");
                 for (int i = 0; i < ranked.Count; i++)
                 {
-                    var (path, score, breakdown) = ranked[i];
-                    string fileName = Path.GetFileName(path);
-                    Debugger.show($"  [{i + 1}] Score={score:D3} | {breakdown}| {fileName}");
+                    var r = ranked[i];
+                    string fileName = Path.GetFileName(r.path);
+                    Debugger.show($"  [{i + 1}] Score={r.score:D3} | {r.breakdown}| {fileName}");
+                }
+                if (ordered.Count > 1)
+                {
+                    Debugger.show("Tie-broken order:");
+                    foreach (var o in ordered)
+                        Debugger.show($"  size={o.size} | {Path.GetFileName(o.path)}");
                 }
 
                 TimeSpan? duration = null;

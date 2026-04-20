@@ -312,10 +312,10 @@ namespace musicpresense
 
             await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} tcpip {port}").ConfigureAwait(false);
             await Task.Delay(750).ConfigureAwait(false);
-            await AdbHelper.RunAdbCaptureAsync($"connect {ip}:{port}"). ConfigureAwait(false);
+            await AdbHelper.RunAdbCaptureAsync($"connect {ip}:{port}").ConfigureAwait(false);
             await Task.Delay(750).ConfigureAwait(false);
 
-            var devices = await AdbHelper.RunAdbCaptureAsync("devices"). ConfigureAwait(false);
+            var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
             var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var wifiId = $"{ip}:{port}";
             if (deviceList.Any(l => l.StartsWith(wifiId) && l.EndsWith("device")))
@@ -354,84 +354,108 @@ namespace musicpresense
         }
 
         /// <summary>
-        /// Attempts to parse title, artist, and album from media session metadata when fields contain commas.
-        /// Uses notification data to determine field lengths for accurate parsing.
-        /// This should only be called when commaCount > 3.
+        /// Parses title, artist and album from the scrambled media_session metadata string by
+        /// reading the exact field lengths from `dumpsys notification --noredact` for the active
+        /// package. Mapping: title = android.title, artist = android.text, album = android.subText.
+        /// Field separator in scrambled string is assumed to be ", " (comma + space, 2 chars).
+        /// Returns success=false if the notification cannot be located or lengths cannot be read,
+        /// so the caller can fall back to a simple split.
         /// </summary>
-        private async Task<(string title, string artist, string album, bool success)> TryParseMediaMetadataAsync(
+        private async Task<(string? title, string? artist, string? album, bool success)> TryParseMediaMetadataAsync(
             string scrambledMetadata, string packageName)
         {
             try
             {
-                // Get notification data for the active player
-                Debugger.show($"[CommaParser] Fetching notification data for package: {packageName}");
+                Debugger.show($"[NotifParser] Fetching notification data for package: {packageName}");
                 string notifOutput = await AdbHelper.RunAdbCaptureAsync(
-                    $"-s {_currentDevice} shell dumpsys notification --noredact")
+                    $"-s {_currentDevice} shell dumpsys notification")
                     .ConfigureAwait(false);
 
                 if (string.IsNullOrWhiteSpace(notifOutput))
                 {
-                    // Fallback to simple split if no notification data
-                    Debugger.show($"[CommaParser] ⚠ No notification data available, falling back to simple split");
-                    var parts = scrambledMetadata.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 3)
-                    {
-                        return (parts[0].Trim(), parts[1].Trim(), parts[2].Trim(), true);
-                    }
+                    Debugger.show("[NotifParser] No notification data available");
                     return (null, null, null, false);
                 }
 
-                // Try to find the package's notification to extract field information
+                // Find the NotificationRecord block for our package and isolate it from the next record.
+                // We grab everything from "pkg=<package>" up to the next "NotificationRecord(" or end of dump.
                 var pkgPattern = Regex.Escape(packageName);
-                var notifMatches = Regex.Matches(notifOutput, 
-                    $@"record.*?pkg={pkgPattern}.*?(?:title|contentTitle)=([^\n]*?)[\n]",
-                    RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                var blockMatch = Regex.Match(notifOutput,
+                    $@"pkg={pkgPattern}\b.*?(?=NotificationRecord\(|\Z)",
+                    RegexOptions.Singleline);
 
-                if (notifMatches.Count == 0)
+                if (!blockMatch.Success)
                 {
-                    // No matching notification found, use fallback simple split
-                    Debugger.show($"[CommaParser] ⚠ No matching notification found for {packageName}, falling back to simple split");
-                    var parts = scrambledMetadata.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 3)
-                    {
-                        return (parts[0].Trim(), parts[1].Trim(), parts[2].Trim(), true);
-                    }
+                    Debugger.show($"[NotifParser] No notification record found for {packageName}");
                     return (null, null, null, false);
                 }
 
-                Debugger.show($"[CommaParser] Found notification data for {packageName}, parsing...");
+                string notifBlock = blockMatch.Value;
 
-                // Parse based on comma positions
-                // Find the first comma to separate title
-                int titleLength = scrambledMetadata.IndexOf(',');
-                if (titleLength <= 0)
+                // Extract lengths from the extras block. Format example:
+                //   android.title=String [length=52]
+                //   android.text=String [length=24]
+                //   android.subText=String [length=44]
+                int? titleLen = ExtractStringLength(notifBlock, "android.title");
+                int? artistLen = ExtractStringLength(notifBlock, "android.text");
+                int? albumLen = ExtractStringLength(notifBlock, "android.subText");
+
+                if (!titleLen.HasValue || !artistLen.HasValue)
                 {
-                    Debugger.show($"[CommaParser] ✗ Failed to find title end (first comma)");
+                    Debugger.show($"[NotifParser] Missing required lengths (title={titleLen}, text={artistLen}, subText={albumLen})");
                     return (null, null, null, false);
                 }
 
-                string title = scrambledMetadata.Substring(0, titleLength).Trim();
-                string remaining = scrambledMetadata.Substring(titleLength + 1).TrimStart();
+                // Separator between fields in the scrambled string is ", " (2 chars).
+                const int sep = 2;
+                int needed = titleLen.Value + sep + artistLen.Value;
+                if (albumLen.HasValue) needed += sep + albumLen.Value;
 
-                // Find the second comma to separate artist
-                int artistEnd = remaining.IndexOf(',');
-                if (artistEnd <= 0)
+                if (scrambledMetadata.Length < needed)
                 {
-                    Debugger.show($"[CommaParser] ✗ Failed to find artist end (second comma)");
+                    Debugger.show($"[NotifParser] Scrambled string ({scrambledMetadata.Length}) shorter than expected ({needed})");
                     return (null, null, null, false);
                 }
 
-                string artist = remaining.Substring(0, artistEnd).Trim();
-                string album = remaining.Substring(artistEnd + 1).Trim();
+                string title = scrambledMetadata.Substring(0, titleLen.Value);
+                string artist = scrambledMetadata.Substring(titleLen.Value + sep, artistLen.Value);
+                string album = albumLen.HasValue
+                    ? scrambledMetadata.Substring(titleLen.Value + sep + artistLen.Value + sep, albumLen.Value)
+                    : string.Empty;
 
-                Debugger.show($"[CommaParser] ✓ Successfully parsed with notification context: Title='{title}', Artist='{artist}', Album='{album}'");
+                Debugger.show($"[NotifParser] ✓ Parsed via lengths (T={titleLen}, A={artistLen}, Al={albumLen}): Title='{title}', Artist='{artist}', Album='{album}'");
                 return (title, artist, album, true);
             }
             catch (Exception ex)
             {
-                Debugger.show($"[CommaParser] ✗ Exception in advanced parsing: {ex.Message}");
+                Debugger.show($"[NotifParser] ✗ Exception: {ex.Message}");
                 return (null, null, null, false);
             }
+        }
+
+        /// <summary>
+        /// Extracts the [length=N] value for a given extras key from a notification dump block.
+        /// Returns null if the key is missing or the length cannot be parsed.
+        /// </summary>
+        private static int? ExtractStringLength(string notifBlock, string extrasKey)
+        {
+            var pattern = Regex.Escape(extrasKey) + @"=String\s*\[length=(\d+)\]";
+            var m = Regex.Match(notifBlock, pattern);
+            if (!m.Success) return null;
+            return int.TryParse(m.Groups[1].Value, out var len) ? len : (int?)null;
+        }
+
+        /// <summary>
+        /// Simple comma-split fallback used when notification data is unavailable.
+        /// </summary>
+        private static (string? title, string? artist, string? album, bool success) SimpleSplitFallback(string scrambledMetadata)
+        {
+            var parts = scrambledMetadata.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 3)
+                return (parts[0].Trim(), parts[1].Trim(), parts[2].Trim(), true);
+            if (parts.Length == 2)
+                return (parts[0].Trim(), parts[1].Trim(), string.Empty, true);
+            return (null, null, null, false);
         }
 
         private async Task<bool> UpdateCurrentSongAsync()
@@ -480,64 +504,43 @@ namespace musicpresense
                         continue;
                     }
 
+                    // Pull the full metadata line (everything after "description=" up to end-of-line).
+                    // Earlier versions used a non-greedy comma regex here which silently truncated
+                    // titles/artists/albums that contained commas; we now hand the FULL scrambled
+                    // string to the notification-length parser so it can split it correctly.
                     var metaMatch = Regex.Match(block,
-                        @"metadata:\s+size=\d+,\s+description=(.+?),\s+(.+?),\s+(.+)",
+                        @"description=(?<desc>[^\r\n]+)",
                         RegexOptions.Singleline);
 
                     if (!metaMatch.Success)
                         continue;
 
-                    // Extract the raw metadata string and try to parse it
-                    string rawMetadata = metaMatch.Groups[0].Value.Trim();
-                    // Remove the "metadata: size=..., description=" prefix to get just the data
-                    var descMatch = Regex.Match(rawMetadata, @"description=(.+)$", RegexOptions.Singleline);
-                    string scrambledData = descMatch.Success ? descMatch.Groups[1].Value : rawMetadata;
+                    string scrambledData = metaMatch.Groups["desc"].Value.Trim();
 
                     // Skip parsing if metadata hasn't changed since last update
                     if (string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal))
                     {
-                        Debugger.show($"[CommaParser] ⊘ Skipped parsing (metadata unchanged)");
+                        Debugger.show($"[NotifParser] ⊘ Skipped parsing (metadata unchanged)");
                         continue;
                     }
 
                     _lastScrambledMetadata = scrambledData;
 
-                    // Only use the advanced parsing if there are more than 3 commas in the data
-                    // which indicates fields contain commas
-                    int commaCount = scrambledData.Count(c => c == ',');
-                    (string title, string artist, string album, bool parseSuccess) parseResult;
-
-                    if (commaCount > 3)
+                    // Always try notification-based parsing first (uses exact field lengths).
+                    // Fall back to a naive comma split only when notification data isn't available.
+                    var parseResult = await TryParseMediaMetadataAsync(scrambledData, pkg).ConfigureAwait(false);
+                    if (!parseResult.success)
                     {
-                        // Complex case: use async helper to check notification data
-                        Debugger.show($"[CommaParser] Detected {commaCount} commas in metadata, using advanced parsing for package: {pkg}");
-                        parseResult = await TryParseMediaMetadataAsync(scrambledData, pkg).ConfigureAwait(false);
-                        if (parseResult.parseSuccess)
-                        {
-                            Debugger.show($"[CommaParser] ✓ Advanced parsing SUCCESS - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
-                        }
-                        else
-                        {
-                            Debugger.show($"[CommaParser] ✗ Advanced parsing FAILED for package: {pkg}");
-                        }
-                    }
-                    else
-                    {
-                        // Simple case: just split by comma
-                        var parts = scrambledData.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                        parseResult = parts.Length >= 3 
-                            ? (parts[0].Trim(), parts[1].Trim(), parts[2].Trim(), true)
-                            : (null, null, null, false);
-                        if (parseResult.parseSuccess)
-                        {
-                            Debugger.show($"[CommaParser] Simple parsing ({commaCount} commas) - Title: '{parseResult.title}', Artist: '{parseResult.artist}'");
-                        }
+                        Debugger.show($"[NotifParser] Falling back to simple split for package: {pkg}");
+                        parseResult = SimpleSplitFallback(scrambledData);
+                        if (parseResult.success)
+                            Debugger.show($"[NotifParser] Fallback parsed - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
                     }
 
-                    string title = parseResult.title;
-                    string artist = parseResult.artist;
-                    string album = parseResult.album;
-                    bool parseSuccess = parseResult.parseSuccess;
+                    string? title = parseResult.title;
+                    string? artist = parseResult.artist;
+                    string? album = parseResult.album;
+                    bool parseSuccess = parseResult.success;
 
                     if (!parseSuccess)
                         continue;
