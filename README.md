@@ -1,3 +1,5 @@
+#old detection setting to remind myself how bad i am at coding 
+
 # Android Music Presence Link
 
 Share what is currently playing on your Android device to Windows, and optionally forward it to Discord using MusicPresence.
