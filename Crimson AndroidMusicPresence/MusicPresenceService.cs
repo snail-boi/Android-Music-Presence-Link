@@ -534,23 +534,25 @@ namespace musicpresense
                     // matching length fields. That yields a bad first parse. To correct for it we
                     // force a re-parse for 2 further ticks after any scrambled change, so the cache
                     // ends up populated with the result from a tick where both surfaces agree.
+                    //
+                    // We always cache the scrambled string after the parse attempt, even when the
+                    // parse failed. Otherwise an unchanging-but-unparsable string (e.g. when no song
+                    // is playing) would re-fire two adb calls every tick forever.
                     bool scrambledChanged = !string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal);
                     if (scrambledChanged)
                     {
                         _reparseTicksRemaining = 2;
                     }
 
-                    bool mustReparse = scrambledChanged || _reparseTicksRemaining > 0 || !_lastParseSuccess;
+                    bool mustReparse = scrambledChanged || _reparseTicksRemaining > 0;
 
                     (string? title, string? artist, string? album, bool success) parseResult;
                     if (!mustReparse)
                     {
-                        parseResult = (_lastParsedTitle, _lastParsedArtist, _lastParsedAlbum, true);
+                        parseResult = (_lastParsedTitle, _lastParsedArtist, _lastParsedAlbum, _lastParseSuccess);
                     }
                     else
                     {
-                        _lastScrambledMetadata = scrambledData;
-
                         // Always try notification-based parsing first (uses exact field lengths).
                         // Fall back to a naive comma split only when notification data isn't available.
                         parseResult = await TryParseMediaMetadataAsync(scrambledData, pkg).ConfigureAwait(false);
@@ -562,6 +564,7 @@ namespace musicpresense
                                 Debugger.show($"[NotifParser] Fallback parsed - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
                         }
 
+                        _lastScrambledMetadata = scrambledData;
                         _lastParsedTitle = parseResult.title;
                         _lastParsedArtist = parseResult.artist;
                         _lastParsedAlbum = parseResult.album;
