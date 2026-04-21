@@ -28,6 +28,10 @@ namespace musicpresense
         private string? _lastNowPlayingArtist;
         private string? _lastNowPlayingAlbum;
         private string? _lastScrambledMetadata;
+        private string? _lastParsedTitle;
+        private string? _lastParsedArtist;
+        private string? _lastParsedAlbum;
+        private bool _lastParseSuccess;
 
         internal string CurrentDevice => _currentDevice;
         internal event Action<TrayIconState>? TrayStateChanged;
@@ -517,24 +521,36 @@ namespace musicpresense
 
                     string scrambledData = metaMatch.Groups["desc"].Value.Trim();
 
-                    // Skip parsing if metadata hasn't changed since last update
-                    if (string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal))
+                    // Parse title/artist/album. If the scrambled string is identical to last tick
+                    // we reuse the cached parse result so we don't re-run the notification parser
+                    // (which would fire another adb call). We must NOT skip the rest of the loop:
+                    // the position-ticking logic in MediaController.UpdateMediaControlsAsync needs
+                    // to run every tick because Android reports a static position that we have to
+                    // increment ourselves.
+                    (string? title, string? artist, string? album, bool success) parseResult;
+                    if (_lastParseSuccess && string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal))
                     {
-                        Debugger.show($"[NotifParser] ⊘ Skipped parsing (metadata unchanged)");
-                        continue;
+                        parseResult = (_lastParsedTitle, _lastParsedArtist, _lastParsedAlbum, true);
                     }
-
-                    _lastScrambledMetadata = scrambledData;
-
-                    // Always try notification-based parsing first (uses exact field lengths).
-                    // Fall back to a naive comma split only when notification data isn't available.
-                    var parseResult = await TryParseMediaMetadataAsync(scrambledData, pkg).ConfigureAwait(false);
-                    if (!parseResult.success)
+                    else
                     {
-                        Debugger.show($"[NotifParser] Falling back to simple split for package: {pkg}");
-                        parseResult = SimpleSplitFallback(scrambledData);
-                        if (parseResult.success)
-                            Debugger.show($"[NotifParser] Fallback parsed - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
+                        _lastScrambledMetadata = scrambledData;
+
+                        // Always try notification-based parsing first (uses exact field lengths).
+                        // Fall back to a naive comma split only when notification data isn't available.
+                        parseResult = await TryParseMediaMetadataAsync(scrambledData, pkg).ConfigureAwait(false);
+                        if (!parseResult.success)
+                        {
+                            Debugger.show($"[NotifParser] Falling back to simple split for package: {pkg}");
+                            parseResult = SimpleSplitFallback(scrambledData);
+                            if (parseResult.success)
+                                Debugger.show($"[NotifParser] Fallback parsed - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
+                        }
+
+                        _lastParsedTitle = parseResult.title;
+                        _lastParsedArtist = parseResult.artist;
+                        _lastParsedAlbum = parseResult.album;
+                        _lastParseSuccess = parseResult.success;
                     }
 
                     string? title = parseResult.title;
