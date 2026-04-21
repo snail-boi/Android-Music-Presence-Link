@@ -32,6 +32,7 @@ namespace musicpresense
         private const int HotkeyIdVolumeDown = 2;
         private const int HotkeyIdToggleScrcpy = 3;
         private const int HotkeyIdToggleLyricsOverlay = 4;
+        private const int HotkeyIdCopyTrackInfo = 5;
         private const int ModShift = 0x0004;
         private const int VkVolumeUp = 0xAF;
         private const int VkVolumeDown = 0xAE;
@@ -42,6 +43,9 @@ namespace musicpresense
 
         private bool _isScrcpyRunning;
         private TrayIconState _lastTrayState = TrayIconState.NoDevice;
+        private string? _lastNowPlayingArtist;
+        private string? _lastNowPlayingTitle;
+        private string? _lastNowPlayingAlbum;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -85,6 +89,9 @@ namespace musicpresense
 
             Dispatcher.BeginInvoke(() =>
             {
+                _lastNowPlayingArtist = artist;
+                _lastNowPlayingTitle = title;
+                _lastNowPlayingAlbum = album;
                 _trayIconManager?.SetNowPlaying(artist, title, album);
             });
         }
@@ -445,6 +452,7 @@ namespace musicpresense
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, Config.HotkeyModifier, Config.HotkeyVolumeDownKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.HotkeyModifier, Config.HotkeyToggleScrcpyKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay, Config.HotkeyModifier, Config.HotkeyToggleLyricsOverlayKey); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo, Config.HotkeyModifier, Config.HotkeyCopyTrackInfoKey); } catch { }
         }
 
         private void UpdateTrayAudioSettings()
@@ -464,6 +472,7 @@ namespace musicpresense
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown);
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy);
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay);
+                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo);
                 _hotkeySource.RemoveHook(HotkeyHook);
                 _hotkeySource.Dispose();
                 _hotkeySource = null;
@@ -491,6 +500,9 @@ namespace musicpresense
                         _lyricsOverlayManager?.ToggleVisibility();
                         handled = true;
                         break;
+                    case HotkeyIdCopyTrackInfo:
+                        handled = TryCopyCurrentTrackInfoToClipboard();
+                        break;
                 }
             }
 
@@ -504,6 +516,39 @@ namespace musicpresense
                 return false;
 
             return ScrcpyVolumeController.TryAdjustVolume(process.Id, delta);
+        }
+
+        private bool TryCopyCurrentTrackInfoToClipboard()
+        {
+            var artist = _lastNowPlayingArtist ?? string.Empty;
+            var title = _lastNowPlayingTitle ?? string.Empty;
+            var album = _lastNowPlayingAlbum ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(album))
+                return false;
+
+            var template = string.IsNullOrWhiteSpace(Config.CopyTrackInfoTemplate)
+                ? "{artist} - {title}"
+                : Config.CopyTrackInfoTemplate;
+
+            var text = template
+                .Replace("{artist}", artist, StringComparison.OrdinalIgnoreCase)
+                .Replace("{title}", title, StringComparison.OrdinalIgnoreCase)
+                .Replace("{album}", album, StringComparison.OrdinalIgnoreCase)
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            try
+            {
+                Dispatcher.Invoke(() => Clipboard.SetText(text));
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         [DllImport("user32.dll", SetLastError = true)]

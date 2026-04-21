@@ -224,6 +224,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                 <Button x:Name="BtnClearCoverCache" Content="Clear Cover Cache" Width="160" />
+                <Button x:Name="BtnOpenCoverCache" Content="Open Cover Cache" Width="160" Margin="8,0,0,0" />
             </StackPanel>
 
             <Expander Header="Eligible Apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
@@ -323,6 +324,12 @@
                         <TextBox x:Name="TxtHotkeyToggleLyricsOverlay" Width="220" />
                         <Button x:Name="BtnRecordHotkeyToggleLyricsOverlay" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleLyricsOverlay_Click" />
                     </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Copy Track Info key:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtHotkeyCopyTrackInfo" Width="220" />
+                        <Button x:Name="BtnRecordHotkeyCopyTrackInfo" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyCopyTrackInfo_Click" />
+                    </StackPanel>
                 </StackPanel>
             </Expander>
 
@@ -388,6 +395,16 @@
                         <TextBlock Text="Lyrics folder (phone):" Width="140" VerticalAlignment="Center" />
                         <TextBox x:Name="TxtLyricsFolderOverride" Width="220" />
                         <Button x:Name="BtnBrowseLyricsFolder" Content="Pick" Width="80" Margin="8,0,0,0" Click="BtnBrowseLyricsFolder_Click" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Cover filename patterns:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtCoverPatterns" Width="220" ToolTip="Semicolon separated, e.g. cover.jpg;folder.jpg;front.png" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Copy template:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtCopyTrackTemplate" Width="220" ToolTip="Use {artist}, {title}, {album}" />
                     </StackPanel>
                     
                     <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,0" />

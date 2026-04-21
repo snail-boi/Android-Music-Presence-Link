@@ -24,9 +24,7 @@ namespace musicpresense
         idees for future features:
         Now Playing Notifications
         Cover cache viewer, just opens the cache folder in Explorer
-        .lrc lyrics with synced overlay, hotkey toggle
         Embedded lyrics fallback (USLT/SYLT tags in FLAC/MP3)
-        Lyrics search folder override
         Cover art filename pattern editor
         Copy current track info hotkey with user-editable template ({artist} - {title} etc.)
 
@@ -130,6 +128,7 @@ namespace musicpresense
             BtnAutoGather.Click += BtnAutoGather_Click;
             BtnPickRemoteRoot.Click += BtnPickRemoteRoot_Click;
             BtnClearCoverCache.Click += BtnClearCoverCache_Click;
+            BtnOpenCoverCache.Click += BtnOpenCoverCache_Click;
             LstAudioCodecs.SelectionChanged += LstAudioCodecs_SelectionChanged;
             ChkDarkMode.Checked += ChkDarkMode_CheckedChanged;
             ChkDarkMode.Unchecked += ChkDarkMode_CheckedChanged;
@@ -213,7 +212,10 @@ namespace musicpresense
             try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
             try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
             try { TxtHotkeyToggleLyricsOverlay.Text = VirtualKeyToDisplayName(_config.HotkeyToggleLyricsOverlayKey); } catch { TxtHotkeyToggleLyricsOverlay.Text = string.Empty; }
+            try { TxtHotkeyCopyTrackInfo.Text = VirtualKeyToDisplayName(_config.HotkeyCopyTrackInfoKey); } catch { TxtHotkeyCopyTrackInfo.Text = string.Empty; }
             TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
+            TxtCoverPatterns.Text = _config.CoverArtFileNamePatterns ?? string.Empty;
+            TxtCopyTrackTemplate.Text = _config.CopyTrackInfoTemplate ?? string.Empty;
 
             try
             {
@@ -879,7 +881,10 @@ namespace musicpresense
             _config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
             _config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
             _config.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
+            _config.HotkeyCopyTrackInfoKey = ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _config.HotkeyCopyTrackInfoKey);
             _config.LyricsSearchFolderOverride = TxtLyricsFolderOverride.Text.Trim();
+            _config.CoverArtFileNamePatterns = TxtCoverPatterns.Text.Trim();
+            _config.CopyTrackInfoTemplate = TxtCopyTrackTemplate.Text.Trim();
 
             // Modifier: use selected combobox item
             try
@@ -1100,7 +1105,10 @@ namespace musicpresense
             config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
             config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
             config.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
+            config.HotkeyCopyTrackInfoKey = ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _config.HotkeyCopyTrackInfoKey);
             config.LyricsSearchFolderOverride = TxtLyricsFolderOverride.Text.Trim();
+            config.CoverArtFileNamePatterns = TxtCoverPatterns.Text.Trim();
+            config.CopyTrackInfoTemplate = TxtCopyTrackTemplate.Text.Trim();
 
             try
             {
@@ -1165,8 +1173,11 @@ namespace musicpresense
             if (left.HotkeyVolumeDownKey != right.HotkeyVolumeDownKey) return false;
             if (left.HotkeyToggleScrcpyKey != right.HotkeyToggleScrcpyKey) return false;
             if (left.HotkeyToggleLyricsOverlayKey != right.HotkeyToggleLyricsOverlayKey) return false;
+            if (left.HotkeyCopyTrackInfoKey != right.HotkeyCopyTrackInfoKey) return false;
             if (left.HotkeyModifier != right.HotkeyModifier) return false;
             if (!string.Equals(left.LyricsSearchFolderOverride ?? string.Empty, right.LyricsSearchFolderOverride ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(left.CoverArtFileNamePatterns ?? string.Empty, right.CoverArtFileNamePatterns ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(left.CopyTrackInfoTemplate ?? string.Empty, right.CopyTrackInfoTemplate ?? string.Empty, StringComparison.Ordinal)) return false;
 
             var eligibleLeft = (left.EligibleApps ?? new List<EligibleAppConfig>())
                 .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
@@ -1256,7 +1267,10 @@ namespace musicpresense
                 HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
                 HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,
                 HotkeyToggleLyricsOverlayKey = source.HotkeyToggleLyricsOverlayKey,
+                HotkeyCopyTrackInfoKey = source.HotkeyCopyTrackInfoKey,
                 LyricsSearchFolderOverride = source.LyricsSearchFolderOverride ?? string.Empty,
+                CoverArtFileNamePatterns = source.CoverArtFileNamePatterns ?? string.Empty,
+                CopyTrackInfoTemplate = source.CopyTrackInfoTemplate ?? string.Empty,
                 IsWifiEnabled = source.IsWifiEnabled,
                 HotkeyModifier = source.HotkeyModifier
             };
@@ -1275,6 +1289,12 @@ namespace musicpresense
 
             if (TxtLyricsFolderOverride != null)
                 TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
+
+            if (TxtCoverPatterns != null)
+                TxtCoverPatterns.Text = _config.CoverArtFileNamePatterns ?? string.Empty;
+
+            if (TxtCopyTrackTemplate != null)
+                TxtCopyTrackTemplate.Text = _config.CopyTrackInfoTemplate ?? string.Empty;
         }
         #endregion
 
@@ -1308,13 +1328,37 @@ namespace musicpresense
         {
             try
             {
-                var manager = new CoverCacheManager(_config.Paths.FfmpegPath, _config.Paths.CoverCachePath, _config.CachClearInMB);
+                var manager = new CoverCacheManager(_config.Paths.FfmpegPath, _config.Paths.CoverCachePath, _config.CachClearInMB, _config.CoverArtFileNamePatterns);
                 manager.ClearCache();
                 MessageBox.Show("Cover cache cleared.", "Cover Cache", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to clear cover cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnOpenCoverCache_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var cachePath = _config.Paths?.CoverCachePath ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(cachePath))
+                {
+                    MessageBox.Show("Cover cache path is not configured.", "Cover Cache", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                Directory.CreateDirectory(cachePath);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = cachePath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open cover cache folder: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

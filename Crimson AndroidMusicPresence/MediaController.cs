@@ -35,7 +35,7 @@ namespace musicpresense
             this.getCurrentDevice = getCurrentDevice;
             this.updateCurrentSongCallback = updateCurrentSongCallback;
 
-            cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB);
+            cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB, config.CoverArtFileNamePatterns);
             remoteRoots = GetNormalizedRemoteRoots(config);
             deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
         }
@@ -44,7 +44,7 @@ namespace musicpresense
         {
             try
             {
-                cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB);
+                cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB, config.CoverArtFileNamePatterns);
                 remoteRoots = GetNormalizedRemoteRoots(config);
                 deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
                 Debugger.show("MediaController configuration updated. RemoteRoots='" + string.Join(";", remoteRoots) + "'");

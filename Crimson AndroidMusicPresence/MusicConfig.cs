@@ -45,6 +45,8 @@ namespace musicpresense
 
         public int CachClearInMB { get; set; } = 200;
         public string LyricsSearchFolderOverride { get; set; } = string.Empty;
+        public string CoverArtFileNamePatterns { get; set; } = "cover.jpg;cover.png;folder.jpg";
+        public string CopyTrackInfoTemplate { get; set; } = "{artist} - {title}";
 
         public List<string> AllowedApps { get; set; } = new List<string> { };
         public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
@@ -57,6 +59,7 @@ namespace musicpresense
         public int HotkeyVolumeDownKey { get; set; } = 0xAE;
         public int HotkeyToggleScrcpyKey { get; set; } = 0x53;
         public int HotkeyToggleLyricsOverlayKey { get; set; } = 0x4C;
+        public int HotkeyCopyTrackInfoKey { get; set; } = 0x43;
         public int HotkeyModifier { get; set; } = 0x0004; // default SHIFT
     }
 
@@ -233,6 +236,16 @@ namespace musicpresense
             config.LyricsSearchFolderOverride ??= string.Empty;
             config.LyricsSearchFolderOverride = config.LyricsSearchFolderOverride.Trim();
 
+            config.CoverArtFileNamePatterns ??= "cover.jpg;cover.png;folder.jpg";
+            config.CoverArtFileNamePatterns = config.CoverArtFileNamePatterns.Trim();
+            if (string.IsNullOrWhiteSpace(config.CoverArtFileNamePatterns))
+                config.CoverArtFileNamePatterns = "cover.jpg;cover.png;folder.jpg";
+
+            config.CopyTrackInfoTemplate ??= "{artist} - {title}";
+            config.CopyTrackInfoTemplate = config.CopyTrackInfoTemplate.Trim();
+            if (string.IsNullOrWhiteSpace(config.CopyTrackInfoTemplate))
+                config.CopyTrackInfoTemplate = "{artist} - {title}";
+
             if (config.SmtcPauseClearDelayMinutes < 0)
                 config.SmtcPauseClearDelayMinutes = 0;
 
@@ -245,6 +258,8 @@ namespace musicpresense
                 config.HotkeyToggleScrcpyKey = 0x53;
             if (config.HotkeyToggleLyricsOverlayKey < 0 || config.HotkeyToggleLyricsOverlayKey > 0xFF)
                 config.HotkeyToggleLyricsOverlayKey = 0x4C;
+            if (config.HotkeyCopyTrackInfoKey < 0 || config.HotkeyCopyTrackInfoKey > 0xFF)
+                config.HotkeyCopyTrackInfoKey = 0x43;
 
             // Ensure modifier is one of allowed flags (ALT=0x0001, CONTROL=0x0002, SHIFT=0x0004)
             var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };

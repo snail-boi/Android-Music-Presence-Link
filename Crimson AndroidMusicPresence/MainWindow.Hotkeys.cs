@@ -48,6 +48,15 @@ namespace musicpresense
             });
         }
 
+        private void BtnRecordHotkeyCopyTrackInfo_Click(object sender, RoutedEventArgs e)
+        {
+            StartRecordingHotkey(k =>
+            {
+                Dispatcher.Invoke(() => TxtHotkeyCopyTrackInfo.Text = VirtualKeyToDisplayName(k));
+                _config.HotkeyCopyTrackInfoKey = k;
+            });
+        }
+
         private void CmbHotkeyModifier_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             try

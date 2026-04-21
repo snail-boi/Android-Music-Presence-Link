@@ -18,6 +18,7 @@ namespace musicpresense
         private readonly string tempPath;
         private readonly string ffmpegPath;
         private long maxCacheBytes;
+        private readonly string coverFilePatterns;
 
         private readonly string indexFile;
         private readonly string folderIndexFile;
@@ -27,12 +28,13 @@ namespace musicpresense
         private Dictionary<string, string> folderIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, DateTime> nocover = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
 
-        public CoverCacheManager(string ffmpegPath, string cachePath, int MaxCacheSizeInBytes)
+        public CoverCacheManager(string ffmpegPath, string cachePath, int MaxCacheSizeInBytes, string? coverFilePatterns = null)
         {
             this.maxCacheBytes = MaxCacheSizeInBytes * 1024L * 1024L;
             this.ffmpegPath = ffmpegPath;
             this.cachePath = cachePath;
             this.tempPath = Path.Combine(cachePath, "temp");
+            this.coverFilePatterns = string.IsNullOrWhiteSpace(coverFilePatterns) ? "cover.jpg;cover.png;folder.jpg" : coverFilePatterns;
 
             this.indexFile = Path.Combine(cachePath, "index.json");
             this.folderIndexFile = Path.Combine(cachePath, "folder_index.json");
@@ -130,6 +132,23 @@ namespace musicpresense
                 return configuredDeviceName.Trim();
 
             return deviceId;
+        }
+
+        private List<string> GetConfiguredCoverNames()
+        {
+            var names = (coverFilePatterns ?? string.Empty)
+                .Split(new[] { ';', ',', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (names.Count == 0)
+            {
+                names.AddRange(new[] { "cover.jpg", "cover.png", "folder.jpg" });
+            }
+
+            return names;
         }
 
         private class CacheEntry
@@ -279,7 +298,7 @@ namespace musicpresense
                     Debugger.show("Embedded extraction attempt failed: " + ex.Message);
                 }
 
-                var possibleNames = new[] { "cover.jpg", "cover.png", "folder.jpg" };
+                var possibleNames = GetConfiguredCoverNames();
 
                 foreach (var name in possibleNames)
                 {
