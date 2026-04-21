@@ -32,6 +32,7 @@ namespace musicpresense
         private string? _lastParsedArtist;
         private string? _lastParsedAlbum;
         private bool _lastParseSuccess;
+        private int _reparseTicksRemaining;
 
         internal string CurrentDevice => _currentDevice;
         internal event Action<TrayIconState>? TrayStateChanged;
@@ -527,8 +528,22 @@ namespace musicpresense
                     // the position-ticking logic in MediaController.UpdateMediaControlsAsync needs
                     // to run every tick because Android reports a static position that we have to
                     // increment ourselves.
+                    //
+                    // Timing quirk: when a track changes, `dumpsys media_session` sometimes reflects
+                    // the new scrambled metadata before `dumpsys notification` has caught up with the
+                    // matching length fields. That yields a bad first parse. To correct for it we
+                    // force a re-parse for 2 further ticks after any scrambled change, so the cache
+                    // ends up populated with the result from a tick where both surfaces agree.
+                    bool scrambledChanged = !string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal);
+                    if (scrambledChanged)
+                    {
+                        _reparseTicksRemaining = 2;
+                    }
+
+                    bool mustReparse = scrambledChanged || _reparseTicksRemaining > 0 || !_lastParseSuccess;
+
                     (string? title, string? artist, string? album, bool success) parseResult;
-                    if (_lastParseSuccess && string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal))
+                    if (!mustReparse)
                     {
                         parseResult = (_lastParsedTitle, _lastParsedArtist, _lastParsedAlbum, true);
                     }
@@ -551,6 +566,10 @@ namespace musicpresense
                         _lastParsedArtist = parseResult.artist;
                         _lastParsedAlbum = parseResult.album;
                         _lastParseSuccess = parseResult.success;
+
+                        // Only decrement AFTER we actually did a reparse this tick.
+                        if (!scrambledChanged && _reparseTicksRemaining > 0)
+                            _reparseTicksRemaining--;
                     }
 
                     string? title = parseResult.title;
