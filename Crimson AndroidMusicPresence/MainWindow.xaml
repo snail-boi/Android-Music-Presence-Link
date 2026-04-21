@@ -317,6 +317,12 @@
                         <TextBox x:Name="TxtHotkeyToggleScrcpy" Width="220" />
                         <Button x:Name="BtnRecordHotkeyToggleScrcpy" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleScrcpy_Click" />
                     </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Toggle Lyrics key:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtHotkeyToggleLyricsOverlay" Width="220" />
+                        <Button x:Name="BtnRecordHotkeyToggleLyricsOverlay" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleLyricsOverlay_Click" />
+                    </StackPanel>
                 </StackPanel>
             </Expander>
 
@@ -376,6 +382,12 @@
                         <TextBlock Text="Clear Cache after:" Width="140" VerticalAlignment="Center" />
                         <TextBox x:Name="TxtCacheClear" Width="220" />
                         <TextBlock Text="MB" Margin="2,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Lyrics folder (phone):" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtLyricsFolderOverride" Width="220" />
+                        <Button x:Name="BtnBrowseLyricsFolder" Content="Pick" Width="80" Margin="8,0,0,0" Click="BtnBrowseLyricsFolder_Click" />
                     </StackPanel>
                     
                     <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,0" />

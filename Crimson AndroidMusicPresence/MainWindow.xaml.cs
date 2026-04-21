@@ -23,17 +23,13 @@ namespace musicpresense
     /*
         idees for future features:
         Now Playing Notifications
-        •   Show Windows toast notifications when the track changes on the Android device.
-        •   Option to display album art and playback controls in the notification.
+        Cover cache viewer, just opens the cache folder in Explorer
+        .lrc lyrics with synced overlay, hotkey toggle
+        Embedded lyrics fallback (USLT/SYLT tags in FLAC/MP3)
+        Lyrics search folder override
+        Cover art filename pattern editor
+        Copy current track info hotkey with user-editable template ({artist} - {title} etc.)
 
-        big maybe:
-        Playback History & Statistics
-        •   Maintain a local history of played tracks, with play counts and last played time.
-        •   Option to export history to CSV or view stats in the UI.
-
-        Theming & UI Customization
-        •   More theme options (accent color, font size, compact/expanded layouts).
-        •   Option to minimize to tray with a right-click menu for quick actions.
     */
     public partial class MainWindow : Window
     {
@@ -216,6 +212,8 @@ namespace musicpresense
             try { TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
             try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
             try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
+            try { TxtHotkeyToggleLyricsOverlay.Text = VirtualKeyToDisplayName(_config.HotkeyToggleLyricsOverlayKey); } catch { TxtHotkeyToggleLyricsOverlay.Text = string.Empty; }
+            TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
 
             try
             {
@@ -880,6 +878,8 @@ namespace musicpresense
             _config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
             _config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
             _config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
+            _config.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
+            _config.LyricsSearchFolderOverride = TxtLyricsFolderOverride.Text.Trim();
 
             // Modifier: use selected combobox item
             try
@@ -1099,6 +1099,8 @@ namespace musicpresense
             config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
             config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
             config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
+            config.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
+            config.LyricsSearchFolderOverride = TxtLyricsFolderOverride.Text.Trim();
 
             try
             {
@@ -1162,7 +1164,9 @@ namespace musicpresense
             if (left.HotkeyVolumeUpKey != right.HotkeyVolumeUpKey) return false;
             if (left.HotkeyVolumeDownKey != right.HotkeyVolumeDownKey) return false;
             if (left.HotkeyToggleScrcpyKey != right.HotkeyToggleScrcpyKey) return false;
+            if (left.HotkeyToggleLyricsOverlayKey != right.HotkeyToggleLyricsOverlayKey) return false;
             if (left.HotkeyModifier != right.HotkeyModifier) return false;
+            if (!string.Equals(left.LyricsSearchFolderOverride ?? string.Empty, right.LyricsSearchFolderOverride ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
 
             var eligibleLeft = (left.EligibleApps ?? new List<EligibleAppConfig>())
                 .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
@@ -1251,6 +1255,9 @@ namespace musicpresense
                 HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
                 HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
                 HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,
+                HotkeyToggleLyricsOverlayKey = source.HotkeyToggleLyricsOverlayKey,
+                LyricsSearchFolderOverride = source.LyricsSearchFolderOverride ?? string.Empty,
+                IsWifiEnabled = source.IsWifiEnabled,
                 HotkeyModifier = source.HotkeyModifier
             };
         }
@@ -1265,6 +1272,9 @@ namespace musicpresense
 
             if (TxtUsbSerial != null)
                 TxtUsbSerial.Text = _config.SelectedDeviceUSB ?? string.Empty;
+
+            if (TxtLyricsFolderOverride != null)
+                TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
         }
         #endregion
 
@@ -1305,6 +1315,37 @@ namespace musicpresense
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to clear cover cache: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void BtnBrowseLyricsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var device = await GetCurrentDeviceForAppsAsync();
+                if (string.IsNullOrWhiteSpace(device))
+                {
+                    MessageBox.Show("No device connected.", "Device Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var picker = new RemoteFolderPicker(device)
+                {
+                    Owner = this
+                };
+
+                if (picker.ShowDialog() == true)
+                {
+                    var selectedFolder = picker.SelectedFolder?.Trim() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(selectedFolder))
+                    {
+                        TxtLyricsFolderOverride.Text = selectedFolder;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to pick lyrics folder: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

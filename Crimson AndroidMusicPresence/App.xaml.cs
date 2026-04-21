@@ -24,12 +24,14 @@ namespace musicpresense
         private MusicPresenceService? _presenceService;
         private MainWindow? _settingsWindow;
         private Process? _scrcpyProcess;
+        private LyricsOverlayManager? _lyricsOverlayManager;
         private HwndSource? _hotkeySource;
         private const string StartupRunValueName = "AndroidMusicPresenceLink";
 
         private const int HotkeyIdVolumeUp = 1;
         private const int HotkeyIdVolumeDown = 2;
         private const int HotkeyIdToggleScrcpy = 3;
+        private const int HotkeyIdToggleLyricsOverlay = 4;
         private const int ModShift = 0x0004;
         private const int VkVolumeUp = 0xAF;
         private const int VkVolumeDown = 0xAE;
@@ -63,9 +65,11 @@ namespace musicpresense
             }
 
             _presenceService = new MusicPresenceService(Dispatcher, Config);
+            _lyricsOverlayManager = new LyricsOverlayManager(Dispatcher, Config, () => _presenceService?.CurrentDevice ?? string.Empty);
             _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication, Config.UseDarkMode);
             _presenceService.TrayStateChanged += OnTrayStateChanged;
             _presenceService.NowPlayingChanged += OnNowPlayingChanged;
+            _presenceService.LyricsPlaybackChanged += OnLyricsPlaybackChanged;
             _presenceService.Start();
             UpdateTrayAudioSettings();
 
@@ -125,6 +129,7 @@ namespace musicpresense
             AdbHelper.AdbPath = Config.Paths.Adb;
             ApplyTheme(config.UseDarkMode);
             _presenceService?.UpdateConfig(config);
+            _lyricsOverlayManager?.UpdateConfig(config);
             _settingsWindow?.SyncRuntimeConfig(config);
             _trayIconManager?.SetDarkMode(config.UseDarkMode);
             UpdateTrayAudioSettings();
@@ -135,6 +140,11 @@ namespace musicpresense
                 InitializeHotkeys();
             }
             catch { }
+        }
+
+        private void OnLyricsPlaybackChanged(string? artist, string? title, string? album, bool isPlaying, long positionMs)
+        {
+            _lyricsOverlayManager?.OnPlaybackChanged(artist, title, album, isPlaying, positionMs);
         }
 
         private static void ApplyStartupRegistration(bool enable)
@@ -382,6 +392,7 @@ namespace musicpresense
             StopScrcpyOnExit();
             _trayIconManager?.Dispose();
             _presenceService?.Dispose();
+            _lyricsOverlayManager?.Dispose();
             DisposeHotkeys();
             AdbHelper.StopServer();
             base.OnExit(e);
@@ -433,6 +444,7 @@ namespace musicpresense
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, Config.HotkeyModifier, Config.HotkeyVolumeUpKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, Config.HotkeyModifier, Config.HotkeyVolumeDownKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.HotkeyModifier, Config.HotkeyToggleScrcpyKey); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay, Config.HotkeyModifier, Config.HotkeyToggleLyricsOverlayKey); } catch { }
         }
 
         private void UpdateTrayAudioSettings()
@@ -451,6 +463,7 @@ namespace musicpresense
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp);
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown);
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy);
+                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay);
                 _hotkeySource.RemoveHook(HotkeyHook);
                 _hotkeySource.Dispose();
                 _hotkeySource = null;
@@ -472,6 +485,10 @@ namespace musicpresense
                         break;
                     case HotkeyIdToggleScrcpy:
                         ToggleScrcpyNoAudio();
+                        handled = true;
+                        break;
+                    case HotkeyIdToggleLyricsOverlay:
+                        _lyricsOverlayManager?.ToggleVisibility();
                         handled = true;
                         break;
                 }

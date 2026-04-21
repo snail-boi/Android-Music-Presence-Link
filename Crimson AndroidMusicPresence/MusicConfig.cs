@@ -44,6 +44,7 @@ namespace musicpresense
         public bool IsWifiEnabled { get; set; } = false;
 
         public int CachClearInMB { get; set; } = 200;
+        public string LyricsSearchFolderOverride { get; set; } = string.Empty;
 
         public List<string> AllowedApps { get; set; } = new List<string> { };
         public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
@@ -55,6 +56,7 @@ namespace musicpresense
         public int HotkeyVolumeUpKey { get; set; } = 0xAF;
         public int HotkeyVolumeDownKey { get; set; } = 0xAE;
         public int HotkeyToggleScrcpyKey { get; set; } = 0x53;
+        public int HotkeyToggleLyricsOverlayKey { get; set; } = 0x4C;
         public int HotkeyModifier { get; set; } = 0x0004; // default SHIFT
     }
 
@@ -228,6 +230,9 @@ namespace musicpresense
             if (config.ScrcpyAvailableAudioCodecs.Count == 0)
                 config.ScrcpyAvailableAudioCodecs.Add("raw");
 
+            config.LyricsSearchFolderOverride ??= string.Empty;
+            config.LyricsSearchFolderOverride = config.LyricsSearchFolderOverride.Trim();
+
             if (config.SmtcPauseClearDelayMinutes < 0)
                 config.SmtcPauseClearDelayMinutes = 0;
 
@@ -238,6 +243,8 @@ namespace musicpresense
                 config.HotkeyVolumeDownKey = 0xAE;
             if (config.HotkeyToggleScrcpyKey < 0 || config.HotkeyToggleScrcpyKey > 0xFF)
                 config.HotkeyToggleScrcpyKey = 0x53;
+            if (config.HotkeyToggleLyricsOverlayKey < 0 || config.HotkeyToggleLyricsOverlayKey > 0xFF)
+                config.HotkeyToggleLyricsOverlayKey = 0x4C;
 
             // Ensure modifier is one of allowed flags (ALT=0x0001, CONTROL=0x0002, SHIFT=0x0004)
             var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };

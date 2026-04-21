@@ -37,6 +37,7 @@ namespace musicpresense
         internal string CurrentDevice => _currentDevice;
         internal event Action<TrayIconState>? TrayStateChanged;
         internal event Action<string?, string?, string?>? NowPlayingChanged;
+        internal event Action<string?, string?, string?, bool, long>? LyricsPlaybackChanged;
 
         public MusicPresenceService(Dispatcher dispatcher, MusicConfig config)
         {
@@ -94,6 +95,7 @@ namespace musicpresense
                 else
                 {
                     NotifyNowPlaying(null, null, null);
+                    NotifyLyricsPlayback(null, null, null, false, 0);
                 }
 
                 NotifyTrayState(BuildTrayState(hasActiveSong));
@@ -211,6 +213,7 @@ namespace musicpresense
                     _currentDevice = string.Empty;
                     _mediaController.Clear();
                     NotifyNowPlaying(null, null, null);
+                    NotifyLyricsPlayback(null, null, null, false, 0);
                 }
 
                 _currentDeviceIsUsb = false;
@@ -597,6 +600,7 @@ namespace musicpresense
                     if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
                     {
                         NotifyNowPlaying(artist, title, album);
+                        NotifyLyricsPlayback(artist, title, album, isPlaying, Math.Max(0, adbPositionMs));
 
                         if (!isPlaying)
                         {
@@ -642,12 +646,24 @@ namespace musicpresense
                 }
 
                 NotifyNowPlaying(null, null, null);
+                NotifyLyricsPlayback(null, null, null, false, 0);
                 return false;
             }
             catch (Exception ex)
             {
                 Debugger.show("UpdateCurrentSongAsync failed: " + ex.Message);
                 return false;
+            }
+        }
+
+        private void NotifyLyricsPlayback(string? artist, string? title, string? album, bool isPlaying, long positionMs)
+        {
+            try
+            {
+                LyricsPlaybackChanged?.Invoke(artist, title, album, isPlaying, positionMs);
+            }
+            catch
+            {
             }
         }
 
