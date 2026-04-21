@@ -23,10 +23,7 @@ namespace musicpresense
     /*
         idees for future features:
         Now Playing Notifications
-        Cover cache viewer, just opens the cache folder in Explorer
         Embedded lyrics fallback (USLT/SYLT tags in FLAC/MP3)
-        Cover art filename pattern editor
-        Copy current track info hotkey with user-editable template ({artist} - {title} etc.)
 
     */
     public partial class MainWindow : Window
