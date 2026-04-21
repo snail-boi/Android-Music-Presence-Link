@@ -14,6 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\Musiclogo.png" />
     <None Remove="Tray_Icons\Tray_Active_USB.ico" />
     <None Remove="Tray_Icons\Tray_Active_WiFi.ico" />
     <None Remove="Tray_Icons\Tray_NoDevice.ico" />
@@ -24,6 +25,11 @@
 
   <ItemGroup>
     <Content Include="Android_logo_2019(1).ico" />
+    <Content Include="Resources\Musiclogo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </Content>
     <Content Include="Tray_Icons\Tray_Active_USB.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -76,11 +82,6 @@
 	  </None>
 	  <None Update="Resources\libusb-1.0.dll">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="Resources\Musiclogo.png">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	    <Pack>True</Pack>
-	    <PackagePath>\</PackagePath>
 	  </None>
 	  <None Update="Resources\open_a_terminal_here.bat">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
