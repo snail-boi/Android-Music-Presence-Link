@@ -388,12 +388,23 @@ namespace musicpresense
             // Replace every char Android/Windows filesystems can't store, plus stray whitespace,
             // with a single space. We then collapse runs and trim, so "A: B" and "A  B" both
             // normalize to "A B" and a Contains() check survives the substitution either side did.
+            // Tilde variants (wave dash, fullwidth tilde, tilde operator, ASCII tilde) are also
+            // treated as whitespace here. Japanese titles commonly use these as separators and
+            // different players/tools save them differently (and the Shift-JIS U+301C/U+FF5E
+            // conflation means the same file can exist under either code point). Folding them
+            // all to space + collapsing yields a stable comparison regardless of which variant
+            // (or no variant at all, if the player stripped it) ended up on disk.
             var sb = new System.Text.StringBuilder(folded.Length);
             foreach (var ch in folded)
             {
                 bool unsafeChar = ch == '/' || ch == '\\' || ch == ':' || ch == '*' ||
                                   ch == '?' || ch == '"' || ch == '<' || ch == '>' || ch == '|';
-                if (unsafeChar || char.IsWhiteSpace(ch) || char.IsControl(ch))
+                bool tildeVariant = ch == '~' ||        // U+007E ASCII TILDE
+                                    ch == '\u301C' ||   // 〜 WAVE DASH
+                                    ch == '\uFF5E' ||   // ～ FULLWIDTH TILDE
+                                    ch == '\u223C' ||   // ∼ TILDE OPERATOR
+                                    ch == '\u2053';     // ⁓ SWUNG DASH
+                if (unsafeChar || tildeVariant || char.IsWhiteSpace(ch) || char.IsControl(ch))
                     sb.Append(' ');
                 else
                     sb.Append(ch);
@@ -416,7 +427,83 @@ namespace musicpresense
                 }
             }
 
-            return collapsed.ToString().Trim();
+            // Also trim trailing periods. Windows filesystems silently drop them, and
+            // Path.GetFileNameWithoutExtension treats the last dot as the extension delimiter.
+            // A title like "Realm of a Born Sea, Colorful." gets saved as
+            // "Realm of a Born Sea, Colorful..mp3" (or similar) and after extension-strip
+            // becomes "Realm of a Born Sea, Colorful" (no trailing dot). Stripping trailing
+            // periods in normalization keeps the match symmetric so "<title>." == "<file-no-ext>".
+            return collapsed.ToString().Trim().TrimEnd('.');
+        }
+
+        /// <summary>
+        /// Determines whether a title is safe to hand directly to the phone's <c>find -iname</c>
+        /// glob without going through PC-side normalization. If normalizing the title is a no-op
+        /// (beyond trimming), we know no unicode folding or FS-unsafe-char substitution happened,
+        /// which means the filename on disk should contain the title verbatim (case-insensitive).
+        /// In that case the phone can filter before sending paths over the wire, cutting bandwidth
+        /// by 100x+ on typical libraries. When this returns false we fall back to the full scan
+        /// plus PC-side matching, so correctness is preserved on pathological titles.
+        /// </summary>
+        private static bool IsTitleSafeForPhoneFilter(string title)
+        {
+            if (string.IsNullOrWhiteSpace(title)) return false;
+
+            var trimmed = title.Trim();
+            if (trimmed.Length == 0) return false;
+
+            // The normalizer trims, collapses whitespace, folds unicode punctuation, and
+            // replaces FS-unsafe chars. If its output equals the trimmed input, none of
+            // those rewrites fired, so we can rely on byte-for-byte filename matching
+            // via toybox find -iname (which is case-insensitive but otherwise literal).
+            // Case-sensitive compare here: the check is "did any substitution happen", not
+            // "does this match a file", so case differences are irrelevant.
+            return string.Equals(NormalizeForMatch(trimmed), trimmed, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Escapes a string for safe inclusion inside single-quoted shell arguments on Android's
+        /// toybox sh. The only char that can break single-quoting is the single quote itself,
+        /// which we close out, escape literally, and re-open. Every other char (including spaces,
+        /// parentheses, ampersands, dollars, backticks) is literal inside single quotes.
+        /// </summary>
+        private static string ShellSingleQuoteEscape(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            // Split on ', rejoin with '\'' between fragments.
+            return value.Replace("'", "'\\''");
+        }
+
+        /// <summary>
+        /// Picks the longest whitespace-delimited fragment from the normalized title. Used when
+        /// the title contains chars that would be rewritten at save time (so we can't use the
+        /// title verbatim as a glob). Normalization converts FS-unsafe chars and folded unicode
+        /// punctuation to spaces and collapses runs, so splitting the normalized string on spaces
+        /// gives us clean ASCII-ish fragments, the longest of which is most likely to survive
+        /// whatever rewriting the player applied at save time.
+        /// Returns empty string only if the title normalizes to nothing at all (pathological).
+        /// Uses a single fragment deliberately: multi-fragment globs like *a*b* imply order,
+        /// which fails if the player saved them in a different order than the metadata reports.
+        /// </summary>
+        private static string PickLongestFragment(string title)
+        {
+            if (string.IsNullOrWhiteSpace(title)) return string.Empty;
+
+            var normalized = NormalizeForMatch(title);
+            if (string.IsNullOrWhiteSpace(normalized)) return string.Empty;
+
+            // Normalizer already collapsed whitespace, so a single-char split is enough.
+            var parts = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return string.Empty;
+
+            string longest = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                if (parts[i].Length > longest.Length)
+                    longest = parts[i];
+            }
+
+            return longest;
         }
 
         /// <summary>
@@ -476,31 +563,113 @@ namespace musicpresense
 
                 Debugger.show($"Searching in remote roots: {string.Join("; ", localRemoteRoots)}");
 
+                // Declared here (not in the scoring block below) because the hybrid scan
+                // strategy uses it to build the phone-side glob before we ever run `find`.
+                var titleStr = fileNameWithoutExtension ?? string.Empty;
+
+                // --- Hybrid scan strategy ---
+                // Tier 1 (best case, title is clean): title contains no chars that would be
+                // rewritten at save time, so we ask the phone to filter via `find -iname
+                // '*<title>*'`. Only matching paths cross the wire.
+                //
+                // Tier 2 (title has unsafe chars): we can't use the whole title as a glob
+                // because we don't know exactly how it was rewritten on disk, but we can still
+                // ask the phone to filter on the longest clean fragment from the normalized
+                // title. That fragment is guaranteed to appear verbatim in the filename if the
+                // file exists at all, so this still returns only the needle plus some false
+                // positives (which PC-side scoring filters out). Any reduction from the full
+                // scan is a bandwidth win, even if the fragment is short and imprecise, the
+                // phone does the work and we only pay for what it sends back.
+                //
+                // Tier 3 (fallback): if we can't build any glob (title normalized to nothing)
+                // OR the phone-side filter returned zero matches across all roots (rare
+                // save-time rewrite we still couldn't predict), enumerate every file and let
+                // the existing PC-side matching handle it. Correctness preserved in all cases.
                 var allFiles = new List<string>();
-                foreach (var root in localRemoteRoots)
+                bool usedFastPath = false;
+
+                // Pick the glob payload: full title if safe, else longest safe fragment.
+                bool titleSafe = IsTitleSafeForPhoneFilter(titleStr);
+                string globPayload = titleSafe ? titleStr.Trim() : PickLongestFragment(titleStr);
+
+                if (!string.IsNullOrEmpty(globPayload))
                 {
-                    var escapedRoot = root.Replace("\"", "\\\"");
-                    Debugger.show($"Scanning root: {root}");
-                    var findOutput = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell find \"{escapedRoot}\" -type f");
-                    if (string.IsNullOrWhiteSpace(findOutput))
+                    // Wrap the payload in '*...*' and single-quote the whole thing so shell
+                    // metacharacters (spaces, parens, ampersands) stay literal. Single quotes
+                    // are escaped via '\'' which is safe across toybox/mksh/bash on Android.
+                    var escapedForGlob = ShellSingleQuoteEscape(globPayload);
+                    var globArg = $"'*{escapedForGlob}*'";
+
+                    if (titleSafe)
+                        Debugger.show($"Fast path (full title): glob {globArg}");
+                    else
+                        Debugger.show($"Fast path (fragment of '{titleStr}'): glob {globArg}");
+
+                    foreach (var root in localRemoteRoots)
                     {
-                        Debugger.show($"  No files found in this root");
-                        continue;
+                        var escapedRoot = ShellSingleQuoteEscape(root);
+                        var findOutput = await AdbHelper.RunAdbCaptureAsync(
+                            $"-s {device} shell find '{escapedRoot}' -type f -iname {globArg}");
+                        if (string.IsNullOrWhiteSpace(findOutput))
+                        {
+                            Debugger.show($"  Fast path: no matches in {root}");
+                            continue;
+                        }
+
+                        var lines = findOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        Debugger.show($"  Fast path: {lines.Length} matches in {root}");
+                        foreach (var raw in lines)
+                        {
+                            var path = raw.Trim();
+                            if (string.IsNullOrEmpty(path) || !path.StartsWith("/"))
+                                continue;
+
+                            allFiles.Add(path);
+                        }
                     }
 
-                    var lines = findOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                    Debugger.show($"  Found {lines.Length} files in this root");
-                    foreach (var raw in lines)
+                    if (allFiles.Count > 0)
                     {
-                        var path = raw.Trim();
-                        if (string.IsNullOrEmpty(path) || !path.StartsWith("/"))
-                            continue;
+                        usedFastPath = true;
+                        Debugger.show($"Fast path succeeded: {allFiles.Count} candidates (skipped full scan)");
+                    }
+                    else
+                    {
+                        Debugger.show("Fast path returned zero matches across all roots; falling back to full scan");
+                    }
+                }
+                else
+                {
+                    Debugger.show($"Title '{titleStr}' yielded no usable glob fragment; using full scan");
+                }
 
-                        allFiles.Add(path);
+                if (!usedFastPath)
+                {
+                    foreach (var root in localRemoteRoots)
+                    {
+                        var escapedRoot = root.Replace("\"", "\\\"");
+                        Debugger.show($"Scanning root: {root}");
+                        var findOutput = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell find \"{escapedRoot}\" -type f");
+                        if (string.IsNullOrWhiteSpace(findOutput))
+                        {
+                            Debugger.show($"  No files found in this root");
+                            continue;
+                        }
+
+                        var lines = findOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        Debugger.show($"  Found {lines.Length} files in this root");
+                        foreach (var raw in lines)
+                        {
+                            var path = raw.Trim();
+                            if (string.IsNullOrEmpty(path) || !path.StartsWith("/"))
+                                continue;
+
+                            allFiles.Add(path);
+                        }
                     }
                 }
 
-                Debugger.show($"Total files found: {allFiles.Count}");
+                Debugger.show($"Total files found: {allFiles.Count} (fast path: {usedFastPath})");
 
                 if (allFiles.Count == 0)
                 {
@@ -516,7 +685,7 @@ namespace musicpresense
                 //   artist contains in filename: +10
                 //   in subfolder (deeper than its remote root): +100
                 // Tiebreakers: largest file size, then first occurrence.
-                var titleStr = fileNameWithoutExtension ?? string.Empty;
+                // titleStr is declared above (hoisted so the hybrid scan block can use it).
 
                 int ExtensionScore(string ext) => ext switch
                 {

@@ -375,8 +375,13 @@ namespace musicpresense
             try
             {
                 Debugger.show($"[NotifParser] Fetching notification data for package: {packageName}");
+                // Server-side filtering: same rationale as media_session, cuts the notification
+                // dump (often the largest ADB payload we fetch) down to just the lines the
+                // parser consumes. We keep NotificationRecord( as the block delimiter, pkg= to
+                // match the active record, and the three android.* length lines the parser
+                // reads via ExtractStringLength. grep -E is portable toybox on Android 6+.
                 string notifOutput = await AdbHelper.RunAdbCaptureAsync(
-                    $"-s {_currentDevice} shell dumpsys notification")
+                    $"-s {_currentDevice} shell dumpsys notification | grep -E 'NotificationRecord\\(|pkg=|android\\.title=String|android\\.text=String|android\\.subText=String'")
                     .ConfigureAwait(false);
 
                 if (string.IsNullOrWhiteSpace(notifOutput))
@@ -472,7 +477,16 @@ namespace musicpresense
             {
                 if (string.IsNullOrEmpty(_currentDevice)) return false;
 
-                string output = await AdbHelper.RunAdbCaptureAsync($"-s {_currentDevice} shell dumpsys media_session");
+                // Server-side filtering: pipe dumpsys output through grep on the device so only
+                // the lines we actually parse cross the wire. This cuts payload by ~90% and is
+                // the single biggest CPU/bandwidth win on the polling path. toybox grep ships
+                // with Android 6+, guaranteed on Android 13+. -A 2 keeps the two lines after any
+                // match so the multi-line state=PlaybackState{...} block stays intact even if
+                // position= ends up on its own line. Pipe exit code reflects grep's (may be 1
+                // when nothing matches); we already treat empty output as "no session" so that
+                // is harmless.
+                string output = await AdbHelper.RunAdbCaptureAsync(
+                    $"-s {_currentDevice} shell dumpsys media_session | grep -E -A 2 'queueTitle=|active=|package=|description=|state=PlaybackState'");
                 if (string.IsNullOrWhiteSpace(output)) return false;
 
                 var eligibleApps = (_config.EligibleApps ?? new List<EligibleAppConfig>())

@@ -341,6 +341,11 @@ namespace musicpresense
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
+                    // stdout/stderr are already UTF-8, but the default stdin encoding on
+                    // Windows is the legacy console codepage (typically CP1252), which
+                    // mangles non-ASCII chars in commands (e.g. CJK titles used by
+                    // find -iname globs). Force UTF-8 here so commands round-trip correctly.
+                    StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 };
