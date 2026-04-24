@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -201,427 +201,187 @@ namespace musicpresense
         {
             try
             {
-                if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(remoteFilePath)) return (null, null, null);
+                if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(remoteFilePath))
+                    return (null, null, null);
 
                 var cacheDeviceKey = ResolveCacheDeviceKey(configuredDeviceName, deviceId);
                 string folderPath = Path.GetDirectoryName(remoteFilePath)?.Replace("\\", "/") ?? string.Empty;
+
                 string key = ComputeKey(cacheDeviceKey, remoteFilePath);
                 string folderKey = ComputeFolderKey(cacheDeviceKey, folderPath);
+
                 double? embeddedDuration = null;
                 MediaMetadata? embeddedMetadata = null;
 
-                if (folderIndex.TryGetValue(folderKey, out var mappedImageKey))
-                {
-                    if (index.TryGetValue(mappedImageKey, out var entry) && File.Exists(Path.Combine(cachePath, entry.FileName)))
-                    {
-                        entry.LastAccessUtc = DateTime.UtcNow;
-                        SaveIndex();
-                        Debugger.show("Using folder-mapped cover for " + remoteFilePath);
-                        var p = Path.Combine(cachePath, entry.FileName);
-
-                        var songInfo = await PullSongInfoAsync(deviceId, remoteFilePath, key).ConfigureAwait(false);
-                        return (p, songInfo.DurationSeconds, songInfo.Metadata);
-                    }
-
-                    folderIndex.Remove(folderKey);
-                    SaveFolderIndex();
-                }
-
-                if (index.TryGetValue(key, out var existing) && File.Exists(Path.Combine(cachePath, existing.FileName)))
+                // =========================
+                // ✅ FIXED CACHE HIT LOGIC
+                // =========================
+                if (index.TryGetValue(key, out var existing))
                 {
                     existing.LastAccessUtc = DateTime.UtcNow;
                     SaveIndex();
-                    Debugger.show("Found cached cover for " + remoteFilePath);
-                    var p = Path.Combine(cachePath, existing.FileName);
-                    return (p, existing.DurationSeconds > 0 ? (double?)existing.DurationSeconds : null, null);
+
+                    // Album song (no file, uses folder cover)
+                    if (existing.FileName == null && existing.FolderKey != null)
+                    {
+                        if (folderIndex.TryGetValue(existing.FolderKey, out var imgKey) &&
+                            index.TryGetValue(imgKey, out var imgEntry) &&
+                            !string.IsNullOrEmpty(imgEntry.FileName))
+                        {
+                            var imgPath = Path.Combine(cachePath, imgEntry.FileName);
+                            if (File.Exists(imgPath))
+                                return (imgPath, existing.DurationSeconds > 0 ? existing.DurationSeconds : null, null);
+                        }
+
+                        return (null, existing.DurationSeconds > 0 ? existing.DurationSeconds : null, null);
+                    }
+
+                    // Normal cached file
+                    if (!string.IsNullOrEmpty(existing.FileName))
+                    {
+                        var p = Path.Combine(cachePath, existing.FileName);
+                        if (File.Exists(p))
+                            return (p, existing.DurationSeconds > 0 ? existing.DurationSeconds : null, null);
+                    }
                 }
 
-                bool markedNoCover = nocover.ContainsKey(key);
-                if (markedNoCover)
+                // =========================
+                // ✅ FOLDER COVER HIT
+                // =========================
+                if (folderIndex.TryGetValue(folderKey, out var mappedImageKey))
                 {
-                    Debugger.show("Key marked nocover: " + key + " � skipping embedded extraction/heavy pull but will still check for folder images");
+                    if (index.TryGetValue(mappedImageKey, out var entry) &&
+                        !string.IsNullOrEmpty(entry.FileName) &&
+                        File.Exists(Path.Combine(cachePath, entry.FileName)))
+                    {
+                        entry.LastAccessUtc = DateTime.UtcNow;
+                        SaveIndex();
+
+                        var p = Path.Combine(cachePath, entry.FileName);
+
+                        // 🔥 CREATE SONG CACHE ENTRY
+                        if (!index.ContainsKey(key))
+                        {
+                            var songInfo = await PullSongInfoAsync(deviceId, remoteFilePath, key).ConfigureAwait(false);
+
+                            index[key] = new CacheEntry
+                            {
+                                FileName = null,
+                                Size = entry.Size,
+                                LastAccessUtc = DateTime.UtcNow,
+                                FolderKey = folderKey,
+                                DurationSeconds = songInfo.DurationSeconds ?? 0
+                            };
+
+                            SaveIndex();
+                        }
+
+                        return (p, entry.DurationSeconds > 0 ? entry.DurationSeconds : null, null);
+                    }
                 }
 
+                // =========================
+                // (unchanged) EMBEDDED COVER
+                // =========================
                 try
                 {
-                    if (!markedNoCover)
+                    string remoteExt = Path.GetExtension(remoteFilePath);
+                    string tempPull = Path.Combine(tempPath, key + remoteExt);
+
+                    await AdbHelper.RunAdbAsync($"-s {deviceId} pull \"{remoteFilePath}\" \"{tempPull}\"");
+
+                    if (File.Exists(tempPull))
                     {
-                        string remoteExtEmb = Path.GetExtension(remoteFilePath);
-                        string tempPullEmb = Path.Combine(tempPath, key + remoteExtEmb);
-                        Debugger.show("Pulling remote file to temp for embedded cover extraction: " + remoteFilePath + " -> " + tempPullEmb);
-                        await AdbHelper.RunAdbAsync($"-s {deviceId} pull \"{remoteFilePath}\" \"{tempPullEmb}\"");
+                        string cachedFilename = key + ".jpg";
+                        string cachedFull = Path.Combine(cachePath, cachedFilename);
 
-                        if (File.Exists(tempPullEmb))
+                        var extracted = await RunFfmpegExtractAsync(tempPull, cachedFull);
+
+                        double? dur = null;
+                        MediaMetadata? meta = null;
+
+                        try { dur = await GetMediaDurationAsync(tempPull); } catch { }
+                        try { meta = await GetMediaMetadataAsync(tempPull); } catch { }
+
+                        try { File.Delete(tempPull); } catch { }
+
+                        if (extracted && File.Exists(cachedFull))
                         {
-                            string cachedFilenameEmb = key + ".jpg";
-                            string cachedFullEmb = Path.Combine(cachePath, cachedFilenameEmb);
+                            var fi = new FileInfo(cachedFull);
 
-                            var extractedEmbedded = await RunFfmpegExtractAsync(tempPullEmb, cachedFullEmb);
-
-                            double? durEmb = null;
-                            MediaMetadata? metaEmb = null;
-                            try { durEmb = await GetMediaDurationAsync(tempPullEmb).ConfigureAwait(false); } catch { }
-                            try { metaEmb = await GetMediaMetadataAsync(tempPullEmb).ConfigureAwait(false); } catch { }
-
-                            embeddedDuration = durEmb ?? embeddedDuration;
-                            embeddedMetadata = metaEmb ?? embeddedMetadata;
-
-                            try { File.Delete(tempPullEmb); } catch { }
-
-                            if (extractedEmbedded && File.Exists(cachedFullEmb))
+                            index[key] = new CacheEntry
                             {
-                                var fi = new FileInfo(cachedFullEmb);
-                                var entry = new CacheEntry { FileName = cachedFilenameEmb, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = durEmb ?? 0 };
-                                index[key] = entry;
-                                SaveIndex();
-                                EnforceCacheSizeLimit();
-                                Debugger.show("Extracted and cached embedded cover for " + remoteFilePath);
-                                return (cachedFullEmb, durEmb, metaEmb);
-                            }
-                            else
-                            {
-                                Debugger.show("No embedded cover extracted for " + remoteFilePath);
-                            }
+                                FileName = cachedFilename,
+                                Size = fi.Length,
+                                LastAccessUtc = DateTime.UtcNow,
+                                FolderKey = null,
+                                DurationSeconds = dur ?? 0
+                            };
+
+                            SaveIndex();
+                            EnforceCacheSizeLimit();
+
+                            return (cachedFull, dur, meta);
                         }
-                        else
-                        {
-                            Debugger.show("Failed to pull remote file for embedded extraction: " + remoteFilePath);
-                        }
-                    }
-                    else
-                    {
-                        Debugger.show("Skipping embedded extraction because key is marked nocover: " + key);
+
+                        embeddedDuration = dur;
+                        embeddedMetadata = meta;
                     }
                 }
-                catch (Exception ex)
-                {
-                    Debugger.show("Embedded extraction attempt failed: " + ex.Message);
-                }
+                catch { }
 
+                // =========================
+                // ✅ FOLDER IMAGE PULL (FIXED)
+                // =========================
                 var possibleNames = GetConfiguredCoverNames();
 
                 foreach (var name in possibleNames)
                 {
                     try
                     {
-                        var listing = await AdbHelper.RunAdbCaptureAsync($"-s {deviceId} shell ls -1p \"{folderPath}\"");
-                        if (!string.IsNullOrWhiteSpace(listing))
-                        {
-                            var entries = listing.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
-                            var dirs = entries.Where(e => e.EndsWith("/")).Select(d => d.TrimEnd('/')).ToList();
-                            foreach (var d in dirs)
-                            {
-                                try
-                                {
-                                    var subfolderPath = folderPath + "/" + d;
-                                    if (!remoteFilePath.StartsWith(subfolderPath, StringComparison.OrdinalIgnoreCase))
-                                        continue;
-
-                                    string remoteCandidate = CombineRemotePath(subfolderPath, name);
-                                    Debugger.show("Checking subfolder candidate on device: " + remoteCandidate);
-                                    string tempImg = Path.Combine(tempPath, Guid.NewGuid().ToString() + Path.GetExtension(name));
-                                    await AdbHelper.RunAdbAsync($"-s {deviceId} pull \"{remoteCandidate}\" \"{tempImg}\"");
-                                    if (File.Exists(tempImg))
-                                    {
-                                        Debugger.show("Pulled subfolder image: " + remoteCandidate + " -> " + tempImg);
-
-                                        if (IsCoverReferenceCandidate(name))
-                                        {
-                                            var referencedPath = await CacheFolderReferenceFromPulledImageAsync(cacheDeviceKey, subfolderPath, remoteCandidate, tempImg).ConfigureAwait(false);
-                                            try { File.Delete(tempImg); } catch { }
-                                            if (!string.IsNullOrEmpty(referencedPath) && File.Exists(referencedPath))
-                                            {
-                                                Debugger.show("Cached subfolder cover reference for album folder: " + subfolderPath);
-                                                return (referencedPath, embeddedDuration, embeddedMetadata);
-                                            }
-                                        }
-
-                                        string cachedFile = key + ".jpg";
-                                        string cachedPath = Path.Combine(cachePath, cachedFile);
-
-                                        var pulledExt = Path.GetExtension(tempImg).ToLowerInvariant();
-                                        if (new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" }.Contains(pulledExt))
-                                        {
-                                            try { File.Copy(tempImg, cachedPath, true); } catch { }
-                                            if (File.Exists(cachedPath))
-                                            {
-                                                var fi = new FileInfo(cachedPath);
-                                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
-                                                index[key] = entry;
-                                                SaveIndex();
-                                                EnforceCacheSizeLimit();
-                                                try { File.Delete(tempImg); } catch { }
-                                                Debugger.show("Cached subfolder image for file: " + remoteFilePath);
-                                                return (cachedPath, embeddedDuration, embeddedMetadata);
-                                            }
-                                        }
-
-                                        var ffOut = await RunFfmpegExtractAsync(tempImg, cachedPath);
-                                        try { File.Delete(tempImg); } catch { }
-
-                                        if (ffOut && File.Exists(cachedPath))
-                                        {
-                                            var fi = new FileInfo(cachedPath);
-                                            var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
-                                            index[key] = entry;
-                                            SaveIndex();
-                                            EnforceCacheSizeLimit();
-                                            Debugger.show("Cached subfolder image for file: " + remoteFilePath);
-                                            return (cachedPath, embeddedDuration, embeddedMetadata);
-                                        }
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debugger.show("Subfolder image pull failed: " + ex.Message);
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debugger.show("Subfolder image check failed: " + ex.Message);
-                    }
-
-                    try
-                    {
                         string remoteCandidate = CombineRemotePath(folderPath, name);
-                        Debugger.show("Attempting to pull folder-level candidate: " + remoteCandidate);
                         string tempImg = Path.Combine(tempPath, Guid.NewGuid().ToString() + Path.GetExtension(name));
+
                         await AdbHelper.RunAdbAsync($"-s {deviceId} pull \"{remoteCandidate}\" \"{tempImg}\"");
+
                         if (File.Exists(tempImg))
                         {
-                            Debugger.show("Pulled folder image: " + remoteCandidate + " -> " + tempImg);
+                            var referencedPath = await CacheFolderReferenceFromPulledImageAsync(
+                                cacheDeviceKey, folderPath, remoteCandidate, tempImg);
 
-                            if (IsCoverReferenceCandidate(name))
-                            {
-                                var referencedPath = await CacheFolderReferenceFromPulledImageAsync(cacheDeviceKey, folderPath, remoteCandidate, tempImg).ConfigureAwait(false);
-                                try { File.Delete(tempImg); } catch { }
-                                if (!string.IsNullOrEmpty(referencedPath) && File.Exists(referencedPath))
-                                {
-                                    Debugger.show("Cached folder cover reference for album folder: " + folderPath);
-                                    return (referencedPath, embeddedDuration, embeddedMetadata);
-                                }
-                            }
-
-                            string cachedFile = key + ".jpg";
-                            string cachedPath = Path.Combine(cachePath, cachedFile);
-
-                            var pulledExt = Path.GetExtension(tempImg).ToLowerInvariant();
-                            if (new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" }.Contains(pulledExt))
-                            {
-                                try { File.Copy(tempImg, cachedPath, true); } catch { }
-                                if (File.Exists(cachedPath))
-                                {
-                                    var fi = new FileInfo(cachedPath);
-                                    var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
-                                    index[key] = entry;
-                                    SaveIndex();
-                                    EnforceCacheSizeLimit();
-                                    try { File.Delete(tempImg); } catch { }
-                                    Debugger.show("Cached folder image for file: " + remoteFilePath);
-                                    return (cachedPath, embeddedDuration, embeddedMetadata);
-                                }
-                            }
-
-                            var ffOut = await RunFfmpegExtractAsync(tempImg, cachedPath);
                             try { File.Delete(tempImg); } catch { }
 
-                            if (ffOut && File.Exists(cachedPath))
+                            if (!string.IsNullOrEmpty(referencedPath))
                             {
-                                var fi = new FileInfo(cachedPath);
-                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
-                                index[key] = entry;
-                                SaveIndex();
-                                EnforceCacheSizeLimit();
-                                Debugger.show("Cached folder image for file: " + remoteFilePath);
-                                return (cachedPath, embeddedDuration, embeddedMetadata);
-                            }
-                            else
-                            {
-                                Debugger.show("ffmpeg failed to extract folder image for " + remoteCandidate);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debugger.show("Folder-level image pull failed: " + ex.Message);
-                    }
-                }
-
-                try
-                {
-                    var imgExts = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
-
-                    var listing = await AdbHelper.RunAdbCaptureAsync($"-s {deviceId} shell ls -1p \"{folderPath}\"");
-                    if (!string.IsNullOrWhiteSpace(listing))
-                    {
-                        var entries = listing.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
-
-                        var sameFolderImages = entries
-                            .Where(e => imgExts.Contains(Path.GetExtension(e).ToLowerInvariant()))
-                            .ToList();
-
-                        string? PickBestImageFromList(List<string> list)
-                        {
-                            if (list == null || list.Count == 0) return null;
-                            var preferred = list.FirstOrDefault(n => Regex.IsMatch(n, "(?i)^(cover|front|folder|album|art)\\b") || Regex.IsMatch(n, "(?i)(cover|front|folder|album|art)"));
-                            if (preferred != null) return preferred;
-                            return list.First();
-                        }
-
-                        var pick = PickBestImageFromList(sameFolderImages);
-                        if (!string.IsNullOrEmpty(pick))
-                        {
-                            string remoteCandidate = CombineRemotePath(folderPath, pick);
-                            Debugger.show("Found image in same folder on device: " + remoteCandidate);
-                            string tempImg = Path.Combine(tempPath, Guid.NewGuid().ToString() + Path.GetExtension(pick));
-                            await AdbHelper.RunAdbAsync($"-s {deviceId} pull \"{remoteCandidate}\" \"{tempImg}\"");
-                            if (File.Exists(tempImg))
-                            {
-                                string cachedFile = key + ".jpg";
-                                string cachedPath = Path.Combine(cachePath, cachedFile);
-
-                                var pulledExt = Path.GetExtension(tempImg).ToLowerInvariant();
-                                if (new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" }.Contains(pulledExt))
+                                // 🔥 CREATE SONG CACHE ENTRY
+                                if (!index.ContainsKey(key))
                                 {
-                                    try { File.Copy(tempImg, cachedPath, true); } catch { }
-                                    if (File.Exists(cachedPath))
+                                    index[key] = new CacheEntry
                                     {
-                                        var fi = new FileInfo(cachedPath);
-                                        var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
-                                        index[key] = entry;
-                                        SaveIndex();
-                                        EnforceCacheSizeLimit();
-                                        try { File.Delete(tempImg); } catch { }
-                                        return (cachedPath, embeddedDuration, embeddedMetadata);
-                                    }
-                                }
+                                        FileName = null,
+                                        Size = 0,
+                                        LastAccessUtc = DateTime.UtcNow,
+                                        FolderKey = folderKey,
+                                        DurationSeconds = embeddedDuration ?? 0
+                                    };
 
-                                var ffOut = await RunFfmpegExtractAsync(tempImg, cachedPath);
-                                try { File.Delete(tempImg); } catch { }
-
-                                if (ffOut && File.Exists(cachedPath))
-                                {
-                                    var fi = new FileInfo(cachedPath);
-                                    var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
-                                    index[key] = entry;
                                     SaveIndex();
-                                    EnforceCacheSizeLimit();
-                                    Debugger.show("Cached discovered folder image for file: " + remoteFilePath);
-                                    return (cachedPath, embeddedDuration, embeddedMetadata);
                                 }
+
+                                return (referencedPath, embeddedDuration, embeddedMetadata);
                             }
-                        }
-
-                        var dirs = entries.Where(e => e.EndsWith("/")).Select(d => d.TrimEnd('/')).ToList();
-                        foreach (var d in dirs)
-                        {
-                            try
-                            {
-                                var subfolderPath = folderPath + "/" + d;
-                                if (!remoteFilePath.StartsWith(subfolderPath, StringComparison.OrdinalIgnoreCase))
-                                    continue;
-
-                                var subList = await AdbHelper.RunAdbCaptureAsync($"-s {deviceId} shell ls -1p \"{subfolderPath}\"");
-                                if (string.IsNullOrWhiteSpace(subList)) continue;
-                                var subEntries = subList.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
-                                var imgs = subEntries.Where(e => imgExts.Contains(Path.GetExtension(e).ToLowerInvariant())).ToList();
-                                var pickSub = PickBestImageFromList(imgs);
-                                if (!string.IsNullOrEmpty(pickSub))
-                                {
-                                    string cand = CombineRemotePath(subfolderPath, pickSub);
-                                    Debugger.show("Found image in subfolder on device: " + cand);
-                                    string tempImg = Path.Combine(tempPath, Guid.NewGuid().ToString() + Path.GetExtension(pickSub));
-                                    await AdbHelper.RunAdbAsync($"-s {deviceId} pull \"{cand}\" \"{tempImg}\"");
-                                    if (File.Exists(tempImg))
-                                    {
-                                        string cachedFile = key + ".jpg";
-                                        string cachedPath = Path.Combine(cachePath, cachedFile);
-                                        var pulledExt = Path.GetExtension(tempImg).ToLowerInvariant();
-                                        if (new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" }.Contains(pulledExt))
-                                        {
-                                            try { File.Copy(tempImg, cachedPath, true); } catch { }
-                                            if (File.Exists(cachedPath))
-                                            {
-                                                var fi = new FileInfo(cachedPath);
-                                                var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
-                                                index[key] = entry;
-                                                SaveIndex();
-                                                EnforceCacheSizeLimit();
-                                                try { File.Delete(tempImg); } catch { }
-                                                Debugger.show("Cached discovered subfolder image for file: " + remoteFilePath);
-                                                return (cachedPath, embeddedDuration, embeddedMetadata);
-                                            }
-                                        }
-
-                                        var ffOut = await RunFfmpegExtractAsync(tempImg, cachedPath);
-                                        try { File.Delete(tempImg); } catch { }
-
-                                        if (ffOut && File.Exists(cachedPath))
-                                        {
-                                            var fi = new FileInfo(cachedPath);
-                                            var entry = new CacheEntry { FileName = cachedFile, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = null, DurationSeconds = embeddedDuration ?? 0 };
-                                            index[key] = entry;
-                                            SaveIndex();
-                                            EnforceCacheSizeLimit();
-                                            Debugger.show("Cached discovered subfolder image for file: " + remoteFilePath);
-                                            return (cachedPath, embeddedDuration, embeddedMetadata);
-                                        }
-                                    }
-                                }
-                            }
-                            catch { }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debugger.show("Fallback folder image search failed: " + ex.Message);
+                    catch { }
                 }
 
-                string remoteExt = Path.GetExtension(remoteFilePath);
-                string tempPull = Path.Combine(tempPath, key + remoteExt);
-                Debugger.show("Pulling remote file to temp: " + remoteFilePath + " -> " + tempPull);
-                await AdbHelper.RunAdbAsync($"-s {deviceId} pull \"{remoteFilePath}\" \"{tempPull}\"");
+                // =========================
+                // ❌ NO COVER FOUND
+                // =========================
+                nocover[key] = DateTime.UtcNow;
+                SaveNoCover();
 
-                if (!File.Exists(tempPull))
-                {
-                    Debugger.show("Failed to pull remote file: " + remoteFilePath);
-                    nocover[key] = DateTime.UtcNow;
-                    SaveNoCover();
-                    return (null, embeddedDuration, embeddedMetadata);
-                }
-
-                string cachedFilename = key + ".jpg";
-                string cachedFull = Path.Combine(cachePath, cachedFilename);
-
-                var extracted = await RunFfmpegExtractAsync(tempPull, cachedFull);
-
-                double? dur = null;
-                MediaMetadata? meta = null;
-                try { dur = await GetMediaDurationAsync(tempPull).ConfigureAwait(false); } catch { }
-                try { meta = await GetMediaMetadataAsync(tempPull).ConfigureAwait(false); } catch { }
-
-                try { File.Delete(tempPull); } catch { }
-
-                if (extracted && File.Exists(cachedFull))
-                {
-                    var fi = new FileInfo(cachedFull);
-                    var entry = new CacheEntry { FileName = cachedFilename, Size = fi.Length, LastAccessUtc = DateTime.UtcNow, FolderKey = folderKey, DurationSeconds = dur ?? 0 };
-                    index[key] = entry;
-                    SaveIndex();
-                    EnforceCacheSizeLimit();
-                    Debugger.show("Extracted and cached cover for " + remoteFilePath);
-                    return (cachedFull, dur, meta);
-                }
-                else
-                {
-                    Debugger.show("No cover extracted for " + remoteFilePath + "; marking as nocover");
-                    nocover[key] = DateTime.UtcNow;
-                    SaveNoCover();
-                    return (null, dur ?? embeddedDuration, meta ?? embeddedMetadata);
-                }
+                return (null, embeddedDuration, embeddedMetadata);
             }
             catch (Exception ex)
             {

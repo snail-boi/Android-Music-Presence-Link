@@ -21,7 +21,7 @@ namespace musicpresense
         private readonly Func<string> _getCurrentDevice;
         private LyricsOverlayWindow? _overlay;
 
-        private bool _overlayVisible = true;
+        private bool _overlayVisible = false;
         private bool _isPlaying;
         private long _basePositionMs;
         private DateTime _positionAnchorUtc = DateTime.UtcNow;
@@ -260,7 +260,7 @@ namespace musicpresense
         {
             try
             {
-                var cacheKey = ComputeKey(device, remotePath + "|" + trackKey);
+                var cacheKey = ComputeKey(remotePath, trackKey);
                 var localPath = Path.Combine(_lyricsCachePath, cacheKey + ".lrc");
 
                 if (File.Exists(localPath) && new FileInfo(localPath).Length > 0)
@@ -476,8 +476,20 @@ namespace musicpresense
             border.Child = _textBlock;
             Content = border;
 
-            Loaded += (_, __) => PositionWindow();
+            Loaded += (_, __) =>
+            {
+                PositionWindow();
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                int exStyle = GetWindowLong(hwnd, -20);
+                SetWindowLong(hwnd, -20, exStyle | 0x20 | 0x80000);
+            };
         }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int GetWindowLong(IntPtr hwnd, int index);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
 
         public void ShowLine(string text, bool ensureVisible)
         {
