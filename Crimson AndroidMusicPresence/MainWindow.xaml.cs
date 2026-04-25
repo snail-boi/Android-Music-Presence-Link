@@ -131,8 +131,10 @@ namespace musicpresense
             ChkDarkMode.Unchecked += ChkDarkMode_CheckedChanged;
             BtnToggleTheme.Click += BtnToggleTheme_Click;
             BtnRedoOnboarding.Click += BtnRedoOnboarding_Click;
+            BtnShowMediaPlayerNow.Click += BtnShowMediaPlayerNow_Click;
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
+            UpdateMediaPlayerModeButton((Application.Current as App)?.IsMediaPlayerModeActive() == true);
             _isInitializing = false;
         }
 
@@ -195,6 +197,7 @@ namespace musicpresense
             ChkDarkMode.IsChecked = _config.UseDarkMode;
             ChkOpenInTaskbar.IsChecked = _config.OpenInTaskbar;
             ChkStartWithWindows.IsChecked = _config.StartWithWindows;
+            ChkShowMediaPlayerWindow.IsChecked = _config.ShowMediaPlayerWindow;
             UpdateThemeToggleText(_config.UseDarkMode);
 
             TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
@@ -770,6 +773,7 @@ namespace musicpresense
             _config.UseDarkMode = ChkDarkMode.IsChecked == true;
             _config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
             _config.StartWithWindows = ChkStartWithWindows.IsChecked == true;
+            _config.ShowMediaPlayerWindow = ChkShowMediaPlayerWindow.IsChecked == true;
             if (int.TryParse(TxtCacheClear.Text.Trim(), out var CacheValue))
             {
                 if (CacheValue < 10)
@@ -1026,6 +1030,7 @@ namespace musicpresense
             config.UseDarkMode = ChkDarkMode.IsChecked == true;
             config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
             config.StartWithWindows = ChkStartWithWindows.IsChecked == true;
+            config.ShowMediaPlayerWindow = ChkShowMediaPlayerWindow.IsChecked == true;
             if (int.TryParse(TxtCacheClear.Text.Trim(), out var CacheValue))
             {
                 if (CacheValue < 10)
@@ -1161,6 +1166,7 @@ namespace musicpresense
             if (left.UseDarkMode != right.UseDarkMode) return false;
             if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
             if (left.StartWithWindows != right.StartWithWindows) return false;
+            if (left.ShowMediaPlayerWindow != right.ShowMediaPlayerWindow) return false;
             if (left.OnboardingCompleted != right.OnboardingCompleted) return false;
             if (!string.Equals(left.ScrcpyAudioCodec, right.ScrcpyAudioCodec, StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(left.ScrcpyAudioBitrate ?? string.Empty, right.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)) return false;
@@ -1256,6 +1262,7 @@ namespace musicpresense
                 UseDarkMode = source.UseDarkMode,
                 OpenInTaskbar = source.OpenInTaskbar,
                 StartWithWindows = source.StartWithWindows,
+                ShowMediaPlayerWindow = source.ShowMediaPlayerWindow,
                 ScrcpyAudioCodec = source.ScrcpyAudioCodec,
                 ScrcpyAudioBitrate = source.ScrcpyAudioBitrate ?? string.Empty,
                 ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
@@ -1290,6 +1297,9 @@ namespace musicpresense
             if (TxtLyricsFolderOverride != null)
                 TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
 
+            if (ChkShowMediaPlayerWindow != null)
+                ChkShowMediaPlayerWindow.IsChecked = _config.ShowMediaPlayerWindow;
+
             if (TxtCoverPatterns != null)
                 TxtCoverPatterns.Text = _config.CoverArtFileNamePatterns ?? string.Empty;
 
@@ -1318,6 +1328,32 @@ namespace musicpresense
         {
             SaveConfigFromUi(false);
             (Application.Current as App)?.ShowOnboarding(true);
+        }
+
+        private void BtnShowMediaPlayerNow_Click(object sender, RoutedEventArgs e)
+        {
+            var app = Application.Current as App;
+            if (app == null)
+                return;
+
+            if (app.IsMediaPlayerModeActive())
+            {
+                app.GoBackToSettingsWindow();
+                return;
+            }
+
+            SaveConfigFromUi(false);
+            app.ShowMediaPlayerWindowNow();
+        }
+
+        internal void UpdateMediaPlayerModeButton(bool isMediaPlayerModeActive)
+        {
+            if (BtnShowMediaPlayerNow == null)
+                return;
+
+            BtnShowMediaPlayerNow.Content = isMediaPlayerModeActive
+                ? "Go back to settings"
+                : "Show media player now";
         }
 
         private void UpdateThemeToggleText(bool useDarkMode)

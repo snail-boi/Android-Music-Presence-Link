@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -25,6 +26,7 @@ namespace musicpresense
         private MainWindow? _settingsWindow;
         private Process? _scrcpyProcess;
         private LyricsOverlayManager? _lyricsOverlayManager;
+        private MediaPlayerWindow? _mediaPlayerWindow;
         private HwndSource? _hotkeySource;
         private const string StartupRunValueName = "AndroidMusicPresenceLink";
 
@@ -42,10 +44,16 @@ namespace musicpresense
         private static readonly string version = "1.0.12.0";
 
         private bool _isScrcpyRunning;
+        private bool _isExiting;
         private TrayIconState _lastTrayState = TrayIconState.NoDevice;
         private string? _lastNowPlayingArtist;
         private string? _lastNowPlayingTitle;
         private string? _lastNowPlayingAlbum;
+        private string? _lastMediaPlayerTitle;
+        private string? _lastMediaPlayerArtist;
+        private string? _lastMediaPlayerAlbum;
+        private string? _lastMediaPlayerCoverPath;
+        private bool _lastMediaPlayerIsPlaying;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -79,8 +87,18 @@ namespace musicpresense
             _presenceService.TrayStateChanged += OnTrayStateChanged;
             _presenceService.NowPlayingChanged += OnNowPlayingChanged;
             _presenceService.LyricsPlaybackChanged += OnLyricsPlaybackChanged;
+            _presenceService.MediaPlayerStateChanged += OnMediaPlayerStateChanged;
             _presenceService.Start();
             UpdateTrayAudioSettings();
+
+            if (Config.ShowMediaPlayerWindow)
+            {
+                ShowMediaPlayerWindowNow();
+            }
+            else
+            {
+                UpdateSettingsWindowModeButton();
+            }
 
             InitializeHotkeys();
 
@@ -145,6 +163,8 @@ namespace musicpresense
             _settingsWindow?.SyncRuntimeConfig(config);
             _trayIconManager?.SetDarkMode(config.UseDarkMode);
             UpdateTrayAudioSettings();
+            EnsureMediaPlayerWindowState();
+            UpdateSettingsWindowModeButton();
             // Reinitialize hotkeys to reflect updated configuration
             try
             {
@@ -157,6 +177,166 @@ namespace musicpresense
         private void OnLyricsPlaybackChanged(string? artist, string? title, string? album, bool isPlaying, long positionMs)
         {
             _lyricsOverlayManager?.OnPlaybackChanged(artist, title, album, isPlaying, positionMs);
+        }
+
+        private void OnMediaPlayerStateChanged(string? title, string? artist, string? album, string? coverPath, bool isPlaying)
+        {
+            if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+                return;
+
+            _lastMediaPlayerTitle = title;
+            _lastMediaPlayerArtist = artist;
+            _lastMediaPlayerAlbum = album;
+            _lastMediaPlayerCoverPath = coverPath;
+            _lastMediaPlayerIsPlaying = isPlaying;
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (_mediaPlayerWindow == null || !_mediaPlayerWindow.IsVisible)
+                    return;
+
+                _mediaPlayerWindow.UpdateTrack(title, artist, album, coverPath, isPlaying);
+            });
+        }
+
+        private void EnsureMediaPlayerWindowState()
+        {
+            if (!Config.ShowMediaPlayerWindow && _mediaPlayerWindow != null)
+            {
+                CloseMediaPlayerWindow();
+            }
+        }
+
+        internal bool IsMediaPlayerModeActive()
+        {
+            return _mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible;
+        }
+
+        internal void ShowMediaPlayerWindowNow()
+        {
+            if (_mediaPlayerWindow == null)
+            {
+                _mediaPlayerWindow = new MediaPlayerWindow(
+                    () => _presenceService?.PauseCurrentAsync() ?? Task.CompletedTask,
+                    () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask,
+                    () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
+                _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
+            }
+
+            if (_settingsWindow != null)
+            {
+                if (_settingsWindow.Content is FrameworkElement rootContent)
+                {
+                    EnsureEmbeddedSettingsStyles(rootContent, _settingsWindow.Resources);
+                    _settingsWindow.Content = null;
+                    _mediaPlayerWindow.SetSettingsContent(rootContent);
+                }
+
+                if (_settingsWindow.IsVisible)
+                {
+                    _settingsWindow.Hide();
+                }
+            }
+
+            if (!_mediaPlayerWindow.IsVisible)
+            {
+                _mediaPlayerWindow.Show();
+            }
+
+            if (_mediaPlayerWindow.WindowState == WindowState.Minimized)
+            {
+                _mediaPlayerWindow.WindowState = WindowState.Normal;
+            }
+
+            _mediaPlayerWindow.Activate();
+            _mediaPlayerWindow.UpdateTrack(_lastMediaPlayerTitle, _lastMediaPlayerArtist, _lastMediaPlayerAlbum, _lastMediaPlayerCoverPath, _lastMediaPlayerIsPlaying);
+            UpdateSettingsWindowModeButton();
+        }
+
+        internal void GoBackToSettingsWindow()
+        {
+            CloseMediaPlayerWindow(forceShowSettings: true);
+        }
+
+        private static void EnsureEmbeddedSettingsStyles(FrameworkElement rootContent, ResourceDictionary windowResources)
+        {
+            if (rootContent.Resources == null)
+                return;
+
+            bool alreadyMerged = rootContent.Resources.MergedDictionaries
+                .Any(d => ReferenceEquals(d, windowResources));
+
+            if (!alreadyMerged)
+            {
+                rootContent.Resources.MergedDictionaries.Add(windowResources);
+            }
+        }
+
+        private void CloseMediaPlayerWindow(bool forceShowSettings = false)
+        {
+            if (_mediaPlayerWindow == null)
+                return;
+
+            var window = _mediaPlayerWindow;
+            _mediaPlayerWindow = null;
+
+            window.Closing -= MediaPlayerWindow_Closing;
+            var hostedContent = window.TakeSettingsContent();
+            if (_settingsWindow != null && hostedContent != null)
+            {
+                _settingsWindow.Content = hostedContent;
+            }
+
+            window.Close();
+
+            if (_settingsWindow != null
+                && !Dispatcher.HasShutdownStarted
+                && !Dispatcher.HasShutdownFinished
+                && (forceShowSettings || !Config.OpenInTaskbar))
+            {
+                _settingsWindow.Show();
+                _settingsWindow.Activate();
+            }
+
+            UpdateSettingsWindowModeButton();
+        }
+
+        private void MediaPlayerWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (_isExiting)
+                return;
+
+            var window = sender as MediaPlayerWindow;
+            if (window != null)
+            {
+                var hostedContent = window.TakeSettingsContent();
+                if (_settingsWindow != null && hostedContent != null)
+                {
+                    _settingsWindow.Content = hostedContent;
+                }
+            }
+
+            _mediaPlayerWindow = null;
+            Config.ShowMediaPlayerWindow = false;
+            MusicConfigManager.Save(Config);
+
+            if (_settingsWindow != null)
+            {
+                _settingsWindow.SyncRuntimeConfig(Config);
+            }
+
+            if (_settingsWindow != null && !Config.OpenInTaskbar && !Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+            {
+                _settingsWindow.Show();
+                _settingsWindow.Activate();
+            }
+
+            UpdateSettingsWindowModeButton();
+        }
+
+        private void UpdateSettingsWindowModeButton()
+        {
+            _settingsWindow?.UpdateMediaPlayerModeButton(IsMediaPlayerModeActive());
         }
 
         private static void ApplyStartupRegistration(bool enable)
@@ -236,6 +416,12 @@ namespace musicpresense
 
         private void ShowSettingsWindow()
         {
+            if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible)
+            {
+                ShowMediaPlayerWindowNow();
+                return;
+            }
+
             if (_settingsWindow == null)
             {
                 _settingsWindow = new MainWindow();
@@ -426,7 +612,9 @@ namespace musicpresense
 
         protected override void OnExit(ExitEventArgs e)
         {
+            _isExiting = true;
             StopScrcpyOnExit();
+            CloseMediaPlayerWindow();
             _trayIconManager?.Dispose();
             _presenceService?.Dispose();
             _lyricsOverlayManager?.Dispose();

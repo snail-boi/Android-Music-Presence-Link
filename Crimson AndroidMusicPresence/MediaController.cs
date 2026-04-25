@@ -24,10 +24,18 @@ namespace musicpresense
         private long? lastAdbPositionMs;
         private long realPositionMs;
         private TimeSpan? lastTrackDuration;
+        private readonly string _defaultImagePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Snail", "Resources", "Musiclogo.png");
 
         private CoverCacheManager cacheManager;
         private List<string> remoteRoots = new();
         private string deviceName = string.Empty;
+
+        public string? CurrentTitle { get; private set; }
+        public string? CurrentArtist { get; private set; }
+        public string? CurrentAlbum { get; private set; }
+        public string? CurrentCoverPath { get; private set; }
 
         public MediaController(Dispatcher dispatcher, Func<string> getCurrentDevice, Func<Task> updateCurrentSongCallback, MusicConfig config)
         {
@@ -39,6 +47,12 @@ namespace musicpresense
             remoteRoots = GetNormalizedRemoteRoots(config);
             deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
         }
+
+        public Task PauseTrackAsync() => PauseTrack();
+
+        public Task NextTrackAsync() => NextTrack();
+
+        public Task PreviousTrackAsync() => PreviousTrack();
 
         public void UpdateConfig(MusicConfig config)
         {
@@ -231,6 +245,7 @@ namespace musicpresense
                         var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
                         duration = result.Duration ?? duration;
                         meta = result.Metadata;
+                        CurrentCoverPath = result.ImagePath;
                     }
                     else
                     {
@@ -245,6 +260,10 @@ namespace musicpresense
                     if (!string.IsNullOrWhiteSpace(meta.Artist)) artist = meta.Artist;
                     if (!string.IsNullOrWhiteSpace(meta.Album)) album = meta.Album;
                 }
+
+                CurrentTitle = title;
+                CurrentArtist = artist;
+                CurrentAlbum = album;
 
                 if (duration.HasValue && duration.Value > TimeSpan.Zero)
                     lastTrackDuration = duration;
@@ -345,6 +364,10 @@ namespace musicpresense
                 lastAdbPositionMs = null;
                 realPositionMs = 0;
                 lastTrackDuration = null;
+                CurrentTitle = null;
+                CurrentArtist = null;
+                CurrentAlbum = null;
+                CurrentCoverPath = _defaultImagePath;
             }
             catch (Exception ex)
             {
@@ -527,7 +550,7 @@ namespace musicpresense
             }
         }
 
-        private async Task<(TimeSpan? Duration, CoverCacheManager.MediaMetadata? Metadata)> SetSMTCImageAsync(string fileNameWithoutExtension, string artist)
+        private async Task<(TimeSpan? Duration, CoverCacheManager.MediaMetadata? Metadata, string? ImagePath)> SetSMTCImageAsync(string fileNameWithoutExtension, string artist)
         {
             if (mediaPlayer == null || smtcDisplayUpdater == null)
             {
@@ -535,7 +558,7 @@ namespace musicpresense
                 if (mediaPlayer == null || smtcDisplayUpdater == null)
                 {
                     Debugger.show("Failed to initialize media player");
-                    return (null, null);
+                    return (null, null, _defaultImagePath);
                 }
             }
 
@@ -551,14 +574,14 @@ namespace musicpresense
                 {
                     Debugger.show("No device selected for cover lookup");
                     await SetDefaultImage().ConfigureAwait(false);
-                    return (null, null);
+                    return (null, null, _defaultImagePath);
                 }
 
                 if (localRemoteRoots.Count == 0)
                 {
                     Debugger.show("No remote roots configured for cover lookup");
                     await SetDefaultImage().ConfigureAwait(false);
-                    return (null, null);
+                    return (null, null, _defaultImagePath);
                 }
 
                 Debugger.show($"Searching in remote roots: {string.Join("; ", localRemoteRoots)}");
@@ -675,7 +698,7 @@ namespace musicpresense
                 {
                     Debugger.show("No files found in configured remote roots");
                     await SetDefaultImage().ConfigureAwait(false);
-                    return (null, null);
+                    return (null, null, _defaultImagePath);
                 }
 
                 // --- New simple matching & scoring ---
@@ -740,7 +763,7 @@ namespace musicpresense
                 {
                     Debugger.show($"No filename contains the title '{titleStr}' (normalized: '{normTitle}')");
                     await SetDefaultImage().ConfigureAwait(false);
-                    return (null, null);
+                    return (null, null, _defaultImagePath);
                 }
 
                 var ranked = matched
@@ -859,7 +882,7 @@ namespace musicpresense
                             }
                         }).Task.ConfigureAwait(false);
 
-                        return (duration, metadata);
+                        return (duration, metadata, imagePath);
                     }
                     else
                     {
@@ -869,13 +892,13 @@ namespace musicpresense
 
                 Debugger.show("No cover art found for any candidates; using default image");
                 await SetDefaultImage().ConfigureAwait(false);
-                return (duration, metadata);
+                return (duration, metadata, _defaultImagePath);
             }
             catch (Exception ex)
             {
                 Debugger.show($"Critical error in SetSMTCImageAsync: {ex.Message}");
                 await SetDefaultImage().ConfigureAwait(false);
-                return (null, null);
+                return (null, null, _defaultImagePath);
             }
         }
 
@@ -883,20 +906,16 @@ namespace musicpresense
         {
             try
             {
-                string defaultImagePath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "Snail", "Resources", "Musiclogo.png"
-                );
+                Debugger.show($"Setting default image from: {_defaultImagePath}");
 
-                Debugger.show($"Setting default image from: {defaultImagePath}");
-
-                var imageFile = await StorageFile.GetFileFromPathAsync(defaultImagePath).AsTask().ConfigureAwait(false);
+                var imageFile = await StorageFile.GetFileFromPathAsync(_defaultImagePath).AsTask().ConfigureAwait(false);
                 await dispatcher.InvokeAsync(() =>
                 {
                     try
                     {
                         smtcDisplayUpdater!.Thumbnail = RandomAccessStreamReference.CreateFromFile(imageFile);
                         smtcDisplayUpdater.Update();
+                        CurrentCoverPath = _defaultImagePath;
                         Debugger.show("Default thumbnail set successfully");
                     }
                     catch (Exception ex)
