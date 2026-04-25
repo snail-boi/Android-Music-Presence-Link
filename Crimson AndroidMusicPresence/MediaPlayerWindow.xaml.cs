@@ -11,6 +11,11 @@ using System.Windows.Shapes;
 
 namespace musicpresense
 {
+
+    // bugs
+    // settings usercontrol needs a max size
+    // settings usercontrol should dissapear sooner then at size 0
+
     public partial class MediaPlayerWindow : Window
     {
         private const double CollapsedThreshold = 24;
@@ -18,6 +23,7 @@ namespace musicpresense
         private readonly Func<Task> _pauseAction;
         private readonly Func<Task> _nextAction;
         private readonly Func<Task> _previousAction;
+        private readonly Action? _lyricsToggleAction;
         private string? _currentCoverPath;
         private string? _lastGradientSourcePath;
         private static readonly Color DefaultTopLeft = Color.FromRgb(52, 52, 52);
@@ -25,13 +31,15 @@ namespace musicpresense
         private static readonly Color DefaultBottomLeft = Color.FromRgb(36, 36, 36);
         private static readonly Color DefaultBottomRight = Color.FromRgb(28, 28, 28);
 
-        public MediaPlayerWindow(Func<Task> pauseAction, Func<Task> nextAction, Func<Task> previousAction)
+        public MediaPlayerWindow(Func<Task> pauseAction, Func<Task> nextAction, Func<Task> previousAction, Action? lyricsToggleAction = null)
         {
             InitializeComponent();
             _pauseAction = pauseAction;
             _nextAction = nextAction;
             _previousAction = previousAction;
+            _lyricsToggleAction = lyricsToggleAction;
             RenderTransportIcons(isPlaying: false);
+            RenderAuxiliaryIcons();
             RenderSettingsPaneArrowIcon();
             ApplyCoverGradientBackground(null);
         }
@@ -309,6 +317,16 @@ namespace musicpresense
             try { await _nextAction().ConfigureAwait(true); } catch { }
         }
 
+        private void BtnVolume_Click(object sender, RoutedEventArgs e)
+        {
+            // Visual only for now. Wire up to actual volume control if desired.
+        }
+
+        private void BtnLyrics_Click(object sender, RoutedEventArgs e)
+        {
+            try { _lyricsToggleAction?.Invoke(); } catch { }
+        }
+
         private void RenderTransportIcons(bool isPlaying)
         {
             var iconBrush = ResolveIconBrush();
@@ -319,6 +337,15 @@ namespace musicpresense
             BtnPrevious.Content = BuildPreviousIcon(iconBrush, sideIconSize);
             BtnPause.Content = isPlaying ? BuildPauseIcon(iconBrush, centerIconSize) : BuildPlayIcon(iconBrush, centerIconSize);
             BtnNext.Content = BuildNextIcon(iconBrush, sideIconSize);
+        }
+
+        private void RenderAuxiliaryIcons()
+        {
+            var iconBrush = ResolveIconBrush();
+            const double auxIconSize = 22;
+
+            BtnVolume.Content = BuildVolumeIcon(iconBrush, auxIconSize);
+            BtnLyrics.Content = BuildLyricsIcon(iconBrush, auxIconSize);
         }
 
         private void RenderSettingsPaneArrowIcon()
@@ -457,6 +484,70 @@ namespace musicpresense
 
             canvas.Children.Add(triangle);
             canvas.Children.Add(bar);
+
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        private static Viewbox BuildVolumeIcon(Brush brush, double size = 20)
+        {
+            var canvas = new Canvas { Width = 20, Height = 20 };
+
+            // Speaker body: small rectangle (back) + triangle horn projecting right.
+            // Shape via Polygon: back-left rect joined with triangular cone.
+            var speaker = new Polygon
+            {
+                Fill = brush,
+                Points = new PointCollection
+                {
+                    new Point(2, 7.5),
+                    new Point(6, 7.5),
+                    new Point(11, 3),
+                    new Point(11, 17),
+                    new Point(6, 12.5),
+                    new Point(2, 12.5)
+                }
+            };
+
+            // Single small sound wave arc to the right of the speaker (matches the simple speaker glyph in the screenshot).
+            var wave = new System.Windows.Shapes.Path
+            {
+                Stroke = brush,
+                StrokeThickness = 1.6,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                Data = Geometry.Parse("M13.5,8 Q15.5,10 13.5,12")
+            };
+
+            canvas.Children.Add(speaker);
+            canvas.Children.Add(wave);
+
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        private static Viewbox BuildLyricsIcon(Brush brush, double size = 20)
+        {
+            // Stack of horizontal text lines, with one line indented to suggest lyric text.
+            var canvas = new Canvas { Width = 20, Height = 20 };
+
+            void AddLine(double x, double y, double width)
+            {
+                var line = new Rectangle
+                {
+                    Width = width,
+                    Height = 2,
+                    Fill = brush,
+                    RadiusX = 1,
+                    RadiusY = 1
+                };
+                Canvas.SetLeft(line, x);
+                Canvas.SetTop(line, y);
+                canvas.Children.Add(line);
+            }
+
+            AddLine(3, 4, 14);
+            AddLine(3, 8.5, 10);
+            AddLine(3, 13, 13);
+            AddLine(3, 17.5, 8);
 
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }

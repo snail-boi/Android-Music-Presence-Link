@@ -219,7 +219,8 @@ namespace musicpresense
                 _mediaPlayerWindow = new MediaPlayerWindow(
                     () => _presenceService?.PauseCurrentAsync() ?? Task.CompletedTask,
                     () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask,
-                    () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
+                    () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask,
+                    () => _lyricsOverlayManager?.ToggleVisibility());
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
             }
 

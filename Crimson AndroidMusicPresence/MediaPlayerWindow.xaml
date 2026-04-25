@@ -58,20 +58,82 @@
                                 Background="Transparent"
                                 BorderBrush="Transparent"
                                 BorderThickness="0"
-                                Opacity="0.92">
+                                CornerRadius="6">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="1" />
+                                <Setter TargetName="Bd" Property="Background" Value="#33000000" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.55" />
+                                <Setter TargetName="Bd" Property="Background" Value="#55000000" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.35" />
                             </Trigger>
                         </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Custom rounded slider for the progress bar -->
+        <Style x:Key="RoundedProgressSliderStyle" TargetType="Slider">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="Background" Value="#33FFFFFF" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <!-- Track background, full width, rounded -->
+                            <Border Height="4"
+                                    Width="400"
+                                    CornerRadius="2"
+                                    Background="{TemplateBinding Background}"
+                                    VerticalAlignment="Center" />
+                            <!-- Track containing fill + thumb -->
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Focusable="False"
+                                                  IsTabStop="False"
+                                                  Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4"
+                                                        CornerRadius="2"
+                                                        Background="{DynamicResource ThemeControlForegroundBrush}"
+                                                        VerticalAlignment="Center" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Focusable="False"
+                                                  IsTabStop="False"
+                                                  Command="Slider.IncreaseLarge"
+                                                  Background="Transparent"
+                                                  Opacity="0">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Background="Transparent" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="14" Height="14" Focusable="False">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Width="14"
+                                                         Height="14"
+                                                         Fill="{DynamicResource ThemeControlForegroundBrush}" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -180,10 +242,13 @@
                            TextTrimming="CharacterEllipsis"
                            Text="-" />
 
-                <!-- Bottom area: progress bar + transport controls -->
-                <StackPanel Grid.Row="4" Orientation="Vertical">
+                <!-- Bottom area: progress bar + transport controls. Constrained to cover width (420). -->
+                <StackPanel Grid.Row="4"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            MaxWidth="420">
                     <!-- Progress row: 1:19  ====O===========  7:01 -->
-                    <Grid Margin="0,0,0,16">
+                    <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -200,6 +265,7 @@
 
                         <Slider x:Name="ProgressSlider"
                                 Grid.Column="1"
+                                Style="{StaticResource RoundedProgressSliderStyle}"
                                 Minimum="0"
                                 Maximum="1"
                                 Value="0"
@@ -218,27 +284,54 @@
                                    Margin="12,0,0,0" />
                     </Grid>
 
-                    <!-- Transport buttons: just prev / play / next, centered, plain icons -->
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Center">
-                        <Button x:Name="BtnPrevious"
+                    <!-- Transport row: volume on far left, prev/play/next centered, lyrics on far right -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="BtnVolume"
+                                Grid.Column="0"
                                 Style="{StaticResource TransportIconButtonStyle}"
-                                Width="56"
-                                Height="56"
-                                Margin="0,0,28,0"
-                                Click="BtnPrevious_Click" />
-                        <Button x:Name="BtnPause"
+                                Width="44"
+                                Height="44"
+                                HorizontalAlignment="Left"
+                                ToolTip="Volume"
+                                Click="BtnVolume_Click" />
+
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Center">
+                            <Button x:Name="BtnPrevious"
+                                    Style="{StaticResource TransportIconButtonStyle}"
+                                    Width="56"
+                                    Height="56"
+                                    Margin="0,0,16,0"
+                                    Click="BtnPrevious_Click" />
+                            <Button x:Name="BtnPause"
+                                    Style="{StaticResource TransportIconButtonStyle}"
+                                    Width="72"
+                                    Height="72"
+                                    Margin="0,0,16,0"
+                                    Click="BtnPause_Click" />
+                            <Button x:Name="BtnNext"
+                                    Style="{StaticResource TransportIconButtonStyle}"
+                                    Width="56"
+                                    Height="56"
+                                    Click="BtnNext_Click" />
+                        </StackPanel>
+
+                        <Button x:Name="BtnLyrics"
+                                Grid.Column="2"
                                 Style="{StaticResource TransportIconButtonStyle}"
-                                Width="72"
-                                Height="72"
-                                Margin="0,0,28,0"
-                                Click="BtnPause_Click" />
-                        <Button x:Name="BtnNext"
-                                Style="{StaticResource TransportIconButtonStyle}"
-                                Width="56"
-                                Height="56"
-                                Click="BtnNext_Click" />
-                    </StackPanel>
+                                Width="44"
+                                Height="44"
+                                HorizontalAlignment="Right"
+                                ToolTip="Toggle lyrics overlay"
+                                Click="BtnLyrics_Click" />
+                    </Grid>
                 </StackPanel>
             </Grid>
         </Border>
