@@ -182,50 +182,69 @@
                 <TextBlock Text="Device Name:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
                 <TextBox x:Name="TxtDeviceName" Grid.Row="2" Grid.Column="1" Margin="0,4" />
             </Grid>
-
-            <TextBlock Text="Music Remote Folders" FontWeight="Bold" Margin="0,0,0,4" />
-            <StackPanel Margin="0,0,0,12">
-                <ListBox x:Name="LstRemoteRoots"
+            <Expander Header="Folders" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                <StackPanel>
+                    <TextBlock Text="Music Remote Folders" FontWeight="Bold" Margin="0,0,0,4" />
+                    <StackPanel Margin="0,0,0,12">
+                        <ListBox x:Name="LstRemoteRoots"
                          Height="120"
                          Margin="0,0,0,8"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          HorizontalContentAlignment="Stretch">
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,2,0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2,0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
                                            Text="{Binding}"
                                            VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis"
                                            ToolTip="{Binding}" />
-                                <Button Grid.Column="1"
+                                        <Button Grid.Column="1"
                                         Content="Remove"
                                         Width="90"
                                         Margin="8,0,0,0"
                                         Tag="{Binding}"
                                         Click="BtnRemoveRemoteRoot_Click" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-                <StackPanel Orientation="Horizontal">
-                    <Button x:Name="BtnPickRemoteRoot" Content="Add Folder" Width="110" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="BtnPickRemoteRoot" Content="Add Folder" Width="110" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="Lyrics folder (phone):" Width="140" VerticalAlignment="Center" />
+                            <TextBox x:Name="TxtLyricsFolderOverride" Width="220" />
+                            <Button x:Name="BtnBrowseLyricsFolder" Content="Browse" Width="80" Margin="8,0,0,0" Click="BtnBrowseLyricsFolder_Click" />
+                        </StackPanel>
+                    </StackPanel>
+
+
                 </StackPanel>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                <Button x:Name="BtnClearCoverCache" Content="Clear Cover Cache" Width="160" />
-                <Button x:Name="BtnOpenCoverCache" Content="Open Cover Cache" Width="160" Margin="8,0,0,0" />
-            </StackPanel>
+            </Expander>
+            <Expander Header="Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Clear Cache after:" Width="140" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtCacheClear" Width="220" />
+                        <TextBlock Text="MB" Margin="2,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button x:Name="BtnClearCoverCache" Content="Clear Cover Cache" Width="160" />
+                        <Button x:Name="BtnOpenCoverCache" Content="Open Cover Cache" Width="160" Margin="8,0,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Expander>
 
             <Expander Header="Eligible Apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
@@ -314,7 +333,7 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
-                        <TextBlock Text="Toggle Scrcpy key:" Width="140" VerticalAlignment="Center" />
+                        <TextBlock Text="Toggle Audio Link key:" Width="140" VerticalAlignment="Center" />
                         <TextBox x:Name="TxtHotkeyToggleScrcpy" Width="220" />
                         <Button x:Name="BtnRecordHotkeyToggleScrcpy" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleScrcpy_Click" />
                     </StackPanel>
@@ -333,7 +352,7 @@
                 </StackPanel>
             </Expander>
 
-            <Expander Header="Scrcpy Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+            <Expander Header="Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <TextBlock Text="Quality Presets:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
@@ -380,22 +399,14 @@
                     </Grid>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Paused clear delay:" Width="140" VerticalAlignment="Center" />
+                        <TextBlock Text="SMTC paused clear delay:" Width="140" VerticalAlignment="Center" />
                         <TextBox x:Name="TxtPauseClearDelayMinutes" Width="220" />
                         <TextBlock Text="min (0 = off)" Margin="2,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Clear Cache after:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtCacheClear" Width="220" />
-                        <TextBlock Text="MB" Margin="2,0,0,0" VerticalAlignment="Center" />
-                    </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Lyrics folder (phone):" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtLyricsFolderOverride" Width="220" />
-                        <Button x:Name="BtnBrowseLyricsFolder" Content="Pick" Width="80" Margin="8,0,0,0" Click="BtnBrowseLyricsFolder_Click" />
-                    </StackPanel>
+
+                    
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <TextBlock Text="Cover filename patterns:" Width="140" VerticalAlignment="Center" />
