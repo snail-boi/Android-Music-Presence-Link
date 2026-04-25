@@ -313,9 +313,12 @@ namespace musicpresense
         {
             var iconBrush = ResolveIconBrush();
 
-            BtnPrevious.Content = BuildPreviousIcon(iconBrush);
-            BtnPause.Content = isPlaying ? BuildPauseIcon(iconBrush) : BuildPlayIcon(iconBrush);
-            BtnNext.Content = BuildNextIcon(iconBrush);
+            const double sideIconSize = 30;
+            const double centerIconSize = 42;
+
+            BtnPrevious.Content = BuildPreviousIcon(iconBrush, sideIconSize);
+            BtnPause.Content = isPlaying ? BuildPauseIcon(iconBrush, centerIconSize) : BuildPlayIcon(iconBrush, centerIconSize);
+            BtnNext.Content = BuildNextIcon(iconBrush, sideIconSize);
         }
 
         private void RenderSettingsPaneArrowIcon()
@@ -329,7 +332,7 @@ namespace musicpresense
             return TryFindResource("ThemeControlForegroundBrush") as Brush ?? Brushes.White;
         }
 
-        private static Viewbox BuildPreviousIcon(Brush brush)
+        private static Viewbox BuildPreviousIcon(Brush brush, double size = 20)
         {
             var canvas = new Canvas { Width = 20, Height = 20 };
 
@@ -356,7 +359,7 @@ namespace musicpresense
             canvas.Children.Add(bar);
             canvas.Children.Add(triangle);
 
-            return new Viewbox { Width = 20, Height = 20, Child = canvas };
+            return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
         private static Viewbox BuildRevealSettingsArrowIcon(Brush brush)
@@ -381,7 +384,7 @@ namespace musicpresense
             return new Viewbox { Width = 14, Height = 20, Child = canvas };
         }
 
-        private static Viewbox BuildPlayIcon(Brush brush)
+        private static Viewbox BuildPlayIcon(Brush brush, double size = 20)
         {
             var canvas = new Canvas { Width = 20, Height = 20 };
 
@@ -397,10 +400,10 @@ namespace musicpresense
             };
 
             canvas.Children.Add(triangle);
-            return new Viewbox { Width = 20, Height = 20, Child = canvas };
+            return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
-        private static Viewbox BuildPauseIcon(Brush brush)
+        private static Viewbox BuildPauseIcon(Brush brush, double size = 20)
         {
             var canvas = new Canvas { Width = 20, Height = 20 };
 
@@ -425,10 +428,10 @@ namespace musicpresense
             canvas.Children.Add(leftBar);
             canvas.Children.Add(rightBar);
 
-            return new Viewbox { Width = 20, Height = 20, Child = canvas };
+            return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
-        private static Viewbox BuildNextIcon(Brush brush)
+        private static Viewbox BuildNextIcon(Brush brush, double size = 20)
         {
             var canvas = new Canvas { Width = 20, Height = 20 };
 
@@ -455,7 +458,7 @@ namespace musicpresense
             canvas.Children.Add(triangle);
             canvas.Children.Add(bar);
 
-            return new Viewbox { Width = 20, Height = 20, Child = canvas };
+            return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
         private void SaveCoverMenuItem_Click(object sender, RoutedEventArgs e)

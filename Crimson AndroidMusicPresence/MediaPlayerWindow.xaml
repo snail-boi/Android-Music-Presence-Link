@@ -45,32 +45,31 @@
             </Setter>
         </Style>
 
-        <Style x:Key="MediaControlIconButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="52" />
-            <Setter Property="Height" Value="52" />
-            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+        <Style x:Key="TransportIconButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="26">
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0"
+                                Opacity="0.92">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeBackgroundBrush}" />
+                                <Setter TargetName="Bd" Property="Opacity" Value="1" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}" />
-                                <Setter Property="Foreground" Value="White" />
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.35" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -110,29 +109,31 @@
                 BorderThickness="1"
                 CornerRadius="6"
                 Background="{DynamicResource ThemeControlBackgroundBrush}"
-                Padding="12">
+                Padding="24,28,24,28">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0"
-                           Text="Now Playing"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           Margin="0,0,0,10" />
-
-                <StackPanel Grid.Row="1">
-                    <Border Width="300"
-                            Height="300"
-                            HorizontalAlignment="Center"
-                            BorderBrush="{DynamicResource ThemeControlBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Background="{DynamicResource ThemeBackgroundBrush}">
+                <!-- Cover art, takes the largest share, no border, just rounded corners -->
+                <Viewbox Grid.Row="0"
+                         Stretch="Uniform"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Margin="0,0,0,24">
+                    <Border x:Name="CoverBorder"
+                            Width="420"
+                            Height="420"
+                            CornerRadius="10"
+                            ClipToBounds="True"
+                            SnapsToDevicePixels="True">
+                        <Border.Background>
+                            <SolidColorBrush Color="#22000000" />
+                        </Border.Background>
                         <Image x:Name="ImgCover"
                                Stretch="UniformToFill"
                                SnapsToDevicePixels="True"
@@ -144,46 +145,100 @@
                             </Image.ContextMenu>
                         </Image>
                     </Border>
+                </Viewbox>
 
-                    <TextBlock x:Name="TxtTitle"
-                               Margin="0,12,0,2"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               TextAlignment="Center"
-                               TextTrimming="CharacterEllipsis"
-                               Text="-" />
+                <!-- Track title, big and bold, centered -->
+                <TextBlock x:Name="TxtTitle"
+                           Grid.Row="1"
+                           Margin="0,0,0,6"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="-" />
 
-                    <TextBlock x:Name="TxtArtist"
-                               Margin="0,2,0,2"
-                               FontSize="13"
-                               TextAlignment="Center"
-                               TextTrimming="CharacterEllipsis"
-                               Text="-" />
+                <!-- Artist (no opacity dim, like screenshot) -->
+                <TextBlock x:Name="TxtArtist"
+                           Grid.Row="2"
+                           Margin="0,0,0,2"
+                           FontSize="14"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Opacity="0.85"
+                           Text="-" />
 
-                    <TextBlock x:Name="TxtAlbum"
-                               Margin="0,2,0,0"
-                               FontSize="12"
-                               Opacity="0.75"
-                               TextAlignment="Center"
-                               TextTrimming="CharacterEllipsis"
-                               Text="-" />
-                </StackPanel>
+                <!-- Album, slightly smaller, dimmer, centered -->
+                <TextBlock x:Name="TxtAlbum"
+                           Grid.Row="3"
+                           Margin="0,0,0,18"
+                           FontSize="13"
+                           Opacity="0.7"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="-" />
 
-                <StackPanel Grid.Row="2"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Center"
-                            Margin="0,10,0,0">
-                    <Button x:Name="BtnPrevious"
-                            Style="{StaticResource MediaControlIconButtonStyle}"
-                            Margin="0,0,12,0"
-                            Click="BtnPrevious_Click" />
-                    <Button x:Name="BtnPause"
-                            Style="{StaticResource MediaControlIconButtonStyle}"
-                            Margin="0,0,12,0"
-                            Click="BtnPause_Click" />
-                    <Button x:Name="BtnNext"
-                            Style="{StaticResource MediaControlIconButtonStyle}"
-                            Click="BtnNext_Click" />
+                <!-- Bottom area: progress bar + transport controls -->
+                <StackPanel Grid.Row="4" Orientation="Vertical">
+                    <!-- Progress row: 1:19  ====O===========  7:01 -->
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="TxtPositionLabel"
+                                   Grid.Column="0"
+                                   Text="0:00"
+                                   FontSize="12"
+                                   Opacity="0.85"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,12,0" />
+
+                        <Slider x:Name="ProgressSlider"
+                                Grid.Column="1"
+                                Minimum="0"
+                                Maximum="1"
+                                Value="0"
+                                IsMoveToPointEnabled="True"
+                                IsHitTestVisible="False"
+                                Focusable="False"
+                                Cursor="Arrow"
+                                VerticalAlignment="Center" />
+
+                        <TextBlock x:Name="TxtDurationLabel"
+                                   Grid.Column="2"
+                                   Text="0:00"
+                                   FontSize="12"
+                                   Opacity="0.85"
+                                   VerticalAlignment="Center"
+                                   Margin="12,0,0,0" />
+                    </Grid>
+
+                    <!-- Transport buttons: just prev / play / next, centered, plain icons -->
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center">
+                        <Button x:Name="BtnPrevious"
+                                Style="{StaticResource TransportIconButtonStyle}"
+                                Width="56"
+                                Height="56"
+                                Margin="0,0,28,0"
+                                Click="BtnPrevious_Click" />
+                        <Button x:Name="BtnPause"
+                                Style="{StaticResource TransportIconButtonStyle}"
+                                Width="72"
+                                Height="72"
+                                Margin="0,0,28,0"
+                                Click="BtnPause_Click" />
+                        <Button x:Name="BtnNext"
+                                Style="{StaticResource TransportIconButtonStyle}"
+                                Width="56"
+                                Height="56"
+                                Click="BtnNext_Click" />
+                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
