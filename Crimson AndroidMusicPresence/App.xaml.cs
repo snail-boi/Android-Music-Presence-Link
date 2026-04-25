@@ -68,6 +68,11 @@ namespace musicpresense
                 _settingsWindow.Activate();
             }
 
+            if (!Config.OnboardingCompleted)
+            {
+                ShowOnboarding(forceRun: false);
+            }
+
             _presenceService = new MusicPresenceService(Dispatcher, Config);
             _lyricsOverlayManager = new LyricsOverlayManager(Dispatcher, Config, () => _presenceService?.CurrentDevice ?? string.Empty);
             _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication, Config.UseDarkMode);
@@ -181,6 +186,31 @@ namespace musicpresense
             }
             catch
             {
+            }
+        }
+
+        internal void ShowOnboarding(bool forceRun)
+        {
+            if (!forceRun && Config.OnboardingCompleted)
+                return;
+
+            var onboardingWindow = new OnboardingWindow(Config);
+
+            if (_settingsWindow != null)
+            {
+                var ownerHandle = new WindowInteropHelper(_settingsWindow).Handle;
+                if (ownerHandle != IntPtr.Zero)
+                {
+                    onboardingWindow.Owner = _settingsWindow;
+                }
+            }
+
+            var result = onboardingWindow.ShowDialog();
+            if (result == true)
+            {
+                Config = onboardingWindow.UpdatedConfig;
+                MusicConfigManager.Save(Config);
+                UpdateConfig(Config);
             }
         }
 

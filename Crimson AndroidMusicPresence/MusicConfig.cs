@@ -42,6 +42,7 @@ namespace musicpresense
         public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
         public int SmtcPauseClearDelayMinutes { get; set; } = 0;
         public bool IsWifiEnabled { get; set; } = false;
+        public bool OnboardingCompleted { get; set; } = false;
 
         public int CachClearInMB { get; set; } = 200;
         public string LyricsSearchFolderOverride { get; set; } = string.Empty;

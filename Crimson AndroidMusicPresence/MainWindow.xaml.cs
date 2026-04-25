@@ -130,6 +130,7 @@ namespace musicpresense
             ChkDarkMode.Checked += ChkDarkMode_CheckedChanged;
             ChkDarkMode.Unchecked += ChkDarkMode_CheckedChanged;
             BtnToggleTheme.Click += BtnToggleTheme_Click;
+            BtnRedoOnboarding.Click += BtnRedoOnboarding_Click;
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
             _isInitializing = false;
@@ -1160,6 +1161,7 @@ namespace musicpresense
             if (left.UseDarkMode != right.UseDarkMode) return false;
             if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
             if (left.StartWithWindows != right.StartWithWindows) return false;
+            if (left.OnboardingCompleted != right.OnboardingCompleted) return false;
             if (!string.Equals(left.ScrcpyAudioCodec, right.ScrcpyAudioCodec, StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(left.ScrcpyAudioBitrate ?? string.Empty, right.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)) return false;
             if (left.ScrcpyAudioBuffer != right.ScrcpyAudioBuffer) return false;
@@ -1269,6 +1271,7 @@ namespace musicpresense
                 CoverArtFileNamePatterns = source.CoverArtFileNamePatterns ?? string.Empty,
                 CopyTrackInfoTemplate = source.CopyTrackInfoTemplate ?? string.Empty,
                 IsWifiEnabled = source.IsWifiEnabled,
+                OnboardingCompleted = source.OnboardingCompleted,
                 HotkeyModifier = source.HotkeyModifier
             };
         }
@@ -1309,6 +1312,12 @@ namespace musicpresense
         private void BtnToggleTheme_Click(object sender, RoutedEventArgs e)
         {
             ChkDarkMode.IsChecked = !(ChkDarkMode.IsChecked == true);
+        }
+
+        private void BtnRedoOnboarding_Click(object sender, RoutedEventArgs e)
+        {
+            SaveConfigFromUi(false);
+            (Application.Current as App)?.ShowOnboarding(true);
         }
 
         private void UpdateThemeToggleText(bool useDarkMode)

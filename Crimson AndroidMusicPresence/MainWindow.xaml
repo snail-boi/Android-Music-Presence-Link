@@ -4,31 +4,103 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Music Presence Settings" MinWidth="530" MinHeight="425"
+        Title="Music Presence Settings" MinWidth="640" MinHeight="560" Width="720" Height="700"
         Background="{DynamicResource ThemeBackgroundBrush}"
-        Foreground="{DynamicResource ThemeForegroundBrush}" ResizeMode="CanResizeWithGrip" >
+        Foreground="{DynamicResource ThemeForegroundBrush}"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterScreen"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True">
     <Window.Resources>
+
+        <!-- ============ TYPOGRAPHY / TEXT ============ -->
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
+
+        <Style x:Key="HeaderTitleStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="HeaderSubtitleStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+
+        <Style x:Key="SectionLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style x:Key="HintTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,8" />
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- ============ INPUTS ============ -->
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="6,0,0,0" />
         </Style>
-        <Style TargetType="Expander">
-            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
-        </Style>
+
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
             <Setter Property="CaretBrush" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
-        <!-- Updated ComboBox style: includes template for dropdown and item styling to respect dark theme brushes -->
+
+        <!-- ComboBox style preserved (template + dropdown) -->
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
-            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Padding" Value="8,6" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
@@ -40,15 +112,33 @@
                                           Background="{TemplateBinding Background}"
                                           BorderBrush="{TemplateBinding BorderBrush}"
                                           BorderThickness="{TemplateBinding BorderThickness}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Bd"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="4">
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentHoverBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
                                 <Grid>
                                     <ContentPresenter Name="ContentSite"
                                                       IsHitTestVisible="False"
                                                       Content="{TemplateBinding SelectionBoxItem}"
                                                       ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                                       TextElement.Foreground="{TemplateBinding Foreground}"
-                                                      Margin="6,0,24,0"
+                                                      Margin="8,0,28,0"
                                                       VerticalAlignment="Center" />
-                                    <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" Width="10" Height="6" Fill="{DynamicResource ThemeControlForegroundBrush}"
+                                    <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0"
+                                          Width="10" Height="6"
+                                          Fill="{DynamicResource ThemeControlForegroundBrush}"
                                           Data="M 0 0 L 10 0 L 5 6 Z" />
                                 </Grid>
                             </ToggleButton>
@@ -87,13 +177,13 @@
                     <Style TargetType="ComboBoxItem">
                         <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
                         <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
-                        <Setter Property="Padding" Value="6,4" />
+                        <Setter Property="Padding" Value="8,6" />
                         <Setter Property="HorizontalContentAlignment" Value="Left" />
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ComboBoxItem">
-                                    <Border Name="Bd" Background="{TemplateBinding Background}" Padding="2">
-                                        <ContentPresenter />
+                                    <Border Name="Bd" Background="{TemplateBinding Background}" Padding="2" CornerRadius="3">
+                                        <ContentPresenter Margin="6,2" />
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsHighlighted" Value="True">
@@ -112,88 +202,372 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- ============ LISTBOX ============ -->
         <Style TargetType="ListBox">
             <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="false">
+                                <ItemsPresenter />
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border Name="ItemBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="Selector.IsSelectionActive" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ============ BUTTONS ============ -->
+        <!-- Default: primary (accent) button -->
         <Style TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentPressedBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Padding" Value="14,7" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="4">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
                                               RecognizesAccessKey="True" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.6" />
+                                <Setter Property="Opacity" Value="0.5" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Secondary button: subtle, for less-important actions -->
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ============ CARD-STYLE EXPANDER ============ -->
+        <Style TargetType="Expander">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <Border CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <ToggleButton x:Name="HeaderSite"
+                                              IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                              Cursor="Hand"
+                                              Focusable="False"
+                                              OverridesDefaultStyle="True"
+                                              Content="{TemplateBinding Header}"
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border x:Name="HBd" Background="Transparent" Padding="14,12" CornerRadius="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <ContentPresenter Grid.Column="0"
+                                                                      Content="{TemplateBinding Content}"
+                                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                                      ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                                                      VerticalAlignment="Center"
+                                                                      TextBlock.FontWeight="SemiBold"
+                                                                      TextBlock.FontSize="14"
+                                                                      TextBlock.Foreground="{DynamicResource ThemeForegroundBrush}" />
+                                                    <Path x:Name="Arrow"
+                                                          Grid.Column="1"
+                                                          Width="10" Height="6"
+                                                          VerticalAlignment="Center"
+                                                          Fill="{DynamicResource ThemeControlForegroundBrush}"
+                                                          Data="M 0 0 L 10 0 L 5 6 Z"
+                                                          RenderTransformOrigin="0.5,0.5">
+                                                        <Path.RenderTransform>
+                                                            <RotateTransform Angle="-90" />
+                                                        </Path.RenderTransform>
+                                                    </Path>
+                                                </Grid>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="Arrow" Property="RenderTransform">
+                                                        <Setter.Value>
+                                                            <RotateTransform Angle="0" />
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="HBd" Property="Background" Value="{DynamicResource ThemeBackgroundBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                                <Border x:Name="ContentSite"
+                                        Grid.Row="1"
+                                        Visibility="Collapsed"
+                                        Padding="14,4,14,14">
+                                    <Border BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                            BorderThickness="0,1,0,0"
+                                            Padding="0,12,0,0">
+                                        <ContentPresenter />
+                                    </Border>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ContentSite" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="16" Orientation="Vertical" >
-            <Grid Margin="0,0,0,8">
+
+    <DockPanel>
+
+        <!-- ============ STICKY HEADER ============ -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource ThemeControlBackgroundBrush}"
+                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="20,16">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Device Selection" FontWeight="Bold" Grid.Column="0" VerticalAlignment="Center" />
-                <Button x:Name="BtnAutoGather" Content="Auto Gather Info" Grid.Column="1" />
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="Music Presence" Style="{StaticResource HeaderTitleStyle}" />
+                    <TextBlock Text="Configure how your Android device shares music with your PC."
+                               Style="{StaticResource HeaderSubtitleStyle}" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        x:Name="BtnToggleTheme"
+                        Content="Switch theme"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Width="120"
+                        VerticalAlignment="Center" />
             </Grid>
+        </Border>
 
-            <Grid Margin="0,0,0,12">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <!-- ============ STICKY FOOTER (SAVE BAR) ============ -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource ThemeControlBackgroundBrush}"
+                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="20,12">
+            <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="140" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-
-                <TextBlock Text="USB Serial:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
-                <TextBox x:Name="TxtUsbSerial" Grid.Row="0" Grid.Column="1" Margin="0,4" />
-
-                <TextBlock Text="Wi-Fi (ip:port):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" />
-                <TextBox x:Name="TxtWifi" Grid.Row="1" Grid.Column="1" Margin="0,4" />
-
-                <TextBlock Text="Device Name:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" />
-                <TextBox x:Name="TxtDeviceName" Grid.Row="2" Grid.Column="1" Margin="0,4" />
+                <TextBlock Grid.Column="0"
+                           Text="Changes are applied when you click Save."
+                           Style="{StaticResource HintTextStyle}"
+                           Margin="0"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        x:Name="BtnSave"
+                        Content="Save changes"
+                        Width="140"
+                        Height="36" />
             </Grid>
-            <Expander Header="Folders" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
-                <StackPanel>
-                    <TextBlock Text="Music Remote Folders" FontWeight="Bold" Margin="0,0,0,4" />
-                    <StackPanel Margin="0,0,0,12">
+        </Border>
+
+        <!-- ============ MAIN SCROLLABLE CONTENT ============ -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20,18,20,18" Orientation="Vertical">
+
+                <!-- ====== DEVICE CARD (open by default for new users) ====== -->
+                <Border CornerRadius="6"
+                        Background="{DynamicResource ThemeControlBackgroundBrush}"
+                        BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                        BorderThickness="1"
+                        Padding="16"
+                        Margin="0,0,0,12">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Device" Style="{StaticResource SectionLabelStyle}" />
+                                <TextBlock Text="Connect your Android phone via USB or Wi-Fi."
+                                           Style="{StaticResource HintTextStyle}"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    x:Name="BtnAutoGather"
+                                    Content="Auto-detect"
+                                    Width="130"
+                                    VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="USB serial"
+                                       Grid.Row="0" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtUsbSerial"
+                                     Grid.Row="0" Grid.Column="1"
+                                     Margin="0,0,0,8" />
+
+                            <TextBlock Text="Wi-Fi (ip:port)"
+                                       Grid.Row="1" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtWifi"
+                                     Grid.Row="1" Grid.Column="1"
+                                     Margin="0,0,0,8" />
+
+                            <TextBlock Text="Device name"
+                                       Grid.Row="2" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtDeviceName"
+                                     Grid.Row="2" Grid.Column="1" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ====== FOLDERS ====== -->
+                <Expander Header="Folders" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <StackPanel>
+                        <TextBlock Text="Tell the app where to find your music and lyrics on the device."
+                                   Style="{StaticResource HintTextStyle}" />
+
+                        <TextBlock Text="Music remote folders"
+                                   Style="{StaticResource SectionLabelStyle}"
+                                   Margin="0,4,0,6" />
                         <ListBox x:Name="LstRemoteRoots"
-                         Height="120"
-                         Margin="0,0,0,8"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         HorizontalContentAlignment="Stretch">
+                                 Height="130"
+                                 Margin="0,0,0,8"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 HorizontalContentAlignment="Stretch">
                             <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                 </Style>
                             </ListBox.ItemContainerStyle>
@@ -205,232 +579,413 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0"
-                                           Text="{Binding}"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding}" />
+                                                   Text="{Binding}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding}" />
                                         <Button Grid.Column="1"
-                                        Content="Remove"
-                                        Width="90"
-                                        Margin="8,0,0,0"
-                                        Tag="{Binding}"
-                                        Click="BtnRemoveRemoteRoot_Click" />
+                                                Content="Remove"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Width="90"
+                                                Margin="8,0,0,0"
+                                                Tag="{Binding}"
+                                                Click="BtnRemoveRemoteRoot_Click" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <Button x:Name="BtnPickRemoteRoot" Content="Add folder" Width="120" />
+                        </StackPanel>
+
+                        <Grid Margin="0,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Lyrics folder (phone)"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtLyricsFolderOverride"
+                                     Grid.Column="1" />
+                            <Button x:Name="BtnBrowseLyricsFolder"
+                                    Grid.Column="2"
+                                    Content="Browse"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,0"
+                                    Click="BtnBrowseLyricsFolder_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Expander>
+
+                <!-- ====== CACHING ====== -->
+                <Expander Header="Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <StackPanel>
+                        <TextBlock Text="Album art is cached locally so it loads faster."
+                                   Style="{StaticResource HintTextStyle}" />
+
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="220" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Clear cache after"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtCacheClear" Grid.Column="1" />
+                            <TextBlock Text="MB"
+                                       Grid.Column="2"
+                                       Margin="8,0,0,0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                        </Grid>
+
                         <StackPanel Orientation="Horizontal">
-                            <Button x:Name="BtnPickRemoteRoot" Content="Add Folder" Width="110" />
+                            <Button x:Name="BtnClearCoverCache"
+                                    Content="Clear cover cache"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="170" />
+                            <Button x:Name="BtnOpenCoverCache"
+                                    Content="Open cover cache"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="170"
+                                    Margin="8,0,0,0" />
                         </StackPanel>
+                    </StackPanel>
+                </Expander>
+
+                <!-- ====== ELIGIBLE APPS ====== -->
+                <Expander Header="Eligible apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <StackPanel>
+                        <TextBlock Text="Choose which Android apps can broadcast presence and share album art."
+                                   Style="{StaticResource HintTextStyle}" />
+
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <TextBlock Text="Lyrics folder (phone):" Width="140" VerticalAlignment="Center" />
-                            <TextBox x:Name="TxtLyricsFolderOverride" Width="220" />
-                            <Button x:Name="BtnBrowseLyricsFolder" Content="Browse" Width="80" Margin="8,0,0,0" Click="BtnBrowseLyricsFolder_Click" />
+                            <Button x:Name="BtnRefreshApps"
+                                    Content="Refresh apps"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="130" />
+                            <TextBlock x:Name="TxtAppsStatus"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center" />
                         </StackPanel>
+
+                        <Grid Margin="6,0,6,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="70" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Package" FontWeight="SemiBold" FontSize="12" />
+                            <TextBlock Grid.Column="1" Text="Presence" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Cover" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
+                        </Grid>
+                        <ListBox x:Name="LstAllowedApps"
+                                 Height="200"
+                                 Margin="0,0,0,0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 TextSearch.TextPath="PackageName"
+                                 HorizontalContentAlignment="Stretch">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2,0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="190" />
+                                            <ColumnDefinition Width="70" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding PackageName}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding PackageName}" />
+
+                                        <CheckBox Grid.Column="1"
+                                                  Content=""
+                                                  IsChecked="{Binding IsSelected}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+
+                                        <CheckBox Grid.Column="2"
+                                                  Content=""
+                                                  IsChecked="{Binding IsCoverSearchEnabled}"
+                                                  IsEnabled="{Binding IsSelected}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </StackPanel>
+                </Expander>
 
+                <!-- ====== HOTKEYS ====== -->
+                <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <StackPanel>
+                        <TextBlock Text="Enter virtual-key codes (letters, function keys or common names) and pick a modifier."
+                                   Style="{StaticResource HintTextStyle}" />
 
-                </StackPanel>
-            </Expander>
-            <Expander Header="Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Clear Cache after:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtCacheClear" Width="220" />
-                        <TextBlock Text="MB" Margin="2,0,0,0" VerticalAlignment="Center" />
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="Modifier"
+                                       Grid.Row="0" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <ComboBox x:Name="CmbHotkeyModifier"
+                                      Grid.Row="0" Grid.Column="1"
+                                      Margin="0,0,0,8"
+                                      SelectionChanged="CmbHotkeyModifier_SelectionChanged">
+                                <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
+                                <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
+                                <ComboBoxItem Tag="0x0001">Alt</ComboBoxItem>
+                            </ComboBox>
+
+                            <TextBlock Text="Volume up"
+                                       Grid.Row="1" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtHotkeyVolumeUp"
+                                     Grid.Row="1" Grid.Column="1"
+                                     Margin="0,0,0,6" />
+                            <Button x:Name="BtnRecordHotkeyVolumeUp"
+                                    Grid.Row="1" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,6"
+                                    Click="BtnRecordHotkeyVolumeUp_Click" />
+
+                            <TextBlock Text="Volume down"
+                                       Grid.Row="2" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtHotkeyVolumeDown"
+                                     Grid.Row="2" Grid.Column="1"
+                                     Margin="0,0,0,6" />
+                            <Button x:Name="BtnRecordHotkeyVolumeDown"
+                                    Grid.Row="2" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,6"
+                                    Click="BtnRecordHotkeyVolumeDown_Click" />
+
+                            <TextBlock Text="Toggle audio link"
+                                       Grid.Row="3" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtHotkeyToggleScrcpy"
+                                     Grid.Row="3" Grid.Column="1"
+                                     Margin="0,0,0,6" />
+                            <Button x:Name="BtnRecordHotkeyToggleScrcpy"
+                                    Grid.Row="3" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,6"
+                                    Click="BtnRecordHotkeyToggleScrcpy_Click" />
+
+                            <TextBlock Text="Toggle lyrics"
+                                       Grid.Row="4" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtHotkeyToggleLyricsOverlay"
+                                     Grid.Row="4" Grid.Column="1"
+                                     Margin="0,0,0,6" />
+                            <Button x:Name="BtnRecordHotkeyToggleLyricsOverlay"
+                                    Grid.Row="4" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,6"
+                                    Click="BtnRecordHotkeyToggleLyricsOverlay_Click" />
+
+                            <TextBlock Text="Copy track info"
+                                       Grid.Row="5" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtHotkeyCopyTrackInfo"
+                                     Grid.Row="5" Grid.Column="1" />
+                            <Button x:Name="BtnRecordHotkeyCopyTrackInfo"
+                                    Grid.Row="5" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,0"
+                                    Click="BtnRecordHotkeyCopyTrackInfo_Click" />
+                        </Grid>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Button x:Name="BtnClearCoverCache" Content="Clear Cover Cache" Width="160" />
-                        <Button x:Name="BtnOpenCoverCache" Content="Open Cover Cache" Width="160" Margin="8,0,0,0" />
+                </Expander>
+
+                <!-- ====== AUDIO ====== -->
+                <Expander Header="Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <StackPanel>
+                        <TextBlock Text="Quality settings used when streaming audio from your phone."
+                                   Style="{StaticResource HintTextStyle}" />
+
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Quality preset"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <ComboBox x:Name="CmbQualityPresets"
+                                      Grid.Column="1"
+                                      SelectionChanged="CmbQualityPresets_SelectionChanged" />
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <Button x:Name="BtnListCodecs"
+                                    Content="List codecs"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="130" />
+                            <TextBlock x:Name="TxtCodecStatus"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <ListBox x:Name="LstAudioCodecs"
+                                 Height="120"
+                                 Margin="0,0,0,12"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto" />
+
+                        <Grid x:Name="PanelAudioBitrate" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="220" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Bitrate"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtAudioBitrate" Grid.Column="1" />
+                            <TextBlock Text="kbps"
+                                       Grid.Column="2"
+                                       Margin="8,0,0,0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                        </Grid>
+
+                        <Grid x:Name="PanelAudioBuffer" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="220" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Audio buffer"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtAudioBuffer" Grid.Column="1" />
+                            <TextBlock Text="ms"
+                                       Grid.Column="2"
+                                       Margin="8,0,0,0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                        </Grid>
+
+                        <Grid x:Name="PanelFlacCompression">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="FLAC level"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtFlacCompressionLevel" Grid.Column="1" />
+                        </Grid>
                     </StackPanel>
-                </StackPanel>
-            </Expander>
+                </Expander>
 
-            <Expander Header="Eligible Apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <Button x:Name="BtnRefreshApps" Content="Refresh Apps" Width="120" />
-                        <TextBlock x:Name="TxtAppsStatus" Margin="12,4,0,0" VerticalAlignment="Center" />
-                    </StackPanel>
-                    <Grid Margin="0,0,0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="130" />
-                            <ColumnDefinition Width="120" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Package" FontWeight="Bold" />
-                        <TextBlock Grid.Column="1" Text="Enable Presence" FontWeight="Bold" HorizontalAlignment="Center" />
-                        <TextBlock Grid.Column="2" Text="Enable Cover" FontWeight="Bold" HorizontalAlignment="Center" />
-                    </Grid>
-                    <ListBox x:Name="LstAllowedApps"
-                             Height="180"
-                             Margin="0,0,0,0"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             HorizontalContentAlignment="Stretch">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,2,0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="190" />
-                                        <ColumnDefinition Width="70" />
-                                    </Grid.ColumnDefinitions>
+                <!-- ====== OTHER ====== -->
+                <Expander Header="Other" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <StackPanel>
+                        <TextBlock Text="Advanced behavior, startup, and miscellaneous options."
+                                   Style="{StaticResource HintTextStyle}" />
 
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding PackageName}"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip="{Binding PackageName}" />
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Update interval"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <ComboBox x:Name="CmbUpdateInterval" Grid.Column="1" />
+                        </Grid>
 
-                                    <CheckBox Grid.Column="1"
-                                              Content=""
-                                              IsChecked="{Binding IsSelected}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="220" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="SMTC paused clear delay"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtPauseClearDelayMinutes" Grid.Column="1" />
+                            <TextBlock Text="min (0 = off)"
+                                       Grid.Column="2"
+                                       Margin="8,0,0,0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                        </Grid>
 
-                                    <CheckBox Grid.Column="2"
-                                              Content=""
-                                              IsChecked="{Binding IsCoverSearchEnabled}"
-                                              IsEnabled="{Binding IsSelected}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </StackPanel>
-            </Expander>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Cover filename patterns"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtCoverPatterns"
+                                     Grid.Column="1"
+                                     ToolTip="Semicolon separated, e.g. cover.jpg;folder.jpg;front.png" />
+                        </Grid>
 
-            <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
-                <StackPanel>
-                    <TextBlock Text="Enter virtual-key codes (letters, function keys or common names). Choose modifier below." TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Copy template"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtCopyTrackTemplate"
+                                     Grid.Column="1"
+                                     ToolTip="Use {artist}, {title}, {album}" />
+                        </Grid>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Modifier:" Width="140" VerticalAlignment="Center" />
-                        <ComboBox x:Name="CmbHotkeyModifier" Width="220" SelectionChanged="CmbHotkeyModifier_SelectionChanged">
-                            <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
-                            <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
-                            <ComboBoxItem Tag="0x0001">Alt</ComboBoxItem>
-                        </ComboBox>
-                    </StackPanel>
+                        <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ChkOpenInTaskbar" Content="Show window in taskbar" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,0,0,12" />
 
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <TextBlock Text="Volume Up key:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtHotkeyVolumeUp" Width="220" />
-                        <Button x:Name="BtnRecordHotkeyVolumeUp" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyVolumeUp_Click" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <TextBlock Text="Volume Down key:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtHotkeyVolumeDown" Width="220" />
-                        <Button x:Name="BtnRecordHotkeyVolumeDown" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyVolumeDown_Click" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
-                        <TextBlock Text="Toggle Audio Link key:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtHotkeyToggleScrcpy" Width="220" />
-                        <Button x:Name="BtnRecordHotkeyToggleScrcpy" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleScrcpy_Click" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Toggle Lyrics key:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtHotkeyToggleLyricsOverlay" Width="220" />
-                        <Button x:Name="BtnRecordHotkeyToggleLyricsOverlay" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyToggleLyricsOverlay_Click" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Copy Track Info key:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtHotkeyCopyTrackInfo" Width="220" />
-                        <Button x:Name="BtnRecordHotkeyCopyTrackInfo" Content="Record" Width="80" Margin="8,0,0,0" Click="BtnRecordHotkeyCopyTrackInfo_Click" />
-                    </StackPanel>
-                </StackPanel>
-            </Expander>
-
-            <Expander Header="Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <TextBlock Text="Quality Presets:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
-                        <ComboBox x:Name="CmbQualityPresets" Grid.Row="0" Grid.Column="1" Width="220" Margin="25,0,0,0" SelectionChanged="CmbQualityPresets_SelectionChanged"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <Button x:Name="BtnListCodecs" Content="List codecs" Width="120" />
-                        <TextBlock x:Name="TxtCodecStatus" Margin="12,4,0,0" VerticalAlignment="Center" />
-                    </StackPanel>
-                    <ListBox x:Name="LstAudioCodecs" Height="120" Margin="0,0,0,8" ScrollViewer.VerticalScrollBarVisibility="Auto" />
-
-                    <StackPanel x:Name="PanelAudioBitrate" Orientation="Horizontal" Margin="0,0,0,4">
-                        <TextBlock Text="Bitrate:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtAudioBitrate" Width="220" />
-                        <TextBlock Text="kbps" Margin="8,0,0,0" VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <StackPanel x:Name="PanelAudioBuffer" Orientation="Horizontal" Margin="0,0,0,4">
-                        <TextBlock Text="Audio Buffer:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtAudioBuffer" Width="220" />
-                        <TextBlock Text="ms" Margin="8,0,0,0" VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <StackPanel x:Name="PanelFlacCompression" Orientation="Horizontal" Margin="0,0,0,0">
-                        <TextBlock Text="Flac Level:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtFlacCompressionLevel" Width="220" />
-                    </StackPanel>
-                </StackPanel>
-            </Expander>
-
-            <Expander Header="other" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
-                <StackPanel>
-                    <Grid Margin="0,0,0,12">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="140" />
-                            <ColumnDefinition Width="220" />
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Text="Update Interval:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" />
-                        <ComboBox x:Name="CmbUpdateInterval" Grid.Row="0" Grid.Column="1" Width="220" />
-                    </Grid>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="SMTC paused clear delay:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtPauseClearDelayMinutes" Width="220" />
-                        <TextBlock Text="min (0 = off)" Margin="2,0,0,0" VerticalAlignment="Center" />
-                    </StackPanel>
-
-
-
-                    
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Cover filename patterns:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtCoverPatterns" Width="220" ToolTip="Semicolon separated, e.g. cover.jpg;folder.jpg;front.png" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Copy template:" Width="140" VerticalAlignment="Center" />
-                        <TextBox x:Name="TxtCopyTrackTemplate" Width="220" ToolTip="Use {artist}, {title}, {album}" />
-                    </StackPanel>
-                    
-                    <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,0" />
-                    <CheckBox x:Name="ChkOpenInTaskbar" Content="Open in taskbar" Margin="0,8,0,0" />
-                    <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,8,0,0" />
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <CheckBox x:Name="ChkDarkMode" Content="Use dark mode" VerticalAlignment="Center" Visibility="Collapsed" />
-                        <Button x:Name="BtnToggleTheme" Content="Switch" Width="110" Margin="12,0,0,0" />
-                    </StackPanel>
-                </StackPanel>
-            </Expander>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="BtnSave" Content="Save" Width="100" />
+                        <Button x:Name="BtnRedoOnboarding"
+                                Content="Run onboarding again"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Width="200"
+                                HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Expander>
+
             </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+    </DockPanel>
 </Window>
