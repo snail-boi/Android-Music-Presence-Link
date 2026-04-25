@@ -39,7 +39,7 @@ namespace musicpresense
         private const int WmHotkey = 0x0312;
         private const float ScrcpyVolumeStep = 0.05f;
 
-        private static readonly string version = "1.0.11.1";
+        private static readonly string version = "1.0.12.0";
 
         private bool _isScrcpyRunning;
         private TrayIconState _lastTrayState = TrayIconState.NoDevice;
