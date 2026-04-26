@@ -276,46 +276,78 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- Cover art, takes the largest share, no border, just rounded corners -->
-                    <Viewbox Grid.Row="0"
-                         Stretch="Uniform"
-                         HorizontalAlignment="Center"
-                         VerticalAlignment="Center"
-                         Margin="0,16,0,24">
-                        <Border x:Name="CoverBorder"
-                            Width="420"
-                            Height="420"
-                            CornerRadius="10"
-                            ClipToBounds="True"
-                            SnapsToDevicePixels="True">
-                            <Border.Background>
-                                <SolidColorBrush Color="#22000000" />
-                            </Border.Background>
-                            <Grid>
-                                <!-- Crossfade layer A (outgoing) -->
-                                <Image x:Name="ImgCoverA"
-                                   Stretch="UniformToFill"
-                                   SnapsToDevicePixels="True"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   Opacity="1" />
-                                <!-- Crossfade layer B (incoming) -->
-                                <Image x:Name="ImgCoverB"
-                                   Stretch="UniformToFill"
-                                   SnapsToDevicePixels="True"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   Opacity="0" />
-                                <!-- Invisible hit-test overlay for right-click context menu -->
-                                <Border x:Name="CoverContextMenuHost" Background="Transparent">
-                                    <Border.ContextMenu>
-                                        <ContextMenu>
-                                            <MenuItem Header="Save cover image..." Click="SaveCoverMenuItem_Click" />
-                                            <MenuItem Header="Copy track info" Click="CopyCoverInfoMenuItem_Click" />
-                                        </ContextMenu>
-                                    </Border.ContextMenu>
-                                </Border>
-                            </Grid>
-                        </Border>
-                    </Viewbox>
+                    <!-- Cover art area: hosts cover image AND the inline lyrics view (toggled by BtnLyrics).
+                         Both occupy the same square; lyrics is hidden by default. -->
+                    <Grid Grid.Row="0"
+                          Margin="0,16,0,24">
+                        <Viewbox Stretch="Uniform"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center">
+                            <Border x:Name="CoverBorder"
+                                Width="420"
+                                Height="420"
+                                CornerRadius="10"
+                                ClipToBounds="True"
+                                SnapsToDevicePixels="True">
+                                <Border.Background>
+                                    <SolidColorBrush Color="#22000000" />
+                                </Border.Background>
+                                <Grid>
+                                    <!-- Crossfade layer A (outgoing) -->
+                                    <Image x:Name="ImgCoverA"
+                                       Stretch="UniformToFill"
+                                       SnapsToDevicePixels="True"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       Opacity="1" />
+                                    <!-- Crossfade layer B (incoming) -->
+                                    <Image x:Name="ImgCoverB"
+                                       Stretch="UniformToFill"
+                                       SnapsToDevicePixels="True"
+                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                       Opacity="0" />
+                                    <!-- Invisible hit-test overlay for right-click context menu -->
+                                    <Border x:Name="CoverContextMenuHost" Background="Transparent">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Save cover image..." Click="SaveCoverMenuItem_Click" />
+                                                <MenuItem Header="Copy track info" Click="CopyCoverInfoMenuItem_Click" />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Viewbox>
+
+                        <!-- Inline lyrics view: occupies the same square as the cover when shown.
+                             Code-behind toggles Visibility and populates LyricsItemsHost. -->
+                        <Grid x:Name="LyricsViewHost"
+                              Visibility="Collapsed"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              MaxWidth="600">
+                            <ScrollViewer x:Name="LyricsScroller"
+                                          VerticalScrollBarVisibility="Hidden"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          Focusable="False"
+                                          IsHitTestVisible="True"
+                                          PanningMode="VerticalOnly">
+                                <StackPanel x:Name="LyricsItemsHost"
+                                            Orientation="Vertical"
+                                            HorizontalAlignment="Stretch" />
+                            </ScrollViewer>
+
+                            <!-- Empty/loading state -->
+                            <TextBlock x:Name="LyricsEmptyState"
+                                       Text="No lyrics found for this track"
+                                       FontSize="14"
+                                       Opacity="0.6"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       Visibility="Collapsed" />
+                        </Grid>
+                    </Grid>
 
                     <!-- Track title, big and bold, centered -->
                     <TextBlock x:Name="TxtTitle"

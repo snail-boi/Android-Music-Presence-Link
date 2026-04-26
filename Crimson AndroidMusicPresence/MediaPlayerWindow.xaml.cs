@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
@@ -10,12 +11,23 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace musicpresense
 {
 
     // stuff
     // either keep lyrics a toggle or make it switch to a different lyrics view
+    // under the album text, but above the progress bar place a button called connection info, it's color should work the same as connection colors in other places
+    // when clicked should show the connection status is a small overlay
+    // a button that activates and deactivates audio link (dynamic icon)
+    // when a song is over 10 mins long we show fast forwards buttons, they send that command using ADB
+    // fade in/out the covers
+    // change volume slider to same style as position bar
+    // when you click the current time it should change to time left and back
+    // right clicking the cover art allows you to copy the title artist and album with it's template
+    // when no song is playing the background should be solid dark mode color instead of a gradient
+    // when we use lightmode the text of the mediaplayer itself shouldn't change color to black, except for when nothing is detected then we make the background white and the icons black
     public partial class MediaPlayerWindow : Window
     {
         // Settings pane snaps to collapsed when dragged below this width.
@@ -81,7 +93,16 @@ namespace musicpresense
         // Fast-seek ADB action
         private readonly Func<int, Task>? _seekRelativeSeconds;
 
-        public MediaPlayerWindow(
+        // Inline lyrics view state
+        private readonly LyricsOverlayManager? _lyricsManager;
+        private bool _lyricsViewActive;
+        private IReadOnlyList<LyricsOverlayManager.LyricsLineDto> _lyricsLines = Array.Empty<LyricsOverlayManager.LyricsLineDto>();
+        private bool _lyricsAreTimed;
+        private int _lyricsHighlightedIndex = -1;
+        private DispatcherTimer? _lyricsTimer;
+        private readonly List<TextBlock> _lyricsLineBlocks = new();
+
+        internal MediaPlayerWindow(
             Func<Task> pauseAction,
             Func<Task> nextAction,
             Func<Task> previousAction,
@@ -91,7 +112,8 @@ namespace musicpresense
             Action<float>? setVolume = null,
             Action<bool>? stepVolume = null,
             Action<bool>? setAudioLink = null,
-            Func<int, Task>? seekRelativeSeconds = null)
+            Func<int, Task>? seekRelativeSeconds = null,
+            LyricsOverlayManager? lyricsManager = null)
         {
             InitializeComponent();
             _pauseAction = pauseAction;
@@ -104,6 +126,12 @@ namespace musicpresense
             _stepVolume = stepVolume;
             _setAudioLink = setAudioLink;
             _seekRelativeSeconds = seekRelativeSeconds;
+            _lyricsManager = lyricsManager;
+
+            if (_lyricsManager != null)
+            {
+                _lyricsManager.LinesChanged += OnLyricsLinesChanged;
+            }
 
             RenderTransportIcons(isPlaying: false);
             RenderAuxiliaryIcons();
@@ -127,6 +155,21 @@ namespace musicpresense
         {
             if (!e.WidthChanged) return;
             UpdateSettingsColumnMaxWidth();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            try
+            {
+                if (_lyricsManager != null)
+                {
+                    _lyricsManager.LinesChanged -= OnLyricsLinesChanged;
+                }
+                StopLyricsTimer();
+                _lyricsTimer = null;
+            }
+            catch { }
+            base.OnClosed(e);
         }
 
         private void UpdateGradientClip()
@@ -302,6 +345,14 @@ namespace musicpresense
             // already has its own _lastGradientSourcePath guard so repeated calls are cheap.
             ApplyCoverGradientBackground(hasSong ? _currentCoverPath : null);
             ApplyPlayerTextColor(hasSong);
+
+            // The inline lyrics color set depends on _hasSong; refresh if open.
+            if (_lyricsViewActive && _lyricsLines.Count > 0)
+            {
+                RebuildLyricsPanel();
+                _lyricsHighlightedIndex = -1;
+                Dispatcher.BeginInvoke(new Action(() => UpdateLyricsHighlightAndScroll(animate: false)), DispatcherPriority.Loaded);
+            }
         }
 
         /// <summary>
@@ -369,6 +420,14 @@ namespace musicpresense
             RenderAuxiliaryIcons();
             RefreshVolumeIcon();
             RenderSettingsPaneArrowIcon();
+
+            // Lyrics panel uses theme-aware brushes; rebuild colors.
+            if (_lyricsViewActive && _lyricsLines.Count > 0)
+            {
+                RebuildLyricsPanel();
+                _lyricsHighlightedIndex = -1;
+                Dispatcher.BeginInvoke(new Action(() => UpdateLyricsHighlightAndScroll(animate: false)), DispatcherPriority.Loaded);
+            }
         }
 
         /// <summary>
@@ -822,7 +881,307 @@ namespace musicpresense
 
         private void BtnLyrics_Click(object sender, RoutedEventArgs e)
         {
-            try { _lyricsToggleAction?.Invoke(); } catch { }
+            ToggleInlineLyricsView();
+        }
+
+        // ── Inline Lyrics View ────────────────────────────────────────────────
+
+        private void ToggleInlineLyricsView()
+        {
+            _lyricsViewActive = !_lyricsViewActive;
+            ApplyLyricsViewVisibility();
+            RenderAuxiliaryIcons();
+
+            if (_lyricsViewActive)
+            {
+                // Pull current lines from the manager (it may already have them loaded
+                // from an earlier OnPlaybackChanged call).
+                if (_lyricsManager != null)
+                {
+                    var data = _lyricsManager.GetCurrentTrackData();
+                    AdoptLyricsData(data, scrollToCurrent: true);
+                }
+                else
+                {
+                    AdoptLyricsData(new LyricsOverlayManager.LyricsTrackData(Array.Empty<LyricsOverlayManager.LyricsLineDto>(), false), scrollToCurrent: true);
+                }
+                StartLyricsTimer();
+            }
+            else
+            {
+                StopLyricsTimer();
+            }
+        }
+
+        private void ApplyLyricsViewVisibility()
+        {
+            // The inline lyrics replace the cover art visually. We collapse the cover
+            // Viewbox's parent (CoverBorder is inside a Viewbox) by hiding LyricsViewHost
+            // / showing it. The cover layers stay where they are; we just toggle which
+            // child of the parent grid is visible.
+            if (_lyricsViewActive)
+            {
+                LyricsViewHost.Visibility = Visibility.Visible;
+                CoverBorder.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                LyricsViewHost.Visibility = Visibility.Collapsed;
+                CoverBorder.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void OnLyricsLinesChanged(LyricsOverlayManager.LyricsTrackData data)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(() => OnLyricsLinesChanged(data));
+                return;
+            }
+
+            // Always cache; only re-render the panel when the inline view is open,
+            // to avoid wasted layout work.
+            if (_lyricsViewActive)
+            {
+                AdoptLyricsData(data, scrollToCurrent: true);
+            }
+            else
+            {
+                _lyricsLines = data.Lines;
+                _lyricsAreTimed = data.IsTimed;
+                _lyricsHighlightedIndex = -1;
+            }
+        }
+
+        private void AdoptLyricsData(LyricsOverlayManager.LyricsTrackData data, bool scrollToCurrent)
+        {
+            _lyricsLines = data.Lines;
+            _lyricsAreTimed = data.IsTimed;
+            _lyricsHighlightedIndex = -1;
+
+            RebuildLyricsPanel();
+
+            if (scrollToCurrent)
+            {
+                // Defer the scroll to after layout so ScrollViewer measurements are valid.
+                Dispatcher.BeginInvoke(new Action(() => UpdateLyricsHighlightAndScroll(animate: false)), DispatcherPriority.Loaded);
+            }
+        }
+
+        private void RebuildLyricsPanel()
+        {
+            LyricsItemsHost.Children.Clear();
+            _lyricsLineBlocks.Clear();
+
+            if (_lyricsLines.Count == 0)
+            {
+                LyricsEmptyState.Visibility = Visibility.Visible;
+                return;
+            }
+
+            LyricsEmptyState.Visibility = Visibility.Collapsed;
+
+            // Top spacer so the first line can be vertically centered when scrolled to.
+            LyricsItemsHost.Children.Add(new Border
+            {
+                Height = 180,
+                Background = Brushes.Transparent,
+                IsHitTestVisible = false
+            });
+
+            var inactiveBrush = ResolveLyricsInactiveBrush();
+            var activeBrush = ResolveLyricsActiveBrush();
+
+            for (int i = 0; i < _lyricsLines.Count; i++)
+            {
+                var line = _lyricsLines[i];
+
+                // Treat empty plain-text separator lines as visual gap.
+                if (line.Text.Length == 0)
+                {
+                    LyricsItemsHost.Children.Add(new Border
+                    {
+                        Height = 18,
+                        Background = Brushes.Transparent,
+                        IsHitTestVisible = false
+                    });
+                    _lyricsLineBlocks.Add(null!); // keep index alignment with _lyricsLines
+                    continue;
+                }
+
+                var tb = new TextBlock
+                {
+                    Text = line.Text,
+                    FontSize = 18,
+                    TextWrapping = TextWrapping.Wrap,
+                    TextAlignment = TextAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(24, 8, 24, 8),
+                    Foreground = inactiveBrush,
+                    Opacity = _lyricsAreTimed ? 0.55 : 0.85
+                };
+
+                LyricsItemsHost.Children.Add(tb);
+                _lyricsLineBlocks.Add(tb);
+            }
+
+            // Bottom spacer so the last line can be centered.
+            LyricsItemsHost.Children.Add(new Border
+            {
+                Height = 180,
+                Background = Brushes.Transparent,
+                IsHitTestVisible = false
+            });
+        }
+
+        private void StartLyricsTimer()
+        {
+            if (_lyricsTimer == null)
+            {
+                _lyricsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+                _lyricsTimer.Tick += LyricsTimer_Tick;
+            }
+            if (!_lyricsTimer.IsEnabled)
+                _lyricsTimer.Start();
+        }
+
+        private void StopLyricsTimer()
+        {
+            if (_lyricsTimer != null && _lyricsTimer.IsEnabled)
+                _lyricsTimer.Stop();
+        }
+
+        private void LyricsTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!_lyricsViewActive) return;
+            UpdateLyricsHighlightAndScroll(animate: true);
+        }
+
+        private void UpdateLyricsHighlightAndScroll(bool animate)
+        {
+            if (_lyricsLines.Count == 0) return;
+
+            int newIdx;
+            if (_lyricsAreTimed && _lyricsManager != null)
+            {
+                newIdx = _lyricsManager.GetCurrentLineIndex();
+            }
+            else
+            {
+                // Plain-text: no auto-highlight; just leave nothing highlighted.
+                newIdx = -1;
+            }
+
+            if (newIdx == _lyricsHighlightedIndex)
+                return;
+
+            // Restore old block style
+            if (_lyricsHighlightedIndex >= 0 && _lyricsHighlightedIndex < _lyricsLineBlocks.Count)
+            {
+                var prev = _lyricsLineBlocks[_lyricsHighlightedIndex];
+                if (prev != null)
+                {
+                    prev.FontWeight = FontWeights.Normal;
+                    prev.Opacity = 0.55;
+                    prev.Foreground = ResolveLyricsInactiveBrush();
+                }
+            }
+
+            _lyricsHighlightedIndex = newIdx;
+
+            if (newIdx < 0 || newIdx >= _lyricsLineBlocks.Count)
+                return;
+
+            var current = _lyricsLineBlocks[newIdx];
+            if (current == null) return;
+
+            current.FontWeight = FontWeights.Bold;
+            current.Opacity = 1.0;
+            current.Foreground = ResolveLyricsActiveBrush();
+
+            ScrollLyricsToCenter(current, animate);
+        }
+
+        private void ScrollLyricsToCenter(TextBlock target, bool animate)
+        {
+            if (LyricsScroller == null) return;
+
+            // Force a layout pass so TranslatePoint returns valid coordinates.
+            LyricsScroller.UpdateLayout();
+
+            try
+            {
+                var transform = target.TransformToAncestor(LyricsItemsHost);
+                var topInPanel = transform.Transform(new Point(0, 0)).Y;
+                var targetCenter = topInPanel + (target.ActualHeight / 2.0);
+
+                var viewportH = LyricsScroller.ViewportHeight;
+                if (viewportH <= 0) viewportH = LyricsScroller.ActualHeight;
+                if (viewportH <= 0) return;
+
+                double targetOffset = targetCenter - (viewportH / 2.0);
+                targetOffset = Math.Max(0, Math.Min(targetOffset, LyricsScroller.ExtentHeight - viewportH));
+
+                if (!animate)
+                {
+                    LyricsScroller.ScrollToVerticalOffset(targetOffset);
+                    return;
+                }
+
+                AnimateScrollTo(LyricsScroller, targetOffset);
+            }
+            catch
+            {
+                // Layout may not yet be ready - skip silently; next tick will retry.
+            }
+        }
+
+        private static void AnimateScrollTo(ScrollViewer scroller, double targetOffset)
+        {
+            // ScrollViewer.VerticalOffset isn't directly animatable; use a DoubleAnimation
+            // on a dummy DP and forward each tick to ScrollToVerticalOffset.
+            double from = scroller.VerticalOffset;
+            var anim = new DoubleAnimation
+            {
+                From = from,
+                To = targetOffset,
+                Duration = new Duration(TimeSpan.FromMilliseconds(280)),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            var clock = anim.CreateClock();
+            clock.CurrentTimeInvalidated += (_, _) =>
+            {
+                if (clock.CurrentProgress is double p)
+                {
+                    // Apply easing manually so we follow the same curve as the animation
+                    var ease = anim.EasingFunction;
+                    double eased = ease != null ? ease.Ease(p) : p;
+                    double next = from + ((targetOffset - from) * eased);
+                    scroller.ScrollToVerticalOffset(next);
+                }
+            };
+            clock.Controller?.Begin();
+        }
+
+        private Brush ResolveLyricsInactiveBrush()
+        {
+            // When a song is playing the cover gradient sits behind the lyrics view,
+            // and white reads well against it. Otherwise follow the theme.
+            if (_hasSong)
+                return new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+
+            return IsDarkThemeActive()
+                ? new SolidColorBrush(Color.FromArgb(0x99, 0xFF, 0xFF, 0xFF))
+                : new SolidColorBrush(Color.FromArgb(0xCC, 0x00, 0x00, 0x00));
+        }
+
+        private Brush ResolveLyricsActiveBrush()
+        {
+            if (_hasSong)
+                return Brushes.White;
+
+            return IsDarkThemeActive() ? Brushes.White : Brushes.Black;
         }
 
         // ── Connection Info ───────────────────────────────────────────────────
@@ -940,7 +1299,7 @@ namespace musicpresense
             const double auxIconSize = 22;
 
             BtnVolume.Content = BuildVolumeIcon(iconBrush, auxIconSize, VolumeIconLevel.High);
-            BtnLyrics.Content = BuildLyricsIcon(iconBrush, auxIconSize);
+            BtnLyrics.Content = BuildLyricsIcon(iconBrush, auxIconSize, _lyricsViewActive);
 
             RenderFastSeekIcons();
             RenderAudioLinkButton();
@@ -1237,10 +1596,27 @@ namespace musicpresense
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
-        private static Viewbox BuildLyricsIcon(Brush brush, double size = 20)
+        private static Viewbox BuildLyricsIcon(Brush brush, double size = 20, bool active = false)
         {
             // Stack of horizontal text lines, with one line indented to suggest lyric text.
             var canvas = new Canvas { Width = 20, Height = 20 };
+
+            if (active)
+            {
+                // Rounded background pill behind the lines indicates active state.
+                var bg = new Rectangle
+                {
+                    Width = 18,
+                    Height = 18,
+                    Fill = brush,
+                    Opacity = 0.18,
+                    RadiusX = 4,
+                    RadiusY = 4
+                };
+                Canvas.SetLeft(bg, 1);
+                Canvas.SetTop(bg, 1);
+                canvas.Children.Add(bg);
+            }
 
             void AddLine(double x, double y, double width)
             {

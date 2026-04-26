@@ -33,6 +33,9 @@ namespace musicpresense
 
         private string? _loadedTrackKey;
         private List<LyricsLine> _lines = new();
+        // True when at least one line in _lines came from a timestamped LRC entry.
+        // False for plain-text lyrics files (no [mm:ss] markers anywhere).
+        private bool _linesAreTimed;
 
         private readonly string _lyricsCachePath;
         private readonly Dictionary<string, string?> _trackLyricsPathCache = new(StringComparer.OrdinalIgnoreCase);
@@ -121,17 +124,23 @@ namespace musicpresense
                 if (string.IsNullOrWhiteSpace(_currentTitle) || string.IsNullOrWhiteSpace(_currentArtist))
                 {
                     _loadedTrackKey = null;
+                    bool hadLines = _lines.Count > 0;
                     _lines.Clear();
+                    _linesAreTimed = false;
                     _lastReportedPositionMs = null;
                     _timer.Stop();
                     _overlay?.Hide();
+                    if (hadLines) RaiseLinesChanged();
                     return;
                 }
 
                 if (!string.Equals(_loadedTrackKey, trackKey, StringComparison.Ordinal))
                 {
                     _loadedTrackKey = trackKey;
-                    _lines = await LoadLyricsForCurrentTrackAsync().ConfigureAwait(true);
+                    var loaded = await LoadLyricsForCurrentTrackAsync().ConfigureAwait(true);
+                    _lines = loaded.lines;
+                    _linesAreTimed = loaded.isTimed;
+                    RaiseLinesChanged();
                 }
 
                 if (_lines.Count == 0 || !_overlayVisible)
@@ -190,7 +199,7 @@ namespace musicpresense
             return _lines[idx].Text;
         }
 
-        private async Task<List<LyricsLine>> LoadLyricsForCurrentTrackAsync()
+        private async Task<(List<LyricsLine> lines, bool isTimed)> LoadLyricsForCurrentTrackAsync()
         {
             var artist = _currentArtist ?? string.Empty;
             var title = _currentTitle ?? string.Empty;
@@ -202,14 +211,14 @@ namespace musicpresense
                 if (!string.IsNullOrWhiteSpace(cachedPath) && File.Exists(cachedPath))
                     return await ParseLrcFileAsync(cachedPath).ConfigureAwait(true);
 
-                return new List<LyricsLine>();
+                return (new List<LyricsLine>(), false);
             }
 
             var device = _getCurrentDevice();
             if (string.IsNullOrWhiteSpace(device))
             {
                 _trackLyricsPathCache[key] = null;
-                return new List<LyricsLine>();
+                return (new List<LyricsLine>(), false);
             }
 
             var remoteRoots = GetRemoteRoots(_config);
@@ -244,14 +253,14 @@ namespace musicpresense
             if (string.IsNullOrWhiteSpace(bestRemotePath) || bestScore < 20)
             {
                 _trackLyricsPathCache[key] = null;
-                return new List<LyricsLine>();
+                return (new List<LyricsLine>(), false);
             }
 
             var localPath = await PullAndCacheLyricsAsync(device, bestRemotePath, key).ConfigureAwait(true);
             _trackLyricsPathCache[key] = localPath;
 
             if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
-                return new List<LyricsLine>();
+                return (new List<LyricsLine>(), false);
 
             return await ParseLrcFileAsync(localPath).ConfigureAwait(true);
         }
@@ -358,7 +367,7 @@ namespace musicpresense
             return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
         }
 
-        private static async Task<List<LyricsLine>> ParseLrcFileAsync(string path)
+        private static async Task<(List<LyricsLine> lines, bool isTimed)> ParseLrcFileAsync(string path)
         {
             string text;
             try
@@ -373,14 +382,19 @@ namespace musicpresense
                 }
                 catch
                 {
-                    return new List<LyricsLine>();
+                    return (new List<LyricsLine>(), false);
                 }
             }
 
             var lines = new List<LyricsLine>();
             var regex = new Regex(@"\[(\d{1,2}):(\d{2})(?:[\.:](\d{1,3}))?\]");
+            // Tag-only lines like [ar:...], [ti:...], [length:...] - skip from plain-text fallback.
+            var tagOnlyRegex = new Regex(@"^\s*\[[a-zA-Z]{2,}:[^\]]*\]\s*$");
 
-            foreach (var rawLine in text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+            bool anyTimestamp = false;
+            var rawLines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+            foreach (var rawLine in rawLines)
             {
                 if (string.IsNullOrWhiteSpace(rawLine))
                     continue;
@@ -388,6 +402,8 @@ namespace musicpresense
                 var matches = regex.Matches(rawLine);
                 if (matches.Count == 0)
                     continue;
+
+                anyTimestamp = true;
 
                 var lyricText = regex.Replace(rawLine, string.Empty).Trim();
                 if (string.IsNullOrWhiteSpace(lyricText))
@@ -412,7 +428,36 @@ namespace musicpresense
                 }
             }
 
-            return lines.OrderBy(l => l.Time).ToList();
+            if (anyTimestamp)
+            {
+                return (lines.OrderBy(l => l.Time).ToList(), true);
+            }
+
+            // Plain-text fallback: no usable timestamps anywhere in the file.
+            // Return one entry per non-empty source line, with TimeSpan.Zero, IsTimed=false.
+            var plain = new List<LyricsLine>();
+            foreach (var rawLine in rawLines)
+            {
+                var trimmed = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed))
+                {
+                    // Preserve paragraph breaks as empty entries so the renderer can render gaps.
+                    if (plain.Count > 0 && plain[^1].Text.Length > 0)
+                        plain.Add(new LyricsLine(TimeSpan.Zero, string.Empty));
+                    continue;
+                }
+
+                if (tagOnlyRegex.IsMatch(trimmed))
+                    continue;
+
+                plain.Add(new LyricsLine(TimeSpan.Zero, trimmed));
+            }
+
+            // Trim trailing empty separator
+            while (plain.Count > 0 && plain[^1].Text.Length == 0)
+                plain.RemoveAt(plain.Count - 1);
+
+            return (plain, false);
         }
 
         private void EnsureOverlay()
@@ -438,6 +483,62 @@ namespace musicpresense
             {
             }
         }
+
+        // ── Public surface for the inline media-player lyrics view ────────────
+
+        /// <summary>
+        /// Fired on the dispatcher whenever the loaded lyrics for the current track change
+        /// (track switched, lyrics newly loaded, or cleared because no track is playing).
+        /// </summary>
+        public event Action<LyricsTrackData>? LinesChanged;
+
+        /// <summary>
+        /// Returns the lines currently loaded for the playing track, plus whether they
+        /// carry usable timestamps. May be empty.
+        /// </summary>
+        public LyricsTrackData GetCurrentTrackData()
+        {
+            return new LyricsTrackData(_lines.Select(l => new LyricsLineDto(l.Time, l.Text)).ToList(), _linesAreTimed);
+        }
+
+        /// <summary>
+        /// Index into the current lines list that should be highlighted right now,
+        /// or -1 if there are no lines (or lyrics aren't timed).
+        /// </summary>
+        public int GetCurrentLineIndex()
+        {
+            if (_lines.Count == 0 || !_linesAreTimed)
+                return -1;
+
+            var posMs = _basePositionMs;
+            if (_isPlaying)
+            {
+                var elapsed = DateTime.UtcNow - _positionAnchorUtc;
+                posMs += Math.Max(0, (long)elapsed.TotalMilliseconds);
+            }
+            posMs += LyricsLeadMs;
+
+            var position = TimeSpan.FromMilliseconds(Math.Max(0, posMs));
+
+            var idx = -1;
+            for (var i = 0; i < _lines.Count; i++)
+            {
+                if (_lines[i].Time <= position)
+                    idx = i;
+                else
+                    break;
+            }
+            return idx < 0 ? 0 : idx;
+        }
+
+        private void RaiseLinesChanged()
+        {
+            try { LinesChanged?.Invoke(GetCurrentTrackData()); } catch { }
+        }
+
+        public sealed record LyricsLineDto(TimeSpan Time, string Text);
+
+        public sealed record LyricsTrackData(IReadOnlyList<LyricsLineDto> Lines, bool IsTimed);
 
         private sealed record LyricsLine(TimeSpan Time, string Text);
     }

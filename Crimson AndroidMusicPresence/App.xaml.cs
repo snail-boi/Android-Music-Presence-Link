@@ -307,7 +307,8 @@ namespace musicpresense
                     TrySetScrcpyVolume,
                     StepVolumeOnce,
                     SetAudioLinkFromMediaPlayer,
-                    seconds => _presenceService?.SeekRelativeCurrentAsync(seconds) ?? Task.CompletedTask);
+                    seconds => _presenceService?.SeekRelativeCurrentAsync(seconds) ?? Task.CompletedTask,
+                    _lyricsOverlayManager);
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
 
                 // Push current connection + scrcpy state into the freshly created window.
