@@ -101,6 +101,22 @@ namespace musicpresense
         private int _lyricsHighlightedIndex = -1;
         private DispatcherTimer? _lyricsTimer;
         private readonly List<TextBlock> _lyricsLineBlocks = new();
+        // Wrapper Border for each line, parallel to _lyricsLineBlocks, used to render
+        // the darkened background pill behind the active line. null entries match the
+        // empty separator slots in _lyricsLineBlocks.
+        private readonly List<Border> _lyricsLineHosts = new();
+        // Brushes for lyrics lines. Recomputed once per track/theme change in
+        // RebuildLyricsPanel; reused per highlight update to avoid allocating new
+        // brushes (which would cause a render-pass flash on each line transition).
+        private Brush _lyricsInactiveBrush = Brushes.White;
+        private Brush _lyricsActiveBrush = Brushes.White;
+        private Brush _lyricsActiveLineBgBrush = Brushes.Transparent;
+
+        // Continuous-lerp scroll: instead of starting a new tween on each line change
+        // (which produces a stuttery restart when lines come fast), we keep a target
+        // offset and ease toward it once per frame via CompositionTarget.Rendering.
+        private double _lyricsTargetScrollOffset;
+        private bool _lyricsScrollLoopActive;
 
         internal MediaPlayerWindow(
             Func<Task> pauseAction,
@@ -166,6 +182,7 @@ namespace musicpresense
                     _lyricsManager.LinesChanged -= OnLyricsLinesChanged;
                 }
                 StopLyricsTimer();
+                StopLyricsScrollLoop();
                 _lyricsTimer = null;
             }
             catch { }
@@ -910,6 +927,7 @@ namespace musicpresense
             else
             {
                 StopLyricsTimer();
+                StopLyricsScrollLoop();
             }
         }
 
@@ -972,6 +990,15 @@ namespace musicpresense
         {
             LyricsItemsHost.Children.Clear();
             _lyricsLineBlocks.Clear();
+            _lyricsLineHosts.Clear();
+
+            // Recompute and freeze the per-line brushes once so highlight updates can
+            // reuse the same instances without allocating. Allocating a fresh brush per
+            // tick was causing each line transition to flash for a frame as WPF realized
+            // the new brush.
+            _lyricsInactiveBrush = ComputeLyricsInactiveBrush();
+            _lyricsActiveBrush = ComputeLyricsActiveBrush();
+            _lyricsActiveLineBgBrush = ComputeLyricsActiveLineBgBrush();
 
             if (_lyricsLines.Count == 0)
             {
@@ -989,9 +1016,6 @@ namespace musicpresense
                 IsHitTestVisible = false
             });
 
-            var inactiveBrush = ResolveLyricsInactiveBrush();
-            var activeBrush = ResolveLyricsActiveBrush();
-
             for (int i = 0; i < _lyricsLines.Count; i++)
             {
                 var line = _lyricsLines[i];
@@ -1006,6 +1030,7 @@ namespace musicpresense
                         IsHitTestVisible = false
                     });
                     _lyricsLineBlocks.Add(null!); // keep index alignment with _lyricsLines
+                    _lyricsLineHosts.Add(null!);
                     continue;
                 }
 
@@ -1013,16 +1038,32 @@ namespace musicpresense
                 {
                     Text = line.Text,
                     FontSize = 18,
+                    // Use one consistent FontWeight for every line - changing weight on
+                    // active/inactive transitions remeasures the whole list and causes
+                    // a visible flash. Active state is conveyed by Opacity, Foreground,
+                    // and the wrapper Border's Background instead.
+                    FontWeight = FontWeights.SemiBold,
                     TextWrapping = TextWrapping.Wrap,
                     TextAlignment = TextAlignment.Center,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
-                    Margin = new Thickness(24, 8, 24, 8),
-                    Foreground = inactiveBrush,
-                    Opacity = _lyricsAreTimed ? 0.55 : 0.85
+                    Margin = new Thickness(16, 8, 16, 8),
+                    Foreground = _lyricsInactiveBrush,
+                    Opacity = _lyricsAreTimed ? 0.45 : 0.85
                 };
 
-                LyricsItemsHost.Children.Add(tb);
+                // Wrap the TextBlock in a Border so the active line can paint a darkened
+                // pill behind itself. Border background is transparent for inactive lines.
+                var host = new Border
+                {
+                    Background = Brushes.Transparent,
+                    CornerRadius = new CornerRadius(8),
+                    Margin = new Thickness(8, 0, 8, 0),
+                    Child = tb
+                };
+
+                LyricsItemsHost.Children.Add(host);
                 _lyricsLineBlocks.Add(tb);
+                _lyricsLineHosts.Add(host);
             }
 
             // Bottom spacer so the last line can be centered.
@@ -1034,11 +1075,62 @@ namespace musicpresense
             });
         }
 
+        private Brush ComputeLyricsInactiveBrush()
+        {
+            SolidColorBrush brush;
+            if (_hasSong)
+            {
+                brush = new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+            }
+            else
+            {
+                brush = IsDarkThemeActive()
+                    ? new SolidColorBrush(Color.FromArgb(0x99, 0xFF, 0xFF, 0xFF))
+                    : new SolidColorBrush(Color.FromArgb(0xCC, 0x00, 0x00, 0x00));
+            }
+            brush.Freeze();
+            return brush;
+        }
+
+        private Brush ComputeLyricsActiveBrush()
+        {
+            SolidColorBrush brush;
+            if (_hasSong)
+            {
+                brush = new SolidColorBrush(Colors.White);
+            }
+            else
+            {
+                brush = IsDarkThemeActive() ? new SolidColorBrush(Colors.White) : new SolidColorBrush(Colors.Black);
+            }
+            brush.Freeze();
+            return brush;
+        }
+
+        private Brush ComputeLyricsActiveLineBgBrush()
+        {
+            // Darkened pill behind the active line. Slightly heavier when a song's gradient
+            // is showing through (so it reads against varied colors), lighter on solid theme.
+            SolidColorBrush brush;
+            if (_hasSong)
+            {
+                brush = new SolidColorBrush(Color.FromArgb(0x66, 0x00, 0x00, 0x00));
+            }
+            else
+            {
+                brush = IsDarkThemeActive()
+                    ? new SolidColorBrush(Color.FromArgb(0x55, 0x00, 0x00, 0x00))
+                    : new SolidColorBrush(Color.FromArgb(0x22, 0x00, 0x00, 0x00));
+            }
+            brush.Freeze();
+            return brush;
+        }
+
         private void StartLyricsTimer()
         {
             if (_lyricsTimer == null)
             {
-                _lyricsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+                _lyricsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
                 _lyricsTimer.Tick += LyricsTimer_Tick;
             }
             if (!_lyricsTimer.IsEnabled)
@@ -1075,15 +1167,26 @@ namespace musicpresense
             if (newIdx == _lyricsHighlightedIndex)
                 return;
 
-            // Restore old block style
+            // Restore old block style.
+            // NOTE: We deliberately do NOT change FontWeight between active/inactive,
+            // because that alters text metrics, forces the StackPanel to remeasure,
+            // shifts ExtentHeight, and makes the in-flight scroll animation land on
+            // a different target than was computed when it started. The visible result
+            // is a flash on every line change. We rely on Opacity, Foreground, and
+            // the wrapper Border's Background to distinguish active vs inactive.
             if (_lyricsHighlightedIndex >= 0 && _lyricsHighlightedIndex < _lyricsLineBlocks.Count)
             {
                 var prev = _lyricsLineBlocks[_lyricsHighlightedIndex];
                 if (prev != null)
                 {
-                    prev.FontWeight = FontWeights.Normal;
-                    prev.Opacity = 0.55;
-                    prev.Foreground = ResolveLyricsInactiveBrush();
+                    prev.Opacity = 0.45;
+                    prev.Foreground = _lyricsInactiveBrush;
+                }
+                if (_lyricsHighlightedIndex < _lyricsLineHosts.Count)
+                {
+                    var prevHost = _lyricsLineHosts[_lyricsHighlightedIndex];
+                    if (prevHost != null)
+                        prevHost.Background = Brushes.Transparent;
                 }
             }
 
@@ -1095,9 +1198,15 @@ namespace musicpresense
             var current = _lyricsLineBlocks[newIdx];
             if (current == null) return;
 
-            current.FontWeight = FontWeights.Bold;
             current.Opacity = 1.0;
-            current.Foreground = ResolveLyricsActiveBrush();
+            current.Foreground = _lyricsActiveBrush;
+
+            if (newIdx < _lyricsLineHosts.Count)
+            {
+                var host = _lyricsLineHosts[newIdx];
+                if (host != null)
+                    host.Background = _lyricsActiveLineBgBrush;
+            }
 
             ScrollLyricsToCenter(current, animate);
         }
@@ -1106,8 +1215,14 @@ namespace musicpresense
         {
             if (LyricsScroller == null) return;
 
-            // Force a layout pass so TranslatePoint returns valid coordinates.
-            LyricsScroller.UpdateLayout();
+            // For an immediate (non-animated) scroll we may need a layout pass so the
+            // target's TransformToAncestor returns a valid offset (e.g. on first paint).
+            // During animations we deliberately skip UpdateLayout to avoid frame stalls
+            // that would visibly stutter the scroll.
+            if (!animate)
+            {
+                LyricsScroller.UpdateLayout();
+            }
 
             try
             {
@@ -1120,15 +1235,21 @@ namespace musicpresense
                 if (viewportH <= 0) return;
 
                 double targetOffset = targetCenter - (viewportH / 2.0);
-                targetOffset = Math.Max(0, Math.Min(targetOffset, LyricsScroller.ExtentHeight - viewportH));
+                targetOffset = Math.Max(0, Math.Min(targetOffset, Math.Max(0, LyricsScroller.ExtentHeight - viewportH)));
 
                 if (!animate)
                 {
+                    StopLyricsScrollLoop();
+                    _lyricsTargetScrollOffset = targetOffset;
                     LyricsScroller.ScrollToVerticalOffset(targetOffset);
                     return;
                 }
 
-                AnimateScrollTo(LyricsScroller, targetOffset);
+                // Update the target and let the per-frame loop ease toward it. The loop
+                // converges from wherever the scroller currently is, so a target change
+                // mid-flight just adjusts the destination - no clock restart, no jump.
+                _lyricsTargetScrollOffset = targetOffset;
+                StartLyricsScrollLoop();
             }
             catch
             {
@@ -1136,52 +1257,56 @@ namespace musicpresense
             }
         }
 
-        private static void AnimateScrollTo(ScrollViewer scroller, double targetOffset)
-        {
-            // ScrollViewer.VerticalOffset isn't directly animatable; use a DoubleAnimation
-            // on a dummy DP and forward each tick to ScrollToVerticalOffset.
-            double from = scroller.VerticalOffset;
-            var anim = new DoubleAnimation
-            {
-                From = from,
-                To = targetOffset,
-                Duration = new Duration(TimeSpan.FromMilliseconds(280)),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
+        // ── Continuous scroll loop ───────────────────────────────────────────
+        // CompositionTarget.Rendering fires once per frame on the UI dispatcher.
+        // We lerp VerticalOffset toward _lyricsTargetScrollOffset by a fixed
+        // fraction each frame (exponential smoothing). When close enough we snap
+        // and detach the handler. This produces smooth motion that handles fast
+        // line changes gracefully, because the target just shifts and the lerp
+        // continues without any restart.
 
-            var clock = anim.CreateClock();
-            clock.CurrentTimeInvalidated += (_, _) =>
-            {
-                if (clock.CurrentProgress is double p)
-                {
-                    // Apply easing manually so we follow the same curve as the animation
-                    var ease = anim.EasingFunction;
-                    double eased = ease != null ? ease.Ease(p) : p;
-                    double next = from + ((targetOffset - from) * eased);
-                    scroller.ScrollToVerticalOffset(next);
-                }
-            };
-            clock.Controller?.Begin();
+        private void StartLyricsScrollLoop()
+        {
+            if (_lyricsScrollLoopActive) return;
+            _lyricsScrollLoopActive = true;
+            CompositionTarget.Rendering += LyricsScrollLoop_Tick;
         }
 
-        private Brush ResolveLyricsInactiveBrush()
+        private void StopLyricsScrollLoop()
         {
-            // When a song is playing the cover gradient sits behind the lyrics view,
-            // and white reads well against it. Otherwise follow the theme.
-            if (_hasSong)
-                return new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
-
-            return IsDarkThemeActive()
-                ? new SolidColorBrush(Color.FromArgb(0x99, 0xFF, 0xFF, 0xFF))
-                : new SolidColorBrush(Color.FromArgb(0xCC, 0x00, 0x00, 0x00));
+            if (!_lyricsScrollLoopActive) return;
+            _lyricsScrollLoopActive = false;
+            CompositionTarget.Rendering -= LyricsScrollLoop_Tick;
         }
 
-        private Brush ResolveLyricsActiveBrush()
+        private void LyricsScrollLoop_Tick(object? sender, EventArgs e)
         {
-            if (_hasSong)
-                return Brushes.White;
+            if (LyricsScroller == null)
+            {
+                StopLyricsScrollLoop();
+                return;
+            }
 
-            return IsDarkThemeActive() ? Brushes.White : Brushes.Black;
+            double current = LyricsScroller.VerticalOffset;
+            double target = _lyricsTargetScrollOffset;
+            double delta = target - current;
+
+            // Snap and stop when close enough; sub-pixel motion isn't visible
+            // and would otherwise keep the loop alive forever.
+            if (Math.Abs(delta) < 0.5)
+            {
+                LyricsScroller.ScrollToVerticalOffset(target);
+                StopLyricsScrollLoop();
+                return;
+            }
+
+            // Exponential smoothing: each frame we close ~22% of the remaining gap.
+            // Tuned to feel responsive (~6-8 frames at 60fps to settle) without
+            // overshooting on a target change. Lower = slower/smoother, higher = snappier.
+            const double smoothing = 0.22;
+            double next = current + (delta * smoothing);
+
+            LyricsScroller.ScrollToVerticalOffset(next);
         }
 
         // ── Connection Info ───────────────────────────────────────────────────
