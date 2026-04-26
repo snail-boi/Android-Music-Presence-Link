@@ -37,6 +37,15 @@ namespace musicpresense
         public string? CurrentAlbum { get; private set; }
         public string? CurrentCoverPath { get; private set; }
 
+        // Android only reports the last scrub position, so realPositionMs is the
+        // value we manually tick forward each poll cycle inside
+        // UpdateMediaControlsAsync. That's the one we expose, NOT the raw ADB
+        // value, otherwise the progress bar would freeze between scrubs.
+        public long CurrentPositionMs => Math.Max(0, realPositionMs);
+
+        public long CurrentDurationMs =>
+            lastTrackDuration.HasValue ? Math.Max(0, (long)lastTrackDuration.Value.TotalMilliseconds) : 0;
+
         public MediaController(Dispatcher dispatcher, Func<string> getCurrentDevice, Func<Task> updateCurrentSongCallback, MusicConfig config)
         {
             this.dispatcher = dispatcher;
@@ -53,6 +62,8 @@ namespace musicpresense
         public Task NextTrackAsync() => NextTrack();
 
         public Task PreviousTrackAsync() => PreviousTrack();
+
+        public Task SeekRelativeAsync(int seconds) => SeekRelative(seconds);
 
         public void UpdateConfig(MusicConfig config)
         {
@@ -210,6 +221,44 @@ namespace musicpresense
             catch (Exception ex)
             {
                 Debugger.show($"PreviousTrack failed: {ex.Message}");
+            }
+        }
+
+        // Seeks relative to the current track position. Positive seconds = forward, negative = rewind.
+        // Uses the standard Android media-key seek dispatch (KEYCODE_MEDIA_FAST_FORWARD = 90,
+        // KEYCODE_MEDIA_REWIND = 89). The actual seek amount is decided by the playing app;
+        // most modern players step by 10-30 seconds per press, so we issue multiple presses
+        // for larger requested deltas (one press per 30 seconds, rounded up).
+        private async Task SeekRelative(int seconds)
+        {
+            try
+            {
+                if (seconds == 0) return;
+
+                var device = getCurrentDevice();
+                if (string.IsNullOrEmpty(device)) return;
+
+                int keycode = seconds > 0 ? 90 : 89;
+                int magnitude = Math.Abs(seconds);
+                // One key press per 30s chunk, minimum one press.
+                int presses = Math.Max(1, (int)Math.Ceiling(magnitude / 30.0));
+                // Hard cap so a stray request can't spam ADB.
+                presses = Math.Min(presses, 8);
+
+                for (int i = 0; i < presses; i++)
+                {
+                    await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent {keycode}").ConfigureAwait(false);
+                    if (i < presses - 1)
+                    {
+                        await Task.Delay(60).ConfigureAwait(false);
+                    }
+                }
+
+                Debugger.show($"Seek {(seconds > 0 ? "+" : "")}{seconds}s requested ({presses} keypress(es)).");
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"SeekRelative failed: {ex.Message}");
             }
         }
 

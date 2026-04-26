@@ -7,6 +7,47 @@ namespace musicpresense
     {
         public static bool TryAdjustVolume(int processId, float delta)
         {
+            return WithSessionVolume(processId, volumeControl =>
+            {
+                volumeControl.GetMasterVolume(out float current);
+                float next = Math.Clamp(current + delta, 0f, 1f);
+                volumeControl.SetMasterVolume(next, Guid.Empty);
+                return true;
+            });
+        }
+
+        /// <summary>
+        /// Reads the absolute (0..1) master volume of the scrcpy audio session.
+        /// Returns false when scrcpy has no audio session yet, e.g. it just started
+        /// or was launched with --no-audio.
+        /// </summary>
+        public static bool TryGetVolume(int processId, out float volume)
+        {
+            float captured = 0f;
+            bool ok = WithSessionVolume(processId, volumeControl =>
+            {
+                volumeControl.GetMasterVolume(out captured);
+                return true;
+            });
+            volume = ok ? Math.Clamp(captured, 0f, 1f) : 0f;
+            return ok;
+        }
+
+        /// <summary>
+        /// Sets the absolute (0..1) master volume of the scrcpy audio session.
+        /// </summary>
+        public static bool TrySetVolume(int processId, float volume)
+        {
+            float clamped = Math.Clamp(volume, 0f, 1f);
+            return WithSessionVolume(processId, volumeControl =>
+            {
+                volumeControl.SetMasterVolume(clamped, Guid.Empty);
+                return true;
+            });
+        }
+
+        private static bool WithSessionVolume(int processId, Func<ISimpleAudioVolume, bool> action)
+        {
             if (processId <= 0) return false;
 
             IMMDeviceEnumerator? deviceEnumerator = null;
@@ -48,10 +89,7 @@ namespace musicpresense
 
                         if (sessionControl2 is ISimpleAudioVolume volumeControl)
                         {
-                            volumeControl.GetMasterVolume(out float current);
-                            float next = Math.Clamp(current + delta, 0f, 1f);
-                            volumeControl.SetMasterVolume(next, Guid.Empty);
-                            return true;
+                            return action(volumeControl);
                         }
                     }
                     finally

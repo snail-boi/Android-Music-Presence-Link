@@ -38,7 +38,7 @@ namespace musicpresense
         internal event Action<TrayIconState>? TrayStateChanged;
         internal event Action<string?, string?, string?>? NowPlayingChanged;
         internal event Action<string?, string?, string?, bool, long>? LyricsPlaybackChanged;
-        internal event Action<string?, string?, string?, string?, bool>? MediaPlayerStateChanged;
+        internal event Action<string?, string?, string?, string?, bool, long, long>? MediaPlayerStateChanged;
 
         public MusicPresenceService(Dispatcher dispatcher, MusicConfig config)
         {
@@ -97,7 +97,7 @@ namespace musicpresense
                 {
                     NotifyNowPlaying(null, null, null);
                     NotifyLyricsPlayback(null, null, null, false, 0);
-                    NotifyMediaPlayerState(null, null, null, null, false);
+                    NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
                 }
 
                 NotifyTrayState(BuildTrayState(hasActiveSong));
@@ -560,7 +560,7 @@ namespace musicpresense
                     bool scrambledChanged = !string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal);
                     if (scrambledChanged)
                     {
-                        _reparseTicksRemaining = 2;
+                        _reparseTicksRemaining = 1;
                     }
 
                     bool mustReparse = scrambledChanged || _reparseTicksRemaining > 0;
@@ -635,7 +635,7 @@ namespace musicpresense
                                     if (!_smtcPausedCleared)
                                     {
                                         _mediaController.Clear();
-                                        NotifyMediaPlayerState(null, null, null, null, false);
+                                        NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
                                         _smtcPausedCleared = true;
                                     }
 
@@ -658,14 +658,14 @@ namespace musicpresense
                         }
 
                         await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp, adbPositionMs, _timer.Interval).ConfigureAwait(false);
-                        NotifyMediaPlayerState(_mediaController.CurrentTitle, _mediaController.CurrentArtist, _mediaController.CurrentAlbum, _mediaController.CurrentCoverPath, isPlaying);
+                        NotifyMediaPlayerState(_mediaController.CurrentTitle, _mediaController.CurrentArtist, _mediaController.CurrentAlbum, _mediaController.CurrentCoverPath, isPlaying, _mediaController.CurrentPositionMs, _mediaController.CurrentDurationMs);
                         return isPlaying;
                     }
                 }
 
                 NotifyNowPlaying(null, null, null);
                 NotifyLyricsPlayback(null, null, null, false, 0);
-                NotifyMediaPlayerState(null, null, null, null, false);
+                NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
                 return false;
             }
             catch (Exception ex)
@@ -675,11 +675,11 @@ namespace musicpresense
             }
         }
 
-        private void NotifyMediaPlayerState(string? title, string? artist, string? album, string? coverPath, bool isPlaying)
+        private void NotifyMediaPlayerState(string? title, string? artist, string? album, string? coverPath, bool isPlaying, long positionMs, long durationMs)
         {
             try
             {
-                MediaPlayerStateChanged?.Invoke(title, artist, album, coverPath, isPlaying);
+                MediaPlayerStateChanged?.Invoke(title, artist, album, coverPath, isPlaying, positionMs, durationMs);
             }
             catch
             {
@@ -691,6 +691,8 @@ namespace musicpresense
         public Task NextCurrentAsync() => _mediaController.NextTrackAsync();
 
         public Task PreviousCurrentAsync() => _mediaController.PreviousTrackAsync();
+
+        public Task SeekRelativeCurrentAsync(int seconds) => _mediaController.SeekRelativeAsync(seconds);
 
         private void NotifyLyricsPlayback(string? artist, string? title, string? album, bool isPlaying, long positionMs)
         {

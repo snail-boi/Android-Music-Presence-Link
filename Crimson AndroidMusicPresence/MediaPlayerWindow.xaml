@@ -77,9 +77,41 @@
             </Setter>
         </Style>
 
+        <!-- Pill-shaped small button style for connection info / audio link -->
+        <Style x:Key="PillButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Custom rounded slider for the progress bar -->
         <Style x:Key="RoundedProgressSliderStyle" TargetType="Slider">
-            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="Foreground" Value="White" />
             <Setter Property="Background" Value="#33FFFFFF" />
             <Setter Property="Height" Value="14" />
             <Setter Property="Template">
@@ -102,7 +134,7 @@
                                             <ControlTemplate TargetType="RepeatButton">
                                                 <Border Height="4"
                                                         CornerRadius="2"
-                                                        Background="{DynamicResource ThemeControlForegroundBrush}"
+                                                        Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}"
                                                         VerticalAlignment="Center" />
                                             </ControlTemplate>
                                         </RepeatButton.Template>
@@ -127,7 +159,57 @@
                                             <ControlTemplate TargetType="Thumb">
                                                 <Ellipse Width="14"
                                                          Height="14"
-                                                         Fill="{DynamicResource ThemeControlForegroundBrush}" />
+                                                         Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Rounded slider style for volume popup (matches RoundedProgressSliderStyle) -->
+        <Style x:Key="RoundedVolumeSliderStyle" TargetType="Slider">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#33FFFFFF" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Border Height="4"
+                                    CornerRadius="2"
+                                    Background="{TemplateBinding Background}"
+                                    VerticalAlignment="Center" />
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Focusable="False" IsTabStop="False" Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4" CornerRadius="2"
+                                                        Background="White"
+                                                        VerticalAlignment="Center" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Focusable="False" IsTabStop="False" Command="Slider.IncreaseLarge" Opacity="0">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Background="Transparent" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="14" Height="14" Focusable="False">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Width="14" Height="14"
+                                                         Fill="White" />
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -143,6 +225,7 @@
     <Grid Margin="14">
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="SettingsColumn" Width="500" MinWidth="0" />
+            <!-- MaxWidth set dynamically in code-behind based on window size -->
             <ColumnDefinition x:Name="SplitterColumn" Width="8" MinWidth="0" />
             <ColumnDefinition Width="1*" />
         </Grid.ColumnDefinitions>
@@ -163,54 +246,79 @@
                       ResizeBehavior="PreviousAndNext"
                       ResizeDirection="Columns"
                       Background="Transparent"
+                      DragDelta="SettingsSplitter_DragDelta"
                       DragCompleted="SettingsSplitter_DragCompleted" />
 
         <Border x:Name="PlayerPaneBorder"
                 Grid.Column="2"
+                Grid.ColumnSpan="1"
                 BorderBrush="{DynamicResource ThemeControlBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6"
-                Background="{DynamicResource ThemeControlBackgroundBrush}"
-                Padding="24,28,24,28">
+                Padding="24,28,24,28"
+                ClipToBounds="True">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+                <!-- Animated gradient background, two stacked rectangles for crossfade.
+                     Negative margin cancels the parent Border's Padding so the gradient
+                     fills edge-to-edge and is clipped by the Border's CornerRadius. -->
+                <Grid x:Name="GradientGrid" Panel.ZIndex="-1" Margin="-24,-28,-24,-28">
+                    <Rectangle x:Name="GradientLayerA" />
+                    <Rectangle x:Name="GradientLayerB" Opacity="0" />
+                </Grid>
 
-                <!-- Cover art, takes the largest share, no border, just rounded corners -->
-                <Viewbox Grid.Row="0"
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Cover art, takes the largest share, no border, just rounded corners -->
+                    <Viewbox Grid.Row="0"
                          Stretch="Uniform"
                          HorizontalAlignment="Center"
                          VerticalAlignment="Center"
-                         Margin="0,0,0,24">
-                    <Border x:Name="CoverBorder"
+                         Margin="0,16,0,24">
+                        <Border x:Name="CoverBorder"
                             Width="420"
                             Height="420"
                             CornerRadius="10"
                             ClipToBounds="True"
                             SnapsToDevicePixels="True">
-                        <Border.Background>
-                            <SolidColorBrush Color="#22000000" />
-                        </Border.Background>
-                        <Image x:Name="ImgCover"
-                               Stretch="UniformToFill"
-                               SnapsToDevicePixels="True"
-                               RenderOptions.BitmapScalingMode="HighQuality">
-                            <Image.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="Save cover image..." Click="SaveCoverMenuItem_Click" />
-                                </ContextMenu>
-                            </Image.ContextMenu>
-                        </Image>
-                    </Border>
-                </Viewbox>
+                            <Border.Background>
+                                <SolidColorBrush Color="#22000000" />
+                            </Border.Background>
+                            <Grid>
+                                <!-- Crossfade layer A (outgoing) -->
+                                <Image x:Name="ImgCoverA"
+                                   Stretch="UniformToFill"
+                                   SnapsToDevicePixels="True"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   Opacity="1" />
+                                <!-- Crossfade layer B (incoming) -->
+                                <Image x:Name="ImgCoverB"
+                                   Stretch="UniformToFill"
+                                   SnapsToDevicePixels="True"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   Opacity="0" />
+                                <!-- Invisible hit-test overlay for right-click context menu -->
+                                <Border x:Name="CoverContextMenuHost" Background="Transparent">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Save cover image..." Click="SaveCoverMenuItem_Click" />
+                                            <MenuItem Header="Copy track info" Click="CopyCoverInfoMenuItem_Click" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Viewbox>
 
-                <!-- Track title, big and bold, centered -->
-                <TextBlock x:Name="TxtTitle"
+                    <!-- Track title, big and bold, centered -->
+                    <TextBlock x:Name="TxtTitle"
                            Grid.Row="1"
                            Margin="0,0,0,6"
                            FontSize="22"
@@ -220,8 +328,8 @@
                            TextTrimming="CharacterEllipsis"
                            Text="-" />
 
-                <!-- Artist (no opacity dim, like screenshot) -->
-                <TextBlock x:Name="TxtArtist"
+                    <!-- Artist (no opacity dim, like screenshot) -->
+                    <TextBlock x:Name="TxtArtist"
                            Grid.Row="2"
                            Margin="0,0,0,2"
                            FontSize="14"
@@ -231,10 +339,10 @@
                            Opacity="0.85"
                            Text="-" />
 
-                <!-- Album, slightly smaller, dimmer, centered -->
-                <TextBlock x:Name="TxtAlbum"
+                    <!-- Album, slightly smaller, dimmer, centered -->
+                    <TextBlock x:Name="TxtAlbum"
                            Grid.Row="3"
-                           Margin="0,0,0,18"
+                           Margin="0,0,0,10"
                            FontSize="13"
                            Opacity="0.7"
                            TextAlignment="Center"
@@ -242,57 +350,143 @@
                            TextTrimming="CharacterEllipsis"
                            Text="-" />
 
-                <!-- Bottom area: progress bar + transport controls. Constrained to cover width (420). -->
-                <StackPanel Grid.Row="4"
+                    <!-- Connection info + Audio link row -->
+                    <StackPanel Grid.Row="4"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,14">
+                        <!-- Connection info pill button; color set in code-behind to match connection status -->
+                        <Button x:Name="BtnConnectionInfo"
+                                Style="{StaticResource PillButtonStyle}"
+                                Margin="0,0,8,0"
+                                Click="BtnConnectionInfo_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="ConnectionDot"
+                                         Width="7" Height="7"
+                                         Fill="Gray"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,5,0" />
+                                <TextBlock x:Name="TxtConnectionLabel"
+                                           Text="Connection"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Foreground="White" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Audio link toggle button; icon swaps in code-behind -->
+                        <Button x:Name="BtnAudioLink"
+                                Style="{StaticResource PillButtonStyle}"
+                                Click="BtnAudioLink_Click" />
+                    </StackPanel>
+
+                    <!-- Connection info overlay popup -->
+                    <Popup x:Name="ConnectionInfoPopup"
+                           Grid.Row="4"
+                           PlacementTarget="{Binding ElementName=BtnConnectionInfo}"
+                           Placement="Top"
+                           VerticalOffset="-8"
+                           StaysOpen="False"
+                           AllowsTransparency="True"
+                           PopupAnimation="Fade">
+                        <Border Background="#EE1E1E1E"
+                                BorderBrush="#55FFFFFF"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="16,12"
+                                MinWidth="220">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtConnectionStatus"
+                                           Text="Status: Unknown"
+                                           FontSize="13"
+                                           Foreground="White"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,4" />
+                                <TextBlock x:Name="TxtConnectionDetail"
+                                           Text=""
+                                           FontSize="11"
+                                           Foreground="#AAFFFFFF"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+
+                    <!-- Bottom area: progress bar + transport controls. Constrained to cover width (420). -->
+                    <StackPanel Grid.Row="5"
                             Orientation="Vertical"
                             HorizontalAlignment="Center"
                             MaxWidth="420">
-                    <!-- Progress row: 1:19  ====O===========  7:01 -->
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                        <!-- Progress row: 1:19  ====O===========  7:01 -->
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <TextBlock x:Name="TxtPositionLabel"
-                                   Grid.Column="0"
-                                   Text="0:00"
-                                   FontSize="12"
-                                   Opacity="0.85"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,12,0" />
+                            <Button x:Name="BtnPositionLabel"
+                                    Grid.Column="0"
+                                    Style="{StaticResource TransportIconButtonStyle}"
+                                    Padding="0"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,12,0"
+                                    Click="BtnPositionLabel_Click">
+                                <TextBlock x:Name="TxtPositionLabel"
+                                       Text="0:00"
+                                       FontSize="12"
+                                       Opacity="0.85"
+                                       VerticalAlignment="Center" />
+                            </Button>
 
-                        <Slider x:Name="ProgressSlider"
-                                Grid.Column="1"
-                                Style="{StaticResource RoundedProgressSliderStyle}"
-                                Minimum="0"
-                                Maximum="1"
-                                Value="0"
-                                IsMoveToPointEnabled="True"
-                                IsHitTestVisible="False"
-                                Focusable="False"
-                                Cursor="Arrow"
-                                VerticalAlignment="Center" />
+                            <Grid Grid.Column="1">
+                                <Slider x:Name="ProgressSlider"
+                                    Style="{StaticResource RoundedProgressSliderStyle}"
+                                    Minimum="0"
+                                    Maximum="1"
+                                    Value="0"
+                                    IsMoveToPointEnabled="False"
+                                    Focusable="False"
+                                    Cursor="No"
+                                    VerticalAlignment="Center"
+                                    ToolTip="Seeking isn't supported"
+                                    ToolTipService.InitialShowDelay="200"
+                                    ToolTipService.BetweenShowDelay="0"
+                                    ToolTipService.ShowDuration="4000"
+                                    PreviewMouseDown="ProgressSlider_PreviewMouseDown" />
 
-                        <TextBlock x:Name="TxtDurationLabel"
+                                <Border x:Name="SeekUnsupportedNotice"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Top"
+                                    Margin="0,-26,0,0"
+                                    Background="#CC000000"
+                                    CornerRadius="4"
+                                    Padding="8,3"
+                                    IsHitTestVisible="False"
+                                    Opacity="0">
+                                    <TextBlock Text="Seeking isn't supported"
+                                           FontSize="11"
+                                           Foreground="White" />
+                                </Border>
+                            </Grid>
+
+                            <TextBlock x:Name="TxtDurationLabel"
                                    Grid.Column="2"
                                    Text="0:00"
                                    FontSize="12"
                                    Opacity="0.85"
                                    VerticalAlignment="Center"
                                    Margin="12,0,0,0" />
-                    </Grid>
+                        </Grid>
 
-                    <!-- Transport row: volume on far left, prev/play/next centered, lyrics on far right -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+                        <!-- Transport row: volume on far left, prev/play/next centered, lyrics on far right -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                        <Button x:Name="BtnVolume"
+                            <Button x:Name="BtnVolume"
                                 Grid.Column="0"
                                 Style="{StaticResource TransportIconButtonStyle}"
                                 Width="44"
@@ -301,29 +495,118 @@
                                 ToolTip="Volume"
                                 Click="BtnVolume_Click" />
 
-                        <StackPanel Grid.Column="1"
+                            <Popup x:Name="VolumePopup"
+                               Grid.Column="0"
+                               PlacementTarget="{Binding ElementName=BtnVolume}"
+                               Placement="Top"
+                               VerticalOffset="-8"
+                               StaysOpen="False"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade">
+                                <Border Background="{DynamicResource ThemeControlBackgroundBrush}"
+                                    BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="14,10">
+                                    <Grid>
+                                        <!-- Slider variant: shown when scrcpy audio session is reachable. -->
+                                        <StackPanel x:Name="VolumeSliderHost"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center"
+                                                Visibility="Collapsed">
+                                            <Slider x:Name="VolumeSlider"
+                                                Style="{StaticResource RoundedVolumeSliderStyle}"
+                                                Width="160"
+                                                Minimum="0"
+                                                Maximum="100"
+                                                Value="0"
+                                                SmallChange="1"
+                                                LargeChange="5"
+                                                IsMoveToPointEnabled="True"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="VolumeSlider_ValueChanged" />
+                                            <TextBlock x:Name="TxtVolumePercent"
+                                                   Text="0%"
+                                                   FontSize="12"
+                                                   Width="40"
+                                                   TextAlignment="Right"
+                                                   VerticalAlignment="Center"
+                                                   Margin="10,0,0,0"
+                                                   Opacity="0.85" />
+                                        </StackPanel>
+
+                                        <!-- Step-only variant: shown when scrcpy is not active. -->
+                                        <StackPanel x:Name="VolumeStepHost"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center"
+                                                Visibility="Collapsed">
+                                            <Button x:Name="BtnVolumeDown"
+                                                Style="{StaticResource TransportIconButtonStyle}"
+                                                Width="36"
+                                                Height="36"
+                                                Content="−"
+                                                FontSize="20"
+                                                ToolTip="Volume down"
+                                                Click="BtnVolumeDown_Click" />
+                                            <TextBlock Text="Volume"
+                                                   FontSize="12"
+                                                   Margin="12,0,12,0"
+                                                   VerticalAlignment="Center"
+                                                   Opacity="0.85" />
+                                            <Button x:Name="BtnVolumeUp"
+                                                Style="{StaticResource TransportIconButtonStyle}"
+                                                Width="36"
+                                                Height="36"
+                                                Content="+"
+                                                FontSize="20"
+                                                ToolTip="Volume up"
+                                                Click="BtnVolumeUp_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Popup>
+
+                            <StackPanel Grid.Column="1"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Center">
-                            <Button x:Name="BtnPrevious"
+                                <!-- Skip-back 30 s — shown only for tracks > 10 min -->
+                                <Button x:Name="BtnSeekBack"
+                                    Style="{StaticResource TransportIconButtonStyle}"
+                                    Width="56"
+                                    Height="56"
+                                    Margin="0,0,4,0"
+                                    Visibility="Collapsed"
+                                    ToolTip="Skip back 30 s"
+                                    Click="BtnSeekBack_Click" />
+                                <Button x:Name="BtnPrevious"
                                     Style="{StaticResource TransportIconButtonStyle}"
                                     Width="56"
                                     Height="56"
                                     Margin="0,0,16,0"
                                     Click="BtnPrevious_Click" />
-                            <Button x:Name="BtnPause"
+                                <Button x:Name="BtnPause"
                                     Style="{StaticResource TransportIconButtonStyle}"
                                     Width="72"
                                     Height="72"
                                     Margin="0,0,16,0"
                                     Click="BtnPause_Click" />
-                            <Button x:Name="BtnNext"
+                                <Button x:Name="BtnNext"
                                     Style="{StaticResource TransportIconButtonStyle}"
                                     Width="56"
                                     Height="56"
                                     Click="BtnNext_Click" />
-                        </StackPanel>
+                                <!-- Skip-forward 30 s — shown only for tracks > 10 min -->
+                                <Button x:Name="BtnSeekFwd"
+                                    Style="{StaticResource TransportIconButtonStyle}"
+                                    Width="56"
+                                    Height="56"
+                                    Margin="4,0,0,0"
+                                    Visibility="Collapsed"
+                                    ToolTip="Skip forward 30 s"
+                                    Click="BtnSeekFwd_Click" />
+                            </StackPanel>
 
-                        <Button x:Name="BtnLyrics"
+                            <Button x:Name="BtnLyrics"
                                 Grid.Column="2"
                                 Style="{StaticResource TransportIconButtonStyle}"
                                 Width="44"
@@ -331,8 +614,9 @@
                                 HorizontalAlignment="Right"
                                 ToolTip="Toggle lyrics overlay"
                                 Click="BtnLyrics_Click" />
-                    </Grid>
-                </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
 

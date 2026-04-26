@@ -54,6 +54,8 @@ namespace musicpresense
         private string? _lastMediaPlayerAlbum;
         private string? _lastMediaPlayerCoverPath;
         private bool _lastMediaPlayerIsPlaying;
+        private long _lastMediaPlayerPositionMs;
+        private long _lastMediaPlayerDurationMs;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -149,6 +151,82 @@ namespace musicpresense
             }
 
             _trayIconManager?.SetState(state);
+            ApplyConnectionStateToMediaPlayer();
+            _mediaPlayerWindow?.SetAudioLinkState(_isScrcpyRunning);
+        }
+
+        // Invoked by the media-player window when the user toggles the audio-link button.
+        // Mirrors the tray menu's ToggleScrcpyNoAudio behaviour.
+        private void SetAudioLinkFromMediaPlayer(bool enable)
+        {
+            try
+            {
+                if (enable)
+                {
+                    if (_scrcpyProcess == null || _scrcpyProcess.HasExited)
+                    {
+                        StartScrcpyNoAudio();
+                    }
+                }
+                else
+                {
+                    if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
+                    {
+                        _ = StopScrcpyAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("SetAudioLinkFromMediaPlayer failed: " + ex.Message);
+            }
+        }
+
+        // Pushes the current tray state to the media-player window's connection-info pill.
+        // Colors here are dedicated to the media player (per UX spec: USB green, Wi-Fi cyan,
+        // not-connected red) and are intentionally separate from the tray icon colors.
+        private void ApplyConnectionStateToMediaPlayer()
+        {
+            var window = _mediaPlayerWindow;
+            if (window == null) return;
+
+            var (label, detail, color) = MapTrayStateToMediaPlayerStatus(_lastTrayState, _isScrcpyRunning);
+            window.SetConnectionStatus(label, detail, color);
+        }
+
+        private static (string label, string detail, Color color) MapTrayStateToMediaPlayerStatus(TrayIconState state, bool scrcpyRunning)
+        {
+            // USB green
+            var usbColor = Color.FromRgb(0x34, 0xC9, 0x54);
+            // Wi-Fi cyan
+            var wifiColor = Color.FromRgb(0x00, 0xBC, 0xD4);
+            // Not connected red
+            var redColor = Color.FromRgb(0xFF, 0x3B, 0x30);
+            // Wi-Fi port lost (existing semantic: connected over Wi-Fi but USB tether dropped)
+            var purpleColor = Color.FromRgb(0xAF, 0x52, 0xDE);
+
+            string scrcpySuffix = scrcpyRunning ? " · audio link active" : "";
+
+            switch (state)
+            {
+                case TrayIconState.ActiveUsb:
+                case TrayIconState.InactiveUsb:
+                case TrayIconState.ActiveUsbScrcpy:
+                case TrayIconState.InactiveUsbScrcpy:
+                    return ("USB connected", "Device reachable over USB" + scrcpySuffix, usbColor);
+
+                case TrayIconState.ActiveWifi:
+                case TrayIconState.InactiveWifi:
+                case TrayIconState.ActiveWifiScrcpy:
+                case TrayIconState.InactiveWifiScrcpy:
+                    return ("Wi-Fi connected", "Device reachable over Wi-Fi" + scrcpySuffix, wifiColor);
+
+                case TrayIconState.NeedsUsbReconnect:
+                    return ("Wi-Fi port lost", "Reconnect USB to restore the Wi-Fi bridge", purpleColor);
+
+                default:
+                    return ("Not connected", "No device detected", redColor);
+            }
         }
 
         internal void UpdateConfig(MusicConfig config)
@@ -179,7 +257,7 @@ namespace musicpresense
             _lyricsOverlayManager?.OnPlaybackChanged(artist, title, album, isPlaying, positionMs);
         }
 
-        private void OnMediaPlayerStateChanged(string? title, string? artist, string? album, string? coverPath, bool isPlaying)
+        private void OnMediaPlayerStateChanged(string? title, string? artist, string? album, string? coverPath, bool isPlaying, long positionMs, long durationMs)
         {
             if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
                 return;
@@ -189,6 +267,8 @@ namespace musicpresense
             _lastMediaPlayerAlbum = album;
             _lastMediaPlayerCoverPath = coverPath;
             _lastMediaPlayerIsPlaying = isPlaying;
+            _lastMediaPlayerPositionMs = positionMs;
+            _lastMediaPlayerDurationMs = durationMs;
 
             Dispatcher.BeginInvoke(() =>
             {
@@ -196,6 +276,7 @@ namespace musicpresense
                     return;
 
                 _mediaPlayerWindow.UpdateTrack(title, artist, album, coverPath, isPlaying);
+                _mediaPlayerWindow.UpdateProgress(positionMs, durationMs);
             });
         }
 
@@ -220,8 +301,18 @@ namespace musicpresense
                     () => _presenceService?.PauseCurrentAsync() ?? Task.CompletedTask,
                     () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask,
                     () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask,
-                    () => _lyricsOverlayManager?.ToggleVisibility());
+                    () => _lyricsOverlayManager?.ToggleVisibility(),
+                    IsScrcpyAudioSessionAvailable,
+                    TryGetScrcpyVolume,
+                    TrySetScrcpyVolume,
+                    StepVolumeOnce,
+                    SetAudioLinkFromMediaPlayer,
+                    seconds => _presenceService?.SeekRelativeCurrentAsync(seconds) ?? Task.CompletedTask);
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
+
+                // Push current connection + scrcpy state into the freshly created window.
+                ApplyConnectionStateToMediaPlayer();
+                _mediaPlayerWindow.SetAudioLinkState(_isScrcpyRunning);
             }
 
             if (_settingsWindow != null)
@@ -251,6 +342,7 @@ namespace musicpresense
 
             _mediaPlayerWindow.Activate();
             _mediaPlayerWindow.UpdateTrack(_lastMediaPlayerTitle, _lastMediaPlayerArtist, _lastMediaPlayerAlbum, _lastMediaPlayerCoverPath, _lastMediaPlayerIsPlaying);
+            _mediaPlayerWindow.UpdateProgress(_lastMediaPlayerPositionMs, _lastMediaPlayerDurationMs);
             UpdateSettingsWindowModeButton();
         }
 
@@ -406,6 +498,10 @@ namespace musicpresense
             Resources["ThemeAccentHoverBrush"] = CreateBrush(useDarkMode ? "#5A8BFF" : "#3E7BFF");
             Resources["ThemeAccentPressedBrush"] = CreateBrush(useDarkMode ? "#275ED6" : "#1F5DD1");
             _trayIconManager?.SetDarkMode(useDarkMode);
+
+            // Push the theme change into the media player window so the idle
+            // background, icon brush, and text colors all flip immediately.
+            _mediaPlayerWindow?.NotifyThemeChanged();
         }
 
         private static SolidColorBrush CreateBrush(string color)
@@ -706,10 +802,12 @@ namespace musicpresense
                 switch (id)
                 {
                     case HotkeyIdVolumeUp:
-                        handled = TryAdjustScrcpyVolume(ScrcpyVolumeStep);
+                        HandleVolumeHotkey(up: true);
+                        handled = true;
                         break;
                     case HotkeyIdVolumeDown:
-                        handled = TryAdjustScrcpyVolume(-ScrcpyVolumeStep);
+                        HandleVolumeHotkey(up: false);
+                        handled = true;
                         break;
                     case HotkeyIdToggleScrcpy:
                         ToggleScrcpyNoAudio();
@@ -728,6 +826,16 @@ namespace musicpresense
             return IntPtr.Zero;
         }
 
+        private void HandleVolumeHotkey(bool up)
+        {
+            // If scrcpy is active and we can adjust its session volume, do that.
+            if (TryAdjustScrcpyVolume(up ? ScrcpyVolumeStep : -ScrcpyVolumeStep))
+                return;
+
+            // Otherwise fall back to sending an ADB volume keyevent to the device.
+            _ = SendAdbVolumeKeyAsync(up);
+        }
+
         private bool TryAdjustScrcpyVolume(float delta)
         {
             var process = _scrcpyProcess;
@@ -735,6 +843,71 @@ namespace musicpresense
                 return false;
 
             return ScrcpyVolumeController.TryAdjustVolume(process.Id, delta);
+        }
+
+        // ---- Volume helpers exposed to MediaPlayerWindow ----
+
+        /// <summary>
+        /// True when scrcpy is running AND its audio session is reachable, i.e.
+        /// we can read/write its absolute volume right now.
+        /// </summary>
+        private bool IsScrcpyAudioSessionAvailable()
+        {
+            var process = _scrcpyProcess;
+            if (process == null || process.HasExited)
+                return false;
+
+            return ScrcpyVolumeController.TryGetVolume(process.Id, out _);
+        }
+
+        private float? TryGetScrcpyVolume()
+        {
+            var process = _scrcpyProcess;
+            if (process == null || process.HasExited)
+                return null;
+
+            return ScrcpyVolumeController.TryGetVolume(process.Id, out var v) ? v : (float?)null;
+        }
+
+        private void TrySetScrcpyVolume(float volume)
+        {
+            var process = _scrcpyProcess;
+            if (process == null || process.HasExited)
+                return;
+
+            ScrcpyVolumeController.TrySetVolume(process.Id, volume);
+        }
+
+        /// <summary>
+        /// Single +/- step matching the hotkey behavior: scrcpy session if active,
+        /// ADB keyevent fallback otherwise. Inlined (rather than calling
+        /// HandleVolumeHotkey) so the +/- buttons don't depend on the hotkey
+        /// method's presence.
+        /// </summary>
+        private void StepVolumeOnce(bool up)
+        {
+            if (TryAdjustScrcpyVolume(up ? ScrcpyVolumeStep : -ScrcpyVolumeStep))
+                return;
+
+            _ = SendAdbVolumeKeyAsync(up);
+        }
+
+        private async Task SendAdbVolumeKeyAsync(bool up)
+        {
+            try
+            {
+                var device = _presenceService?.CurrentDevice;
+                if (string.IsNullOrWhiteSpace(device))
+                    return;
+
+                // 24 = KEYCODE_VOLUME_UP, 25 = KEYCODE_VOLUME_DOWN
+                var keycode = up ? 24 : 25;
+                await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent {keycode}").ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"ADB volume key failed: {ex.Message}");
+            }
         }
 
         private bool TryCopyCurrentTrackInfoToClipboard()
