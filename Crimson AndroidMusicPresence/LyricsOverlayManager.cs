@@ -38,7 +38,7 @@ namespace musicpresense
         private bool _linesAreTimed;
 
         private readonly string _lyricsCachePath;
-        private readonly Dictionary<string, string?> _trackLyricsPathCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, LyricsCacheEntry?> _trackLyricsPathCache = new(StringComparer.OrdinalIgnoreCase);
 
         public LyricsOverlayManager(Dispatcher dispatcher, MusicConfig config, Func<string> getCurrentDevice)
         {
@@ -206,10 +206,31 @@ namespace musicpresense
             var album = _currentAlbum ?? string.Empty;
             var key = BuildTrackKey(artist, title, album);
 
-            if (_trackLyricsPathCache.TryGetValue(key, out var cachedPath))
+            if (_trackLyricsPathCache.TryGetValue(key, out var cachedEntry))
             {
-                if (!string.IsNullOrWhiteSpace(cachedPath) && File.Exists(cachedPath))
-                    return await ParseLrcFileAsync(cachedPath).ConfigureAwait(true);
+                if (cachedEntry?.RemotePath == null)
+                {
+                    if (!string.IsNullOrWhiteSpace(cachedEntry?.LocalPath) && File.Exists(cachedEntry.LocalPath))
+                        return await ParseLrcFileAsync(cachedEntry.LocalPath).ConfigureAwait(true);
+
+                    return (new List<LyricsLine>(), false);
+                }
+
+                var refreshDevice = _getCurrentDevice();
+                if (string.IsNullOrWhiteSpace(refreshDevice))
+                {
+                    if (!string.IsNullOrWhiteSpace(cachedEntry.LocalPath) && File.Exists(cachedEntry.LocalPath))
+                        return await ParseLrcFileAsync(cachedEntry.LocalPath).ConfigureAwait(true);
+
+                    return (new List<LyricsLine>(), false);
+                }
+
+                var refreshedPath = await PullAndCacheLyricsAsync(refreshDevice, cachedEntry.RemotePath, key).ConfigureAwait(true);
+                var finalPath = !string.IsNullOrWhiteSpace(refreshedPath) ? refreshedPath : cachedEntry.LocalPath;
+                _trackLyricsPathCache[key] = new LyricsCacheEntry(cachedEntry.RemotePath, finalPath);
+
+                if (!string.IsNullOrWhiteSpace(finalPath) && File.Exists(finalPath))
+                    return await ParseLrcFileAsync(finalPath).ConfigureAwait(true);
 
                 return (new List<LyricsLine>(), false);
             }
@@ -217,7 +238,7 @@ namespace musicpresense
             var device = _getCurrentDevice();
             if (string.IsNullOrWhiteSpace(device))
             {
-                _trackLyricsPathCache[key] = null;
+                _trackLyricsPathCache[key] = new LyricsCacheEntry(null, null);
                 return (new List<LyricsLine>(), false);
             }
 
@@ -252,12 +273,12 @@ namespace musicpresense
 
             if (string.IsNullOrWhiteSpace(bestRemotePath) || bestScore < 20)
             {
-                _trackLyricsPathCache[key] = null;
+                _trackLyricsPathCache[key] = new LyricsCacheEntry(null, null);
                 return (new List<LyricsLine>(), false);
             }
 
             var localPath = await PullAndCacheLyricsAsync(device, bestRemotePath, key).ConfigureAwait(true);
-            _trackLyricsPathCache[key] = localPath;
+            _trackLyricsPathCache[key] = new LyricsCacheEntry(bestRemotePath, localPath);
 
             if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
                 return (new List<LyricsLine>(), false);
@@ -271,9 +292,9 @@ namespace musicpresense
             {
                 var cacheKey = ComputeKey(remotePath, trackKey);
                 var localPath = Path.Combine(_lyricsCachePath, cacheKey + ".lrc");
-
+                string? existingPath = null;
                 if (File.Exists(localPath) && new FileInfo(localPath).Length > 0)
-                    return localPath;
+                    existingPath = localPath;
 
                 Directory.CreateDirectory(_lyricsCachePath);
 
@@ -283,6 +304,8 @@ namespace musicpresense
 
                 if (File.Exists(localPath) && new FileInfo(localPath).Length > 0)
                     return localPath;
+
+                return existingPath;
             }
             catch (Exception ex)
             {
@@ -539,6 +562,8 @@ namespace musicpresense
         public sealed record LyricsLineDto(TimeSpan Time, string Text);
 
         public sealed record LyricsTrackData(IReadOnlyList<LyricsLineDto> Lines, bool IsTimed);
+
+        private sealed record LyricsCacheEntry(string? RemotePath, string? LocalPath);
 
         private sealed record LyricsLine(TimeSpan Time, string Text);
     }

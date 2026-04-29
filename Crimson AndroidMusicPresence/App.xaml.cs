@@ -93,7 +93,7 @@ namespace musicpresense
             _presenceService.Start();
             UpdateTrayAudioSettings();
 
-            if (Config.ShowMediaPlayerWindow)
+            if (Config.ShowMediaPlayerWindow && !Config.OpenInTaskbar)
             {
                 ShowMediaPlayerWindowNow();
             }
@@ -411,8 +411,6 @@ namespace musicpresense
             }
 
             _mediaPlayerWindow = null;
-            Config.ShowMediaPlayerWindow = false;
-            MusicConfigManager.Save(Config);
 
             if (_settingsWindow != null)
             {
@@ -515,6 +513,14 @@ namespace musicpresense
         private void ShowSettingsWindow()
         {
             if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible)
+            {
+                ShowMediaPlayerWindowNow();
+                return;
+            }
+
+            // Honor the user's saved view-style preference. If they last chose the
+            // media player view, open it again, even if the window has since been closed.
+            if (Config.ShowMediaPlayerWindow)
             {
                 ShowMediaPlayerWindowNow();
                 return;

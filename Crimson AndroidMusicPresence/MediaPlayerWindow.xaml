@@ -4,7 +4,7 @@
         Title="Media Player"
         Width="1080"
         Height="760"
-        MinWidth="900"
+        MinWidth="500"
         MinHeight="620"
         Background="{DynamicResource ThemeBackgroundBrush}"
         Foreground="{DynamicResource ThemeForegroundBrush}"

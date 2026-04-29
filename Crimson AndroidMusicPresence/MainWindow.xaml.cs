@@ -131,7 +131,9 @@ namespace musicpresense
             ChkDarkMode.Unchecked += ChkDarkMode_CheckedChanged;
             BtnToggleTheme.Click += BtnToggleTheme_Click;
             BtnRedoOnboarding.Click += BtnRedoOnboarding_Click;
-            BtnShowMediaPlayerNow.Click += BtnShowMediaPlayerNow_Click;
+            BtnToggleMediaPlayerView.Click += BtnToggleMediaPlayerView_Click;
+            ChkOpenInTaskbar.Checked += ChkOpenInTaskbar_CheckedChanged;
+            ChkOpenInTaskbar.Unchecked += ChkOpenInTaskbar_CheckedChanged;
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
             UpdateMediaPlayerModeButton((Application.Current as App)?.IsMediaPlayerModeActive() == true);
@@ -197,7 +199,6 @@ namespace musicpresense
             ChkDarkMode.IsChecked = _config.UseDarkMode;
             ChkOpenInTaskbar.IsChecked = _config.OpenInTaskbar;
             ChkStartWithWindows.IsChecked = _config.StartWithWindows;
-            ChkShowMediaPlayerWindow.IsChecked = _config.ShowMediaPlayerWindow;
             UpdateThemeToggleText(_config.UseDarkMode);
 
             TxtAudioBitrate.Text = _config.ScrcpyAudioBitrate ?? string.Empty;
@@ -268,7 +269,7 @@ namespace musicpresense
             TxtUsbSerial.Text = usbSerial;
             var port = 0;
             var ip = "none";
-            if (MessageBox.Show("do you want to enable WiFi","May be incompatible with certain networks",MessageBoxButton.YesNo,MessageBoxImage.Question) == MessageBoxResult.No)
+            if (MessageBox.Show("do you want to enable WiFi", "May be incompatible with certain networks", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
             {
                 _config.IsWifiEnabled = false;
             }
@@ -308,7 +309,7 @@ namespace musicpresense
             {
                 return;
             }
-            var deviceName = nameDialog.InputText;;
+            var deviceName = nameDialog.InputText; ;
 
 
             if (!string.IsNullOrWhiteSpace(deviceName))
@@ -773,7 +774,6 @@ namespace musicpresense
             _config.UseDarkMode = ChkDarkMode.IsChecked == true;
             _config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
             _config.StartWithWindows = ChkStartWithWindows.IsChecked == true;
-            _config.ShowMediaPlayerWindow = ChkShowMediaPlayerWindow.IsChecked == true;
             if (int.TryParse(TxtCacheClear.Text.Trim(), out var CacheValue))
             {
                 if (CacheValue < 10)
@@ -792,7 +792,7 @@ namespace musicpresense
                 _config.CachClearInMB = CacheValue > 0 ? CacheValue : 10;
             }
 
-                var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
+            var selectedCodec = LstAudioCodecs.SelectedItem as string ?? "raw";
             _config.ScrcpyAudioCodec = selectedCodec;
 
             if (selectedCodec.Equals("raw", StringComparison.OrdinalIgnoreCase))
@@ -1030,7 +1030,6 @@ namespace musicpresense
             config.UseDarkMode = ChkDarkMode.IsChecked == true;
             config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
             config.StartWithWindows = ChkStartWithWindows.IsChecked == true;
-            config.ShowMediaPlayerWindow = ChkShowMediaPlayerWindow.IsChecked == true;
             if (int.TryParse(TxtCacheClear.Text.Trim(), out var CacheValue))
             {
                 if (CacheValue < 10)
@@ -1297,8 +1296,7 @@ namespace musicpresense
             if (TxtLyricsFolderOverride != null)
                 TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
 
-            if (ChkShowMediaPlayerWindow != null)
-                ChkShowMediaPlayerWindow.IsChecked = _config.ShowMediaPlayerWindow;
+            UpdateMediaPlayerModeButton((Application.Current as App)?.IsMediaPlayerModeActive() == true);
 
             if (TxtCoverPatterns != null)
                 TxtCoverPatterns.Text = _config.CoverArtFileNamePatterns ?? string.Empty;
@@ -1330,7 +1328,7 @@ namespace musicpresense
             (Application.Current as App)?.ShowOnboarding(true);
         }
 
-        private void BtnShowMediaPlayerNow_Click(object sender, RoutedEventArgs e)
+        private void BtnToggleMediaPlayerView_Click(object sender, RoutedEventArgs e)
         {
             var app = Application.Current as App;
             if (app == null)
@@ -1338,22 +1336,40 @@ namespace musicpresense
 
             if (app.IsMediaPlayerModeActive())
             {
+                // Switch back to the original settings view and persist that choice.
+                _config.ShowMediaPlayerWindow = false;
+                MusicConfigManager.Save(_config);
+                _savedConfig.ShowMediaPlayerWindow = false;
                 app.GoBackToSettingsWindow();
                 return;
             }
 
-            SaveConfigFromUi(false);
+            // Switch to the media player view and persist that choice.
+            _config.ShowMediaPlayerWindow = true;
+            MusicConfigManager.Save(_config);
+            _savedConfig.ShowMediaPlayerWindow = true;
             app.ShowMediaPlayerWindowNow();
         }
 
         internal void UpdateMediaPlayerModeButton(bool isMediaPlayerModeActive)
         {
-            if (BtnShowMediaPlayerNow == null)
+            if (BtnToggleMediaPlayerView == null)
                 return;
 
-            BtnShowMediaPlayerNow.Content = isMediaPlayerModeActive
-                ? "Go back to settings"
-                : "Show media player now";
+            BtnToggleMediaPlayerView.Content = isMediaPlayerModeActive
+                ? "Switch to settings view"
+                : "Switch to media player view";
+        }
+
+        private void ChkOpenInTaskbar_CheckedChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing)
+                return;
+
+            // Checkbox semantics: checked = hide on startup (OpenInTaskbar = true).
+            _config.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
+            MusicConfigManager.Save(_config);
+            _savedConfig.OpenInTaskbar = _config.OpenInTaskbar;
         }
 
         private void UpdateThemeToggleText(bool useDarkMode)
@@ -1436,20 +1452,20 @@ namespace musicpresense
         }
 
         private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
-{
-    var roots = (config.MusicRemoteRoots ?? new List<string>())
-        .Where(p => !string.IsNullOrWhiteSpace(p))
-        .Select(p => p.Trim())
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToList();
+        {
+            var roots = (config.MusicRemoteRoots ?? new List<string>())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-    if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
-    {
-        roots.Add(config.MusicRemoteRoot.Trim());
-    }
+            if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
+            {
+                roots.Add(config.MusicRemoteRoot.Trim());
+            }
 
-    return roots;
-}
+            return roots;
+        }
 
         private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)
         {

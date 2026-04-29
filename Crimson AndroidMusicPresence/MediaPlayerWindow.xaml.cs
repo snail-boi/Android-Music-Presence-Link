@@ -15,19 +15,10 @@ using System.Windows.Threading;
 
 namespace musicpresense
 {
-
     // stuff
-    // either keep lyrics a toggle or make it switch to a different lyrics view
-    // under the album text, but above the progress bar place a button called connection info, it's color should work the same as connection colors in other places
-    // when clicked should show the connection status is a small overlay
-    // a button that activates and deactivates audio link (dynamic icon)
-    // when a song is over 10 mins long we show fast forwards buttons, they send that command using ADB
-    // fade in/out the covers
-    // change volume slider to same style as position bar
-    // when you click the current time it should change to time left and back
-    // right clicking the cover art allows you to copy the title artist and album with it's template
-    // when no song is playing the background should be solid dark mode color instead of a gradient
-    // when we use lightmode the text of the mediaplayer itself shouldn't change color to black, except for when nothing is detected then we make the background white and the icons black
+    // Help / What’s this? button for the media player UI
+    // quick audioquality setting in the media player itself (should be displayed as text next to an icon), shows current setting or custom if it isn't a preset one, 
+    //this requires us to save the preset or custom if no preset in the config, we should be able to open a small menu allowing for a preset to be selected
     public partial class MediaPlayerWindow : Window
     {
         // Settings pane snaps to collapsed when dragged below this width.
@@ -1371,7 +1362,7 @@ namespace musicpresense
         {
             var brush = ResolveIconBrush();
             BtnAudioLink.Content = BuildAudioLinkIcon(brush, _audioLinkActive, 22);
-            BtnAudioLink.ToolTip = _audioLinkActive ? "Disable audio link" : "Enable audio link";
+            BtnAudioLink.ToolTip = _audioLinkActive ? "Audio link: sync audio from device (on)" : "Audio link: sync audio from device (off)";
         }
 
         // ── Fast Seek (ADB) ───────────────────────────────────────────────────

@@ -972,12 +972,11 @@
                         </Grid>
 
                         <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,8" />
-                        <CheckBox x:Name="ChkOpenInTaskbar" Content="Show window in taskbar" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ChkOpenInTaskbar" Content="Hide in taskbar on startup" Margin="0,0,0,8" />
                         <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,0,0,12" />
-                        <CheckBox x:Name="ChkShowMediaPlayerWindow" Content="Show media player on startup" Margin="0,0,0,8" />
 
-                        <Button x:Name="BtnShowMediaPlayerNow"
-                                Content="Show media player now"
+                        <Button x:Name="BtnToggleMediaPlayerView"
+                                Content="Switch to media player view"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Width="200"
                                 HorizontalAlignment="Left"
