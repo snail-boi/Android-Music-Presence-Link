@@ -76,6 +76,24 @@ namespace musicpresense
         private bool _audioLinkActive = false;
         private readonly Action<bool>? _setAudioLink;
 
+        // Audio quality preset wiring. _getConfig returns the latest MusicConfig
+        // (so the button label reflects current saved values without needing to be
+        // re-pushed on every config change). _applyAudioQualityPreset writes the
+        // preset to the live config, persists it, and restarts scrcpy if needed.
+        private readonly Func<MusicConfig>? _getConfig;
+        private readonly Action<AudioQualityPresets.Preset>? _applyAudioQualityPreset;
+
+        // Hide-decorations toggle state. We snapshot the chrome before hiding
+        // so the toggle restores the user's exact pre-toggle layout. Despite the
+        // "fullscreen" naming in code, this only hides title bar / borders;
+        // the window stays the same size and remains movable & resizable.
+        private bool _isFullscreen = false;
+        private WindowStyle _prevWindowStyle = WindowStyle.SingleBorderWindow;
+        private ResizeMode _prevResizeMode = ResizeMode.CanResizeWithGrip;
+
+        // Always-on-top state.
+        private bool _alwaysOnTop = false;
+
         // Connection status info (set from outside)
         private string _connectionStatusText = "Not connected";
         private string _connectionDetailText = "";
@@ -120,7 +138,9 @@ namespace musicpresense
             Action<bool>? stepVolume = null,
             Action<bool>? setAudioLink = null,
             Func<int, Task>? seekRelativeSeconds = null,
-            LyricsOverlayManager? lyricsManager = null)
+            LyricsOverlayManager? lyricsManager = null,
+            Func<MusicConfig>? getConfig = null,
+            Action<AudioQualityPresets.Preset>? applyAudioQualityPreset = null)
         {
             InitializeComponent();
             _pauseAction = pauseAction;
@@ -134,6 +154,8 @@ namespace musicpresense
             _setAudioLink = setAudioLink;
             _seekRelativeSeconds = seekRelativeSeconds;
             _lyricsManager = lyricsManager;
+            _getConfig = getConfig;
+            _applyAudioQualityPreset = applyAudioQualityPreset;
 
             if (_lyricsManager != null)
             {
@@ -145,6 +167,10 @@ namespace musicpresense
             RenderSettingsPaneArrowIcon();
             RenderFastSeekIcons();
             RenderAudioLinkButton();
+            RenderHelpButtonIcon();
+            RenderFullscreenButtonIcon();
+            RefreshAlwaysOnTopButton();
+            RefreshAudioQualityButton();
             ApplyCoverGradientBackground(null);
 
             SizeChanged += MediaPlayerWindow_SizeChanged;
@@ -155,6 +181,9 @@ namespace musicpresense
                 RefreshVolumeIcon();
                 UpdateGradientClip();
                 RefreshConnectionButton();
+                RefreshAudioQualityButton();
+                RenderFullscreenButtonIcon();
+                RefreshAlwaysOnTopButton();
             };
         }
 
@@ -428,6 +457,10 @@ namespace musicpresense
             RenderAuxiliaryIcons();
             RefreshVolumeIcon();
             RenderSettingsPaneArrowIcon();
+            RenderHelpButtonIcon();
+            RenderFullscreenButtonIcon();
+            RefreshAudioQualityButton();
+            RefreshAlwaysOnTopButton();
 
             // Lyrics panel uses theme-aware brushes; rebuild colors.
             if (_lyricsViewActive && _lyricsLines.Count > 0)
@@ -1365,6 +1398,386 @@ namespace musicpresense
             BtnAudioLink.ToolTip = _audioLinkActive ? "Audio link: sync audio from device (on)" : "Audio link: sync audio from device (off)";
         }
 
+        // ── Audio Quality Preset ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Called by the host whenever the config might have changed (e.g. after the
+        /// settings window saves). Re-renders the quick quality button label.
+        /// </summary>
+        public void RefreshAudioQualityButton()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(RefreshAudioQualityButton);
+                return;
+            }
+
+            // Defer until the templated controls actually exist.
+            if (BtnAudioQuality == null || AudioQualityContent == null)
+                return;
+
+            var config = _getConfig?.Invoke();
+            string label;
+            if (config == null)
+            {
+                label = AudioQualityPresets.CustomLabel;
+            }
+            else
+            {
+                label = AudioQualityPresets.GetShortLabelForConfig(config);
+            }
+
+            var brush = ResolveIconBrush();
+            AudioQualityContent.Children.Clear();
+
+            var icon = BuildAudioQualityIcon(brush, 16);
+            AudioQualityContent.Children.Add(icon);
+
+            var text = new TextBlock
+            {
+                Text = label,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Foreground = brush
+            };
+            AudioQualityContent.Children.Add(text);
+
+            BtnAudioQuality.ToolTip = config == null
+                ? "Audio quality preset"
+                : $"Audio quality: {label}. Click to change.";
+
+            // Subtle border so the pill reads as a button. Match the icon brush so
+            // it stays legible over both cover-art gradients and the idle theme.
+            var borderColor = (brush is SolidColorBrush scb) ? scb.Color : Colors.White;
+            BtnAudioQuality.BorderBrush = new SolidColorBrush(borderColor) { Opacity = 0.45 };
+        }
+
+        private void BtnAudioQuality_Click(object sender, RoutedEventArgs e)
+        {
+            if (AudioQualityPopup == null || AudioQualityMenuItems == null)
+                return;
+
+            BuildAudioQualityMenu();
+            AudioQualityPopup.IsOpen = !AudioQualityPopup.IsOpen;
+        }
+
+        private void BuildAudioQualityMenu()
+        {
+            AudioQualityMenuItems.Children.Clear();
+
+            var config = _getConfig?.Invoke();
+            var currentMatch = config != null ? AudioQualityPresets.MatchFromConfig(config) : null;
+            bool isCustom = config != null && currentMatch == null;
+
+            // Pop-up background follows the theme, so the text foreground must too.
+            // The pill button on the player pane uses _hasSong-driven brushes (which
+            // are forced white over the cover gradient), but inside this popup the
+            // backdrop is the regular ThemeControlBackgroundBrush, so we want the
+            // matching ThemeControlForegroundBrush.
+            var fg = ResolveMenuForegroundBrush();
+
+            // Header
+            var header = new TextBlock
+            {
+                Text = "Audio quality preset",
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 12,
+                Margin = new Thickness(8, 4, 8, 6),
+                Opacity = 0.85,
+                Foreground = fg
+            };
+            AudioQualityMenuItems.Children.Add(header);
+
+            foreach (var preset in AudioQualityPresets.All)
+            {
+                bool isSelected = currentMatch != null
+                    && currentMatch.Name.Equals(preset.Name, StringComparison.OrdinalIgnoreCase);
+                AudioQualityMenuItems.Children.Add(BuildPresetMenuRow(preset, isSelected, fg));
+            }
+
+            // If the saved values don't match any preset, show a (selected, disabled)
+            // "Custom" row so the user understands why nothing else is highlighted.
+            if (isCustom)
+            {
+                var separator = new Border
+                {
+                    Height = 1,
+                    Background = (Brush)FindResource("ThemeControlBorderBrush"),
+                    Opacity = 0.4,
+                    Margin = new Thickness(8, 4, 8, 4)
+                };
+                AudioQualityMenuItems.Children.Add(separator);
+
+                var customRow = new Border
+                {
+                    Background = Brushes.Transparent,
+                    Padding = new Thickness(10, 8, 10, 8),
+                    CornerRadius = new CornerRadius(4),
+                    Margin = new Thickness(0, 1, 0, 1)
+                };
+                var stack = new StackPanel { Orientation = Orientation.Vertical };
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "● Custom",
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 13,
+                    Foreground = fg
+                });
+                stack.Children.Add(new TextBlock
+                {
+                    Text = "Your settings don't match any preset. Edit them in Settings.",
+                    FontSize = 11,
+                    Opacity = 0.7,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 2, 0, 0),
+                    Foreground = fg
+                });
+                customRow.Child = stack;
+                AudioQualityMenuItems.Children.Add(customRow);
+            }
+        }
+
+        /// <summary>
+        /// Returns the foreground brush that matches the popup's theme-aware
+        /// background. Reads ThemeControlForegroundBrush from app resources, with a
+        /// luminance-based fallback so we never end up with black-on-black.
+        /// </summary>
+        private Brush ResolveMenuForegroundBrush()
+        {
+            if (Application.Current?.Resources["ThemeControlForegroundBrush"] is Brush b)
+                return b;
+            return IsDarkThemeActive() ? Brushes.White : Brushes.Black;
+        }
+
+        private UIElement BuildPresetMenuRow(AudioQualityPresets.Preset preset, bool isSelected, Brush foreground)
+        {
+            // We use a Button so we get hover/press states + a click event for free.
+            var btn = new Button
+            {
+                Background = isSelected
+                    ? new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF))
+                    : Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(10, 8, 10, 8),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 1, 0, 1),
+                Tag = preset,
+                Foreground = foreground
+            };
+
+            // Custom rounded template so the row feels like a menu item, not a chunky button.
+            var template = new ControlTemplate(typeof(Button));
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+            border.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Button.PaddingProperty));
+            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+            border.AppendChild(presenter);
+            template.VisualTree = border;
+
+            // Hover trigger
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(Button.BackgroundProperty,
+                isSelected
+                    ? (Brush)new SolidColorBrush(Color.FromArgb(0x44, 0xFF, 0xFF, 0xFF))
+                    : (Brush)new SolidColorBrush(Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF))));
+            template.Triggers.Add(hoverTrigger);
+            btn.Template = template;
+
+            var stack = new StackPanel { Orientation = Orientation.Vertical };
+            var titleLine = new StackPanel { Orientation = Orientation.Horizontal };
+
+            // Selection mark dot
+            titleLine.Children.Add(new TextBlock
+            {
+                Text = isSelected ? "● " : "  ",
+                FontSize = 13,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Opacity = isSelected ? 1.0 : 0.0,
+                Foreground = foreground
+            });
+            titleLine.Children.Add(new TextBlock
+            {
+                Text = preset.ShortName,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = foreground
+            });
+            stack.Children.Add(titleLine);
+
+            stack.Children.Add(new TextBlock
+            {
+                Text = preset.Description,
+                FontSize = 11,
+                Opacity = 0.7,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 0, 0),
+                Foreground = foreground
+            });
+
+            btn.Content = stack;
+            btn.Click += AudioQualityPresetItem_Click;
+            return btn;
+        }
+
+        private void AudioQualityPresetItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            if (btn.Tag is not AudioQualityPresets.Preset preset) return;
+
+            try
+            {
+                _applyAudioQualityPreset?.Invoke(preset);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("Apply audio quality preset failed: " + ex.Message);
+            }
+
+            AudioQualityPopup.IsOpen = false;
+            RefreshAudioQualityButton();
+        }
+
+        // ── Help / What's this? ───────────────────────────────────────────────
+
+        private void RenderHelpButtonIcon()
+        {
+            if (BtnHelp == null) return;
+            var brush = ResolveIconBrush();
+            BtnHelp.Content = BuildHelpIcon(brush, 18);
+        }
+
+        private void BtnHelp_Click(object sender, RoutedEventArgs e)
+        {
+            // Plain MessageBox keeps things simple and consistent with the rest of the app.
+            const string body =
+                "Media Player buttons:\n\n" +
+                "• Cover art: shows current track artwork. Right-click to save the image or copy track info.\n" +
+                "• Connection pill: shows USB/Wi-Fi status. Click for details.\n" +
+                "• Audio Link: starts/stops scrcpy so audio plays through this PC.\n" +
+                "• Audio quality: shows the current preset (or \"Custom\"). Click to switch presets without opening Settings. Changes take effect on the next Audio Link start; if Audio Link is on, it restarts automatically.\n" +
+                "• Volume icon: opens a volume slider when scrcpy audio is reachable, or +/- buttons otherwise.\n" +
+                "• Skip-back / Skip-forward 30s: appear only on tracks longer than 10 minutes.\n" +
+                "• Lyrics icon: toggles the inline lyrics view in place of the cover.\n" +
+                "• Position label (left of the progress bar): click to switch between elapsed and time-left.\n" +
+                "• Full screen icon (top right): hides the window's title bar and borders. Click again to restore. The window keeps its size and stays resizable from the edges; while decorations are hidden you can drag the window by clicking and holding any empty area.\n" +
+                "• Always on top: keeps the window above other windows.\n\n" +
+                "Right-side panel: open the full settings by clicking the arrow on the right edge.";
+
+            MessageBox.Show(this, body, "Media Player Help", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // ── Window Chrome Toggle (called "fullscreen" in the UI but really
+        // just hides the window's title bar / borders) ────────────────────────
+
+        private void BtnFullscreen_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isFullscreen)
+            {
+                ExitFullscreen();
+            }
+            else
+            {
+                EnterFullscreen();
+            }
+            RenderFullscreenButtonIcon();
+        }
+
+        private void EnterFullscreen()
+        {
+            // Snapshot the chrome state so we can restore it byte-for-byte.
+            // We deliberately do NOT touch WindowState or Topmost here. The user
+            // wanted "no decorations", not actual fullscreen, so the window keeps
+            // its current size/position and stays a regular movable, resizable window.
+            _prevWindowStyle = WindowStyle;
+            _prevResizeMode = ResizeMode;
+
+            WindowStyle = WindowStyle.None;
+            // Keep resize available, but switch to the gripless variant since the
+            // bottom-right grip lives in the chrome we just hid.
+            ResizeMode = ResizeMode.CanResize;
+
+            _isFullscreen = true;
+        }
+
+        private void ExitFullscreen()
+        {
+            WindowStyle = _prevWindowStyle;
+            ResizeMode = _prevResizeMode;
+
+            _isFullscreen = false;
+        }
+
+        /// <summary>
+        /// While chromeless, lets the user drag the window by clicking-and-holding
+        /// any background area that didn't otherwise handle the click. Hooked on
+        /// the bubbling MouseLeftButtonDown event so controls (buttons, sliders)
+        /// still work normally.
+        /// </summary>
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isFullscreen) return;
+            if (e.ChangedButton != MouseButton.Left) return;
+            // If the click was already handled by something else, leave it alone.
+            if (e.Handled) return;
+            try { DragMove(); } catch { }
+        }
+
+        private void RenderFullscreenButtonIcon()
+        {
+            if (BtnFullscreen == null) return;
+            var brush = ResolveIconBrush();
+            BtnFullscreen.Content = BuildFullscreenIcon(brush, _isFullscreen, 18);
+            BtnFullscreen.ToolTip = _isFullscreen ? "Show window decorations" : "Hide window decorations";
+        }
+
+        // ── Always on Top ─────────────────────────────────────────────────────
+
+        private void BtnAlwaysOnTop_Click(object sender, RoutedEventArgs e)
+        {
+            _alwaysOnTop = !_alwaysOnTop;
+            // While in fullscreen we still let the user toggle this, but the
+            // restore-from-fullscreen path will OR it back in either way.
+            Topmost = _alwaysOnTop;
+            RefreshAlwaysOnTopButton();
+        }
+
+        private void RefreshAlwaysOnTopButton()
+        {
+            if (BtnAlwaysOnTop == null || AlwaysOnTopContent == null) return;
+
+            var brush = ResolveIconBrush();
+            AlwaysOnTopContent.Children.Clear();
+
+            AlwaysOnTopContent.Children.Add(BuildAlwaysOnTopIcon(brush, _alwaysOnTop, 14));
+            AlwaysOnTopContent.Children.Add(new TextBlock
+            {
+                Text = _alwaysOnTop ? "On top" : "Always on top",
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Foreground = brush
+            });
+
+            BtnAlwaysOnTop.ToolTip = _alwaysOnTop
+                ? "Always on top is on. Click to turn off."
+                : "Keep this window always on top.";
+
+            // Subtle border in the icon brush so the pill stays legible over
+            // both gradient and idle backgrounds.
+            var borderColor = (brush is SolidColorBrush scb) ? scb.Color : Colors.White;
+            BtnAlwaysOnTop.BorderBrush = new SolidColorBrush(borderColor)
+            {
+                Opacity = _alwaysOnTop ? 0.85 : 0.45
+            };
+        }
+
         // ── Fast Seek (ADB) ───────────────────────────────────────────────────
 
         private async void BtnSeekBack_Click(object sender, RoutedEventArgs e)
@@ -1419,6 +1832,10 @@ namespace musicpresense
 
             RenderFastSeekIcons();
             RenderAudioLinkButton();
+            RenderHelpButtonIcon();
+            RenderFullscreenButtonIcon();
+            RefreshAudioQualityButton();
+            RefreshAlwaysOnTopButton();
         }
 
         /// <summary>
@@ -1838,6 +2255,234 @@ namespace musicpresense
 
             var vb = new Viewbox { Width = size, Height = size, Child = canvas };
             if (!active) vb.Opacity = 0.45;
+            return vb;
+        }
+
+        /// <summary>
+        /// Builds a small audio quality icon: a tuning slider / equalizer glyph.
+        /// Three vertical bars of varying heights with a small dot indicating the
+        /// "knob" position on each.
+        /// </summary>
+        private static Viewbox BuildAudioQualityIcon(Brush brush, double size = 18)
+        {
+            var canvas = new Canvas { Width = 20, Height = 20 };
+
+            // Three vertical track lines.
+            void AddTrack(double x)
+            {
+                var track = new Rectangle
+                {
+                    Width = 1.6,
+                    Height = 14,
+                    Fill = brush,
+                    Opacity = 0.5,
+                    RadiusX = 0.8,
+                    RadiusY = 0.8
+                };
+                Canvas.SetLeft(track, x - 0.8);
+                Canvas.SetTop(track, 3);
+                canvas.Children.Add(track);
+            }
+
+            // Solid knob marker on each track.
+            void AddKnob(double cx, double cy)
+            {
+                var knob = new Rectangle
+                {
+                    Width = 6,
+                    Height = 3,
+                    Fill = brush,
+                    RadiusX = 1.5,
+                    RadiusY = 1.5
+                };
+                Canvas.SetLeft(knob, cx - 3);
+                Canvas.SetTop(knob, cy - 1.5);
+                canvas.Children.Add(knob);
+            }
+
+            AddTrack(5);
+            AddTrack(10);
+            AddTrack(15);
+
+            AddKnob(5, 13);
+            AddKnob(10, 7);
+            AddKnob(15, 10);
+
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        /// <summary>
+        /// Builds a question-mark "help" glyph inside a thin circle.
+        /// </summary>
+        private static Viewbox BuildHelpIcon(Brush brush, double size = 18)
+        {
+            var canvas = new Canvas { Width = 20, Height = 20 };
+
+            var ring = new System.Windows.Shapes.Ellipse
+            {
+                Width = 16,
+                Height = 16,
+                Stroke = brush,
+                StrokeThickness = 1.4,
+                Fill = Brushes.Transparent,
+                Opacity = 0.9
+            };
+            Canvas.SetLeft(ring, 2);
+            Canvas.SetTop(ring, 2);
+            canvas.Children.Add(ring);
+
+            // The "?" mark, drawn as a path so it scales cleanly.
+            var qmark = new System.Windows.Shapes.Path
+            {
+                Stroke = brush,
+                StrokeThickness = 1.6,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                Data = Geometry.Parse("M 7.5,8 C 7.5,6 8.7,5 10,5 C 11.5,5 12.5,6 12.5,7.5 C 12.5,9 10.5,9.5 10,11 L 10,12.2")
+            };
+            canvas.Children.Add(qmark);
+
+            // Dot under the question mark
+            var dot = new System.Windows.Shapes.Ellipse
+            {
+                Width = 2,
+                Height = 2,
+                Fill = brush
+            };
+            Canvas.SetLeft(dot, 9);
+            Canvas.SetTop(dot, 14);
+            canvas.Children.Add(dot);
+
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        /// <summary>
+        /// Builds a fullscreen toggle icon: four corner brackets pointing outward
+        /// when entering fullscreen, inward when already in fullscreen.
+        /// </summary>
+        private static Viewbox BuildFullscreenIcon(Brush brush, bool active, double size = 18)
+        {
+            var canvas = new Canvas { Width = 20, Height = 20 };
+
+            // Each corner is two short strokes meeting at a right angle.
+            // When `active` (in fullscreen), the brackets point inward (collapse glyph);
+            // otherwise they point outward (expand glyph).
+            void AddCorner(double cx, double cy, int dx, int dy)
+            {
+                // dx/dy in {-1, +1} indicate direction the corner opens toward.
+                double len = 5;
+                // Outer point of the L
+                double ox = cx;
+                double oy = cy;
+                // Two endpoints making the L
+                double ex1 = cx + len * dx;
+                double ey1 = cy;
+                double ex2 = cx;
+                double ey2 = cy + len * dy;
+
+                canvas.Children.Add(new System.Windows.Shapes.Line
+                {
+                    X1 = ox,
+                    Y1 = oy,
+                    X2 = ex1,
+                    Y2 = ey1,
+                    Stroke = brush,
+                    StrokeThickness = 1.6,
+                    StrokeStartLineCap = PenLineCap.Round,
+                    StrokeEndLineCap = PenLineCap.Round
+                });
+                canvas.Children.Add(new System.Windows.Shapes.Line
+                {
+                    X1 = ox,
+                    Y1 = oy,
+                    X2 = ex2,
+                    Y2 = ey2,
+                    Stroke = brush,
+                    StrokeThickness = 1.6,
+                    StrokeStartLineCap = PenLineCap.Round,
+                    StrokeEndLineCap = PenLineCap.Round
+                });
+            }
+
+            // outward (expand): brackets at outer edges, opening toward center
+            // inward  (collapse): brackets near center, opening toward edges
+            if (!active)
+            {
+                AddCorner(3, 3, +1, +1);    // top-left, opens down-right
+                AddCorner(17, 3, -1, +1);   // top-right
+                AddCorner(3, 17, +1, -1);   // bottom-left
+                AddCorner(17, 17, -1, -1);  // bottom-right
+            }
+            else
+            {
+                AddCorner(8, 8, -1, -1);    // pointing toward top-left
+                AddCorner(12, 8, +1, -1);   // top-right
+                AddCorner(8, 12, -1, +1);   // bottom-left
+                AddCorner(12, 12, +1, +1);  // bottom-right
+            }
+
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        /// <summary>
+        /// Builds an "always on top" pin icon: a thumbtack viewed from the side.
+        /// Filled head when active, outlined when inactive.
+        /// </summary>
+        private static Viewbox BuildAlwaysOnTopIcon(Brush brush, bool active, double size = 14)
+        {
+            var canvas = new Canvas { Width = 18, Height = 18 };
+
+            // The pin head (filled circle on top)
+            var head = new System.Windows.Shapes.Ellipse
+            {
+                Width = 8,
+                Height = 8,
+                Stroke = brush,
+                StrokeThickness = 1.4,
+                Fill = active ? brush : Brushes.Transparent
+            };
+            Canvas.SetLeft(head, 5);
+            Canvas.SetTop(head, 1);
+            canvas.Children.Add(head);
+
+            // Pin shaft
+            var shaft = new System.Windows.Shapes.Line
+            {
+                X1 = 9,
+                Y1 = 9,
+                X2 = 9,
+                Y2 = 16,
+                Stroke = brush,
+                StrokeThickness = 1.6,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round
+            };
+            canvas.Children.Add(shaft);
+
+            // Two small arrow ticks at the bottom suggesting "stays put / pinned"
+            canvas.Children.Add(new System.Windows.Shapes.Line
+            {
+                X1 = 6,
+                Y1 = 13,
+                X2 = 9,
+                Y2 = 10,
+                Stroke = brush,
+                StrokeThickness = 1.4,
+                Opacity = 0.9
+            });
+            canvas.Children.Add(new System.Windows.Shapes.Line
+            {
+                X1 = 12,
+                Y1 = 13,
+                X2 = 9,
+                Y2 = 10,
+                Stroke = brush,
+                StrokeThickness = 1.4,
+                Opacity = 0.9
+            });
+
+            var vb = new Viewbox { Width = size, Height = size, Child = canvas };
+            if (!active) vb.Opacity = 0.75;
             return vb;
         }
 

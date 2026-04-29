@@ -72,6 +72,17 @@ namespace musicpresense
             ChkOpenInTaskbar.IsChecked = _workingConfig.OpenInTaskbar;
             ChkStartWithWindows.IsChecked = _workingConfig.StartWithWindows;
 
+            // Default-view radio: pick whichever the saved config indicates, defaulting
+            // to Settings view for fresh installs (ShowMediaPlayerWindow == false).
+            if (_workingConfig.ShowMediaPlayerWindow)
+            {
+                RbViewMediaPlayer.IsChecked = true;
+            }
+            else
+            {
+                RbViewSettings.IsChecked = true;
+            }
+
             TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyVolumeUpKey);
             TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyVolumeDownKey);
             TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyToggleScrcpyKey);
@@ -201,6 +212,8 @@ namespace musicpresense
 
             _workingConfig.OpenInTaskbar = ChkOpenInTaskbar.IsChecked == true;
             _workingConfig.StartWithWindows = ChkStartWithWindows.IsChecked == true;
+            // Default view choice: media player view if explicitly selected, otherwise settings.
+            _workingConfig.ShowMediaPlayerWindow = RbViewMediaPlayer.IsChecked == true;
 
             _workingConfig.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _workingConfig.HotkeyVolumeUpKey);
             _workingConfig.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _workingConfig.HotkeyVolumeDownKey);
@@ -781,6 +794,7 @@ namespace musicpresense
                 ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
                 ScrcpyFlacCompressionLevel = source.ScrcpyFlacCompressionLevel,
                 ScrcpyAvailableAudioCodecs = source.ScrcpyAvailableAudioCodecs?.ToList() ?? new List<string>(),
+                AudioQualityPresetName = source.AudioQualityPresetName ?? string.Empty,
                 SmtcPauseClearDelayMinutes = source.SmtcPauseClearDelayMinutes,
                 HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
                 HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,

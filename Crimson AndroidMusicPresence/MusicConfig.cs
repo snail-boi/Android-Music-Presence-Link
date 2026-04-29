@@ -30,7 +30,7 @@ namespace musicpresense
         public string SelectedDeviceName { get; set; } = string.Empty;
         public string MusicRemoteRoot { get; set; } = string.Empty;
         public List<string> MusicRemoteRoots { get; set; } = new List<string>();
-        public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Medium;
+        public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Fast;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
         public bool OpenInTaskbar { get; set; } = false;
@@ -41,6 +41,9 @@ namespace musicpresense
         public int ScrcpyAudioBuffer { get; set; } = 80;
         public int ScrcpyFlacCompressionLevel { get; set; } = 2;
         public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
+        // Display name of the last selected audio quality preset, or "Custom" / empty when
+        // no preset matches. Resolved by AudioQualityPresets at runtime when displayed.
+        public string AudioQualityPresetName { get; set; } = string.Empty;
         public int SmtcPauseClearDelayMinutes { get; set; } = 0;
         public bool IsWifiEnabled { get; set; } = false;
         public bool OnboardingCompleted { get; set; } = false;

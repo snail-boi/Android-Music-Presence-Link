@@ -132,6 +132,7 @@
 			<Setter Property="FontSize" Value="12" />
 			<Setter Property="TextWrapping" Value="Wrap" />
 			<Setter Property="Margin" Value="0,4,0,0" />
+			<Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
 		</Style>
 
 		<Style TargetType="TextBox">
@@ -149,6 +150,11 @@
 		</Style>
 
 		<Style TargetType="CheckBox">
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+		</Style>
+
+		<Style TargetType="RadioButton">
 			<Setter Property="VerticalContentAlignment" Value="Center" />
 			<Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
 		</Style>
@@ -829,6 +835,43 @@
 										<TextBlock Style="{StaticResource HelperText}"
                                                    Margin="22,4,0,0">
 											Convenient if you want music presence to be ready every time you sign in.
+										</TextBlock>
+									</StackPanel>
+								</Border>
+
+								<!-- Default view: settings vs. media player -->
+								<Border BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="16,12"
+                                        Margin="0,10,0,0">
+									<StackPanel>
+										<TextBlock Text="Default view"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,0,4"
+                                                   Foreground="{DynamicResource ThemeForegroundBrush}" />
+										<TextBlock Style="{StaticResource HelperText}"
+                                                   Margin="0,0,0,10">
+											Choose what opens when you launch the app. You can switch any time from the tray menu or the toggle inside each view.
+										</TextBlock>
+
+										<RadioButton x:Name="RbViewSettings"
+                                                     GroupName="OnboardingDefaultView"
+                                                     Content="Settings view"
+                                                     FontWeight="SemiBold"
+                                                     IsChecked="True" />
+										<TextBlock Style="{StaticResource HelperText}"
+                                                   Margin="22,2,0,8">
+											Classic full settings window with all options visible.
+										</TextBlock>
+
+										<RadioButton x:Name="RbViewMediaPlayer"
+                                                     GroupName="OnboardingDefaultView"
+                                                     Content="Media Player view"
+                                                     FontWeight="SemiBold" />
+										<TextBlock Style="{StaticResource HelperText}"
+                                                   Margin="22,2,0,0">
+											Compact now-playing window with cover art, transport controls, and a foldable settings pane.
 										</TextBlock>
 									</StackPanel>
 								</Border>

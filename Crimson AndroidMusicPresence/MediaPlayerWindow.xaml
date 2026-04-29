@@ -11,7 +11,8 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         TextOptions.TextFormattingMode="Display"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
     <Window.Resources>
         <Style x:Key="PaneToggleArrowButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
@@ -410,7 +411,46 @@
                         <Button x:Name="BtnAudioLink"
                                 Style="{StaticResource PillButtonStyle}"
                                 Click="BtnAudioLink_Click" />
+
+                        <!-- Quick audio-quality button; shows current preset name (or "Custom") -->
+                        <Button x:Name="BtnAudioQuality"
+                                Style="{StaticResource PillButtonStyle}"
+                                Margin="8,0,0,0"
+                                ToolTip="Audio quality preset"
+                                Click="BtnAudioQuality_Click">
+                            <StackPanel x:Name="AudioQualityContent"
+                                        Orientation="Horizontal" />
+                        </Button>
+
+                        <!-- Always-on-top toggle, lives in the same pill row -->
+                        <Button x:Name="BtnAlwaysOnTop"
+                                Style="{StaticResource PillButtonStyle}"
+                                Margin="8,0,0,0"
+                                ToolTip="Keep window always on top"
+                                Click="BtnAlwaysOnTop_Click">
+                            <StackPanel x:Name="AlwaysOnTopContent"
+                                        Orientation="Horizontal" />
+                        </Button>
                     </StackPanel>
+
+                    <!-- Audio quality preset picker popup -->
+                    <Popup x:Name="AudioQualityPopup"
+                           Grid.Row="4"
+                           PlacementTarget="{Binding ElementName=BtnAudioQuality}"
+                           Placement="Top"
+                           VerticalOffset="-8"
+                           StaysOpen="False"
+                           AllowsTransparency="True"
+                           PopupAnimation="Fade">
+                        <Border Background="{DynamicResource ThemeControlBackgroundBrush}"
+                                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="6"
+                                MinWidth="280">
+                            <StackPanel x:Name="AudioQualityMenuItems" Orientation="Vertical" />
+                        </Border>
+                    </Popup>
 
                     <!-- Connection info overlay popup -->
                     <Popup x:Name="ConnectionInfoPopup"
@@ -648,6 +688,33 @@
                                 Click="BtnLyrics_Click" />
                         </Grid>
                     </StackPanel>
+
+                    <!-- Help / What's this? button, top-LEFT corner of the player pane -->
+                    <Button x:Name="BtnHelp"
+                            Grid.Row="0"
+                            Style="{StaticResource TransportIconButtonStyle}"
+                            Width="32"
+                            Height="32"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Margin="0,0,0,0"
+                            Panel.ZIndex="10"
+                            ToolTip="What's this? (help)"
+                            Click="BtnHelp_Click" />
+
+                    <!-- Full-screen toggle, top-RIGHT corner. Hides the window's chrome
+                         when active and restores it on the next click. -->
+                    <Button x:Name="BtnFullscreen"
+                            Grid.Row="0"
+                            Style="{StaticResource TransportIconButtonStyle}"
+                            Width="32"
+                            Height="32"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,0,0,0"
+                            Panel.ZIndex="10"
+                            ToolTip="Toggle full screen"
+                            Click="BtnFullscreen_Click" />
                 </Grid>
             </Grid>
         </Border>

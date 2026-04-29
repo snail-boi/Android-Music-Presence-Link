@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -182,6 +182,53 @@ namespace musicpresense
             }
         }
 
+        /// <summary>
+        /// Invoked by the media-player window when the user picks a new audio quality preset.
+        /// Applies the preset to the live config, persists it, propagates via UpdateConfig,
+        /// and restarts scrcpy if it's currently running so the new args take effect.
+        /// </summary>
+        private void ApplyAudioQualityPresetFromMediaPlayer(AudioQualityPresets.Preset preset)
+        {
+            if (preset == null) return;
+
+            try
+            {
+                AudioQualityPresets.ApplyToConfig(Config, preset);
+                MusicConfigManager.Save(Config);
+
+                bool wasRunning = _scrcpyProcess != null && !_scrcpyProcess.HasExited;
+
+                // UpdateConfig pushes everywhere (settings UI, tray, media player label).
+                UpdateConfig(Config);
+
+                if (wasRunning)
+                {
+                    // Restart scrcpy so the new codec/bitrate/buffer take effect.
+                    // StopScrcpyAsync runs asynchronously; chain Start once it's gone.
+                    _ = RestartScrcpyForPresetAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("ApplyAudioQualityPresetFromMediaPlayer failed: " + ex.Message);
+            }
+        }
+
+        private async Task RestartScrcpyForPresetAsync()
+        {
+            try
+            {
+                await StopScrcpyAsync().ConfigureAwait(true);
+                // Tiny pause so the OS releases the audio session before we re-grab it.
+                await Task.Delay(150).ConfigureAwait(true);
+                StartScrcpyNoAudio();
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("RestartScrcpyForPresetAsync failed: " + ex.Message);
+            }
+        }
+
         // Pushes the current tray state to the media-player window's connection-info pill.
         // Colors here are dedicated to the media player (per UX spec: USB green, Wi-Fi cyan,
         // not-connected red) and are intentionally separate from the tray icon colors.
@@ -242,6 +289,8 @@ namespace musicpresense
             _trayIconManager?.SetDarkMode(config.UseDarkMode);
             UpdateTrayAudioSettings();
             EnsureMediaPlayerWindowState();
+            // Push the latest preset label to the media player's quick-quality button.
+            _mediaPlayerWindow?.RefreshAudioQualityButton();
             UpdateSettingsWindowModeButton();
             // Reinitialize hotkeys to reflect updated configuration
             try
@@ -308,7 +357,9 @@ namespace musicpresense
                     StepVolumeOnce,
                     SetAudioLinkFromMediaPlayer,
                     seconds => _presenceService?.SeekRelativeCurrentAsync(seconds) ?? Task.CompletedTask,
-                    _lyricsOverlayManager);
+                    _lyricsOverlayManager,
+                    () => Config,
+                    ApplyAudioQualityPresetFromMediaPlayer);
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
 
                 // Push current connection + scrcpy state into the freshly created window.
@@ -483,6 +534,18 @@ namespace musicpresense
                 Config = onboardingWindow.UpdatedConfig;
                 MusicConfigManager.Save(Config);
                 UpdateConfig(Config);
+
+                // Honor the view choice picked in onboarding: open the media player
+                // window if the user just selected it, or fall back to the settings
+                // window otherwise.
+                if (Config.ShowMediaPlayerWindow)
+                {
+                    ShowMediaPlayerWindowNow();
+                }
+                else if (_mediaPlayerWindow != null)
+                {
+                    GoBackToSettingsWindow();
+                }
             }
         }
 

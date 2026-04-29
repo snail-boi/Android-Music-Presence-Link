@@ -1,4 +1,4 @@
-﻿using Crimson_AndroidMusicPresence;
+using Crimson_AndroidMusicPresence;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -150,14 +150,9 @@ namespace musicpresense
                 "Slow (30s)",
                 "No automatic update"
             };
-            CmbQualityPresets.ItemsSource = new[]
-            {
-                "Data Saver (for slow internet)",
-                "Default Quality (good for general audio)",
-                "High Quality (good for streaming music)",
-                "Lossless (highest quality lower data use)",
-                "Max Quality (I payed for the whole WiFi)"
-            };
+            CmbQualityPresets.ItemsSource = AudioQualityPresets.All
+                .Select(p => p.Name)
+                .ToArray();
         }
 
         private void InitializeAudioCodecUI()
@@ -537,32 +532,30 @@ namespace musicpresense
 
         private void UpdateAudioSettings(string selected)
         {
-            switch (selected)
+            var preset = AudioQualityPresets.FindByName(selected);
+            if (preset == null)
+                return;
+
+            // Apply preset values to the visible controls. The codec list is the
+            // source of truth for the listbox selection, so set its item directly.
+            LstAudioCodecs.SelectedItem = preset.Codec;
+
+            // Bitrate textbox: only meaningful for non-raw, non-flac codecs.
+            if (!string.IsNullOrEmpty(preset.Bitrate))
             {
-                case "Data Saver (for slow internet)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "64";
-                    TxtAudioBuffer.Text = "120";
-                    break;
-                case "Default Quality (good for general audio)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "128";
-                    TxtAudioBuffer.Text = "100";
-                    break;
-                case "High Quality (good for streaming music)":
-                    LstAudioCodecs.SelectedItem = "opus";
-                    TxtAudioBitrate.Text = "256";
-                    TxtAudioBuffer.Text = "80";
-                    break;
-                case "Lossless (highest quality lower data use)":
-                    LstAudioCodecs.SelectedItem = "flac";
-                    TxtAudioBuffer.Text = "80";
-                    TxtFlacCompressionLevel.Text = "2";
-                    break;
-                case "Max Quality (I payed for the whole WiFi)":
-                    LstAudioCodecs.SelectedItem = "raw";
-                    break;
+                TxtAudioBitrate.Text = preset.Bitrate;
             }
+
+            TxtAudioBuffer.Text = preset.BufferMs.ToString();
+
+            if (preset.Codec.Equals("flac", StringComparison.OrdinalIgnoreCase))
+            {
+                TxtFlacCompressionLevel.Text = preset.FlacCompressionLevel.ToString();
+            }
+
+            // Stamp the preset name on the in-memory config so the media player
+            // button shows the friendly label even before the user clicks Save.
+            _config.AudioQualityPresetName = preset.Name;
         }
 
         private void SelectCodecFromConfig()
@@ -901,6 +894,11 @@ namespace musicpresense
             }
             catch { }
 
+            // Auto-detect which preset (if any) the saved values match. Anything that
+            // doesn't match a preset exactly is recorded as "Custom".
+            var detectedPreset = AudioQualityPresets.MatchFromConfig(_config);
+            _config.AudioQualityPresetName = detectedPreset?.Name ?? AudioQualityPresets.CustomLabel;
+
             MusicConfigManager.Save(_config);
             (Application.Current as App)?.UpdateConfig(_config);
             _savedConfig = CloneConfig(_config);
@@ -1124,6 +1122,12 @@ namespace musicpresense
             }
             catch { }
 
+            // Auto-detect which preset (if any) the saved values match. If none match
+            // we record "Custom" so the media player's quick-quality button reflects
+            // the user's manual edits accurately.
+            var detectedPreset = AudioQualityPresets.MatchFromConfig(config);
+            config.AudioQualityPresetName = detectedPreset?.Name ?? AudioQualityPresets.CustomLabel;
+
             return config;
         }
 
@@ -1267,6 +1271,7 @@ namespace musicpresense
                 ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
                 ScrcpyFlacCompressionLevel = source.ScrcpyFlacCompressionLevel,
                 ScrcpyAvailableAudioCodecs = source.ScrcpyAvailableAudioCodecs?.ToList() ?? new List<string>(),
+                AudioQualityPresetName = source.AudioQualityPresetName ?? string.Empty,
                 SmtcPauseClearDelayMinutes = source.SmtcPauseClearDelayMinutes,
                 HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
                 HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
