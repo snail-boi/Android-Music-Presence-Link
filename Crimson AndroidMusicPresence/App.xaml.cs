@@ -41,7 +41,7 @@ namespace musicpresense
         private const int WmHotkey = 0x0312;
         private const float ScrcpyVolumeStep = 0.05f;
 
-        private static readonly string version = "1.1.0.0";
+        private static readonly string version = "1.1.1.0";
 
         private bool _isScrcpyRunning;
         private bool _isExiting;
