@@ -27,6 +27,7 @@ namespace musicpresense
         private readonly string _defaultImagePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Snail", "Resources", "Musiclogo.png");
+        private const string SmtcAppLabel = "Android Music Presence Link";
 
         private CoverCacheManager cacheManager;
         private List<string> remoteRoots = new();
@@ -101,6 +102,7 @@ namespace musicpresense
             try
             {
                 mediaPlayer = new MediaPlayer();
+                mediaPlayer.CommandManager.IsEnabled = false;
                 smtcControls = mediaPlayer.SystemMediaTransportControls;
                 smtcDisplayUpdater = smtcControls.DisplayUpdater;
 
@@ -112,11 +114,23 @@ namespace musicpresense
 
                 smtcControls.ButtonPressed += SmTc_ButtonPressed;
                 smtcDisplayUpdater.Type = MediaPlaybackType.Music;
+                ApplyDefaultSmtcLabel();
             }
             catch (Exception ex)
             {
                 Debugger.show($"MediaPlayer initialization failed: {ex.Message}");
             }
+        }
+
+        private void ApplyDefaultSmtcLabel()
+        {
+            if (smtcDisplayUpdater == null)
+                return;
+
+            var musicProperties = smtcDisplayUpdater.MusicProperties;
+            musicProperties.Title = SmtcAppLabel;
+            musicProperties.Artist = SmtcAppLabel;
+            smtcDisplayUpdater.Update();
         }
 
         private void SmTc_ButtonPressed(SystemMediaTransportControls sender, SystemMediaTransportControlsButtonPressedEventArgs args)
