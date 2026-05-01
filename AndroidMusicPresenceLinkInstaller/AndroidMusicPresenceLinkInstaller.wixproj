@@ -29,33 +29,35 @@
   <PropertyGroup>
     <PreBuildEvent>%40echo off
 :: Read version
-set /p ver=&lt;"$(SolutionDir)Version.txt"
-set ver=%25ver: =%25
+set "ver="
+for /f "tokens=3 delims=&lt;&gt;" %%A in ('findstr /i "&lt;Version&gt;" "$(SolutionDir)Crimson AndroidMusicPresence\AndroidMusicPresenceLink.csproj"') do set "ver=%%A"
+set ver=%ver: =%
 
 :: Generate Version.wxi correctly
 (
     echo ^&lt;%3fxml version="1.0" encoding="UTF-8"%3f^&gt;
     echo ^&lt;Include^&gt;
-    echo ^&lt;%3fdefine ProductVersion = "%25ver%25" %3f^&gt;
+    echo ^&lt;%3fdefine ProductVersion = "%ver%" %3f^&gt;
     echo ^&lt;/Include^&gt;
 ) &gt; "$(ProjectDir)Version.wxi"</PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
     <PostBuildEvent>%40echo off
-set /p ver=&lt;"$(SolutionDir)Version.txt"
-set ver=%25ver: =%25
+set "ver="
+for /f "tokens=3 delims=&lt;&gt;" %%A in ('findstr /i "&lt;Version&gt;" "$(SolutionDir)Crimson AndroidMusicPresence\AndroidMusicPresenceLink.csproj"') do set "ver=%%A"
+set ver=%ver: =%
 (
     echo ^&lt;%3fxml version="1.0" encoding="UTF-8"%3f^&gt;
     echo ^&lt;Include^&gt;
-    echo ^&lt;%3fdefine ProductVersion = "%25ver%25" %3f^&gt;
+    echo ^&lt;%3fdefine ProductVersion = "%ver%" %3f^&gt;
     echo ^&lt;/Include^&gt;
 ) &gt; "$(ProjectDir)Version.wxi"
 :: Delete old version if it exists, then rename
-if exist "$(TargetDir)Android.Music.Presence.Link.V%25ver%25.msi" (
-    del "$(TargetDir)Android.Music.Presence.Link.V%25ver%25.msi"
+if exist "$(TargetDir)Android.Music.Presence.Link.V%ver%.msi" (
+    del "$(TargetDir)Android.Music.Presence.Link.V%ver%.msi"
 )
 if exist "$(TargetDir)$(TargetName).msi" (
-    rename "$(TargetDir)$(TargetName).msi" "Android.Music.Presence.Link.V%25ver%25.msi"
+    rename "$(TargetDir)$(TargetName).msi" "Android.Music.Presence.Link.V%ver%.msi"
 )</PostBuildEvent>
   </PropertyGroup>
   <!--

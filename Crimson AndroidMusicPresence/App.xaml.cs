@@ -43,10 +43,10 @@ namespace musicpresense
         private const float ScrcpyVolumeStep = 0.05f;
         private const string AppUserModelId = "Android Music Presence Link";
 
-        private static readonly string version = "1.1.1.0";
+        private static readonly string version = GetAppVersion();
 
-        [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern int SetCurrentProcessExplicitAppUserModelID(string appID);
+
+
 
         private bool _isScrcpyRunning;
         private bool _isExiting;
@@ -90,7 +90,7 @@ namespace musicpresense
         {
             base.OnStartup(e);
 
-            SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
+
 
             Config = MusicConfigManager.Load();
             ApplyStartupRegistration(Config.StartWithWindows);
@@ -136,6 +136,11 @@ namespace musicpresense
             InitializeHotkeys();
 
             _ = Updater.CheckForUpdateAsync(version);
+        }
+
+        private static string GetAppVersion()
+        {
+            return Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0.0";
         }
 
         private void OnNowPlayingChanged(string? artist, string? title, string? album)
