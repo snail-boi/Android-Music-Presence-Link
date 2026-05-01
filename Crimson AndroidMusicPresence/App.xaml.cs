@@ -468,12 +468,6 @@ namespace musicpresense
                 _settingsWindow.SyncRuntimeConfig(Config);
             }
 
-            if (_settingsWindow != null && !Config.OpenInTaskbar && !Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
-            {
-                _settingsWindow.Show();
-                _settingsWindow.Activate();
-            }
-
             UpdateSettingsWindowModeButton();
         }
 
