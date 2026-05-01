@@ -415,7 +415,7 @@ namespace musicpresense
 
                 if (mediaPlayer != null)
                 {
-                    mediaPlayer.Pause();
+
                     mediaPlayer.Dispose();
                     mediaPlayer = null;
                 }

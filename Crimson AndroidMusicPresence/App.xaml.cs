@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
@@ -49,6 +50,30 @@ namespace musicpresense
 
         private bool _isScrcpyRunning;
         private bool _isExiting;
+        // Device id (USB serial or "ip:port") that _scrcpyProcess was started against.
+        // Used to detect when the active connection changes mid-session and the audio
+        // link needs to be migrated to the new transport.
+        private string? _scrcpyDeviceId;
+        // Whether _scrcpyProcess was started over USB (vs Wi-Fi). Cached so we don't
+        // re-derive it from _scrcpyDeviceId everywhere.
+        private bool _scrcpyDeviceIsUsb;
+        // Set while a transport switch is in progress so reentrant tray-state events
+        // don't kick off overlapping switches. Also prevents the "scrcpy died" path
+        // from interpreting an intentional shutdown of the old process as a real exit.
+        private bool _scrcpySwitchInProgress;
+        // True when the user has requested the audio link be active. Persists across
+        // transport flips so that when scrcpy dies during a USB cable yank (or any
+        // other unexpected exit) we can automatically reconnect on the new transport
+        // instead of leaving audio off forever. Cleared only by an explicit user stop
+        // or app exit.
+        private bool _audioLinkDesired;
+        // Cancels any pending recovery delay when scrcpy has died and we're waiting
+        // for a device to come back so we can restart the audio link. Tied to
+        // _audioLinkDesired: cancelled when the user explicitly stops or app exits.
+        private CancellationTokenSource? _audioLinkRecoveryCts;
+        // How long to wait after an unexpected scrcpy exit for a device to (re)appear
+        // before giving up on automatic reconnection.
+        private const int AudioLinkRecoveryWindowMs = 8000;
         private TrayIconState _lastTrayState = TrayIconState.NoDevice;
         private string? _lastNowPlayingArtist;
         private string? _lastNowPlayingTitle;
@@ -159,6 +184,114 @@ namespace musicpresense
             _trayIconManager?.SetState(state);
             ApplyConnectionStateToMediaPlayer();
             _mediaPlayerWindow?.SetAudioLinkState(_isScrcpyRunning);
+
+            // If the audio link is active and the device's transport (USB vs Wi-Fi)
+            // changed since we started scrcpy, migrate the audio link to the new
+            // transport. We do this from ApplyTrayState because tray state changes
+            // are exactly the moments the connection medium flips.
+            CheckAudioLinkTransport();
+        }
+
+        /// <summary>
+        /// Detects when the device id bound to the running scrcpy process no longer
+        /// matches the live device id from the presence service (i.e. transport changed
+        /// from USB to Wi-Fi or vice versa) and triggers an appropriate handover.
+        /// Safe to call repeatedly; reentrant calls are guarded by _scrcpySwitchInProgress.
+        ///
+        /// When the device is empty (transient, e.g. USB just yanked, Wi-Fi not yet
+        /// enumerated) we do nothing: scrcpy will either survive the blip or die on
+        /// its own, and ScrcpyProcessExited handles the post-death recovery via
+        /// _audioLinkDesired.
+        /// </summary>
+        private void CheckAudioLinkTransport()
+        {
+            if (_isExiting) return;
+            if (_scrcpySwitchInProgress) return;
+            if (_scrcpyProcess == null || _scrcpyProcess.HasExited) return;
+            if (string.IsNullOrEmpty(_scrcpyDeviceId)) return;
+
+            var liveDevice = _presenceService?.CurrentDevice ?? string.Empty;
+
+            // Same device id, nothing to do.
+            if (string.Equals(liveDevice, _scrcpyDeviceId, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            // Device empty: don't stop, don't switch, just wait. If scrcpy dies during
+            // this gap, ScrcpyProcessExited will arm recovery.
+            if (string.IsNullOrWhiteSpace(liveDevice))
+            {
+                Debugger.show($"Audio-link: device transiently empty (was {_scrcpyDeviceId}); waiting.");
+                return;
+            }
+
+            bool liveIsUsb = !liveDevice.Contains(':');
+
+            // Always use a hard switch regardless of transport direction.
+            // Seamless (concurrent) handover is not viable for audio-only scrcpy sessions:
+            // Android does not allow two concurrent --audio-source=playback captures from
+            // the same package, so the new session never actually starts while the old one
+            // is alive. Hard switch (stop old, brief pause, start new) is reliable.
+            Debugger.show($"Audio-link transport change: {_scrcpyDeviceId} ({(_scrcpyDeviceIsUsb ? "USB" : "WiFi")}) -> {liveDevice} ({(liveIsUsb ? "USB" : "WiFi")}), hard switch");
+
+            _scrcpySwitchInProgress = true;
+            _ = PerformAudioLinkSwitchAsync(liveDevice, liveIsUsb);
+        }
+
+        /// <summary>
+        /// Migrates the running audio link to a new device by stopping the current
+        /// scrcpy process and starting a fresh one bound to <paramref name="newDevice"/>.
+        /// A seamless (concurrent) handover is not used because Android does not allow
+        /// two simultaneous --audio-source=playback captures from the same package, so
+        /// the new session would never start while the old one is alive.
+        /// </summary>
+        private async Task PerformAudioLinkSwitchAsync(string newDevice, bool newIsUsb)
+        {
+            try
+            {
+                await StopScrcpyAsync().ConfigureAwait(true);
+                if (!_audioLinkDesired || _isExiting) return;
+
+                // Give the OS time to release the audio session before we reacquire it.
+                // USB audio capture on Android takes longer to initialize than Wi-Fi,
+                // so use a generous delay.
+                await Task.Delay(400).ConfigureAwait(true);
+                if (!_audioLinkDesired || _isExiting) return;
+
+                var process = LaunchScrcpyProcess(newDevice);
+                if (process == null)
+                {
+                    Debugger.show("Audio-link switch: LaunchScrcpyProcess returned null.");
+                    _trayIconManager?.SetScrcpyRunning(false);
+                    UpdateTrayAudioSettings();
+                    ApplyTrayState();
+                    return;
+                }
+
+                _scrcpyProcess = process;
+                _scrcpyDeviceId = newDevice;
+                _scrcpyDeviceIsUsb = newIsUsb;
+                _scrcpyProcess.EnableRaisingEvents = true;
+                _scrcpyProcess.Exited += ScrcpyProcessExited;
+                _isScrcpyRunning = true;
+                _trayIconManager?.SetScrcpyRunning(true);
+                UpdateTrayAudioSettings();
+                ApplyTrayState();
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("PerformAudioLinkSwitchAsync failed: " + ex.Message);
+            }
+            finally
+            {
+                _scrcpySwitchInProgress = false;
+
+                // After releasing the guard, re-check in case the device flipped again
+                // while we were busy.
+                if (!_isExiting)
+                {
+                    CheckAudioLinkTransport();
+                }
+            }
         }
 
         // Invoked by the media-player window when the user toggles the audio-link button.
@@ -169,6 +302,7 @@ namespace musicpresense
             {
                 if (enable)
                 {
+                    _audioLinkDesired = true;
                     if (_scrcpyProcess == null || _scrcpyProcess.HasExited)
                     {
                         StartScrcpyNoAudio();
@@ -176,6 +310,8 @@ namespace musicpresense
                 }
                 else
                 {
+                    _audioLinkDesired = false;
+                    CancelAudioLinkRecovery();
                     if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
                     {
                         _ = StopScrcpyAsync();
@@ -617,10 +753,13 @@ namespace musicpresense
         {
             if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
             {
+                _audioLinkDesired = false;
+                CancelAudioLinkRecovery();
                 _ = StopScrcpyAsync();
             }
             else
             {
+                _audioLinkDesired = true;
                 StartScrcpyNoAudio();
             }
         }
@@ -630,16 +769,60 @@ namespace musicpresense
             var device = _presenceService?.CurrentDevice;
             if (string.IsNullOrWhiteSpace(device))
             {
+                _audioLinkDesired = false;
                 MessageBox.Show("No device connected!", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(Config.Paths.Scrcpy) || !File.Exists(Config.Paths.Scrcpy))
             {
+                _audioLinkDesired = false;
                 MessageBox.Show("scrcpy.exe not found!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
+            try
+            {
+                var process = LaunchScrcpyProcess(device);
+                if (process == null)
+                {
+                    _audioLinkDesired = false;
+                    MessageBox.Show("scrcpy failed to start.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _isScrcpyRunning = false;
+                    _trayIconManager?.SetScrcpyRunning(false);
+                    UpdateTrayAudioSettings();
+                    ApplyTrayState();
+                    return;
+                }
+
+                _scrcpyProcess = process;
+                _scrcpyDeviceId = device;
+                _scrcpyDeviceIsUsb = !device.Contains(':');
+                _scrcpyProcess.EnableRaisingEvents = true;
+                _scrcpyProcess.Exited += ScrcpyProcessExited;
+                _isScrcpyRunning = true;
+                _trayIconManager?.SetScrcpyRunning(true);
+                UpdateTrayAudioSettings();
+                ApplyTrayState();
+            }
+            catch (Exception ex)
+            {
+                _audioLinkDesired = false;
+                MessageBox.Show($"scrcpy launch failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                _isScrcpyRunning = false;
+                _trayIconManager?.SetScrcpyRunning(false);
+                UpdateTrayAudioSettings();
+                ApplyTrayState();
+            }
+        }
+
+        /// <summary>
+        /// Builds the scrcpy argument string for a given device id. Pure (no side effects),
+        /// shared between the user-initiated start and the transport-switch path so both
+        /// paths produce identical args modulo the -s target.
+        /// </summary>
+        private string BuildScrcpyArgs(string device)
+        {
             var codec = string.IsNullOrWhiteSpace(Config.ScrcpyAudioCodec) ? "raw" : Config.ScrcpyAudioCodec.Trim();
             var buffer = Config.ScrcpyAudioBuffer > 0 ? Config.ScrcpyAudioBuffer : 50;
 
@@ -672,52 +855,43 @@ namespace musicpresense
                 argParts.Add($"--audio-codec-options=flac-compression-level={Math.Clamp(Config.ScrcpyFlacCompressionLevel, 1, 8)}");
             }
 
-            var args = string.Join(" ", argParts);
+            return string.Join(" ", argParts);
+        }
 
-            Debugger.show($"Starting scrcpy with args: {args}");
-
-            try
+        /// <summary>
+        /// Launches a scrcpy process bound to the given device id. Returns the started
+        /// Process (with EnableRaisingEvents NOT yet set and no Exited handler attached),
+        /// or null on failure. Caller is responsible for wiring up state and lifetime.
+        /// No UI side effects so this can be used during background transport switches.
+        /// </summary>
+        private Process? LaunchScrcpyProcess(string device)
+        {
+            if (string.IsNullOrWhiteSpace(Config.Paths.Scrcpy) || !File.Exists(Config.Paths.Scrcpy))
             {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = Config.Paths.Scrcpy,
-                    Arguments = args,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                _scrcpyProcess = Process.Start(psi);
-                if (_scrcpyProcess == null)
-                {
-                    MessageBox.Show("scrcpy failed to start.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    _isScrcpyRunning = false;
-                    _trayIconManager?.SetScrcpyRunning(false);
-                    UpdateTrayAudioSettings();
-                    ApplyTrayState();
-                    return;
-                }
-
-                _scrcpyProcess.EnableRaisingEvents = true;
-                _scrcpyProcess.Exited += ScrcpyProcessExited;
-                _isScrcpyRunning = true;
-                _trayIconManager?.SetScrcpyRunning(true);
-                UpdateTrayAudioSettings();
-                ApplyTrayState();
+                Debugger.show("LaunchScrcpyProcess: scrcpy.exe not found at " + (Config.Paths.Scrcpy ?? "<null>"));
+                return null;
             }
-            catch (Exception ex)
+
+            var args = BuildScrcpyArgs(device);
+            Debugger.show($"Starting scrcpy (device={device}) with args: {args}");
+
+            var psi = new ProcessStartInfo
             {
-                MessageBox.Show($"scrcpy launch failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                _isScrcpyRunning = false;
-                _trayIconManager?.SetScrcpyRunning(false);
-                UpdateTrayAudioSettings();
-                ApplyTrayState();
-            }
+                FileName = Config.Paths.Scrcpy,
+                Arguments = args,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            return Process.Start(psi);
         }
 
         private async Task StopScrcpyAsync()
         {
             var process = _scrcpyProcess;
             _scrcpyProcess = null;
+            _scrcpyDeviceId = null;
+            _scrcpyDeviceIsUsb = false;
             _isScrcpyRunning = false;
             _trayIconManager?.SetScrcpyRunning(false);
             UpdateTrayAudioSettings();
@@ -758,23 +932,163 @@ namespace musicpresense
 
         private void ScrcpyProcessExited(object? sender, EventArgs e)
         {
+            // Guard against stale Exited events from a process we already replaced during
+            // a transport switch. PerformAudioLinkSwitchAsync detaches the handler before
+            // stopping the old process, so anything reaching here should be the currently
+            // tracked _scrcpyProcess. The ReferenceEquals check is a safety net.
+            if (sender is Process exited && !ReferenceEquals(exited, _scrcpyProcess))
+            {
+                // Stale event from a process we already replaced; just dispose it.
+                try { exited.Dispose(); } catch { }
+                return;
+            }
+
             if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
             {
                 _scrcpyProcess?.Dispose();
                 _scrcpyProcess = null;
+                _scrcpyDeviceId = null;
+                _scrcpyDeviceIsUsb = false;
                 _isScrcpyRunning = false;
                 return;
             }
 
             Dispatcher.BeginInvoke(() =>
             {
+                bool wasDesired = _audioLinkDesired;
+                bool wasUsb = _scrcpyDeviceIsUsb;
+                string? oldDevice = _scrcpyDeviceId;
+
                 _scrcpyProcess?.Dispose();
                 _scrcpyProcess = null;
+                _scrcpyDeviceId = null;
+                _scrcpyDeviceIsUsb = false;
                 _isScrcpyRunning = false;
                 _trayIconManager?.SetScrcpyRunning(false);
                 UpdateTrayAudioSettings();
                 ApplyTrayState();
+
+                // If the user still wants the audio link active and the process died
+                // on its own (USB cable yanked, network blip, scrcpy crashed), kick
+                // off recovery: poll briefly for a usable device, then restart on it.
+                // We don't immediately know which transport will come up, so we let
+                // the recovery wait for the device to be present and start fresh.
+                if (wasDesired && !_isExiting && !_scrcpySwitchInProgress)
+                {
+                    Debugger.show($"Audio-link: scrcpy exited unexpectedly (was on {(wasUsb ? "USB" : "WiFi")} as {oldDevice ?? "<null>"}), arming recovery.");
+                    ArmAudioLinkRecovery();
+                }
             });
+        }
+
+        /// <summary>
+        /// Starts polling for a usable device to restart the audio link on. Used after
+        /// scrcpy exits unexpectedly (e.g. USB cable yank) when the user still wants
+        /// audio link active. Coalesces with any in-flight recovery.
+        /// </summary>
+        private void ArmAudioLinkRecovery()
+        {
+            CancelAudioLinkRecovery();
+            var cts = new CancellationTokenSource();
+            _audioLinkRecoveryCts = cts;
+            _ = AudioLinkRecoveryLoopAsync(cts.Token);
+        }
+
+        private void CancelAudioLinkRecovery()
+        {
+            var cts = _audioLinkRecoveryCts;
+            _audioLinkRecoveryCts = null;
+            if (cts != null)
+            {
+                try { cts.Cancel(); } catch { }
+                try { cts.Dispose(); } catch { }
+            }
+        }
+
+        private async Task AudioLinkRecoveryLoopAsync(CancellationToken token)
+        {
+            var deadline = Environment.TickCount + AudioLinkRecoveryWindowMs;
+            const int pollIntervalMs = 300;
+
+            try
+            {
+                while (Environment.TickCount < deadline)
+                {
+                    if (token.IsCancellationRequested) return;
+                    if (_isExiting) return;
+                    if (!_audioLinkDesired) return;
+                    // Someone else (e.g. user, switch path) already restarted scrcpy.
+                    if (_scrcpyProcess != null && !_scrcpyProcess.HasExited) return;
+
+                    var device = _presenceService?.CurrentDevice ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(device))
+                    {
+                        Debugger.show($"Audio-link recovery: device available ({device}), restarting scrcpy.");
+                        // Use the silent helper so we don't pop a MessageBox if anything
+                        // races with the user disconnecting again.
+                        StartAudioLinkSilently(device);
+                        return;
+                    }
+
+                    await Task.Delay(pollIntervalMs, token).ConfigureAwait(true);
+                }
+
+                Debugger.show("Audio-link recovery: window expired without device, giving up.");
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancelled because user explicitly stopped, exit, or another recovery armed.
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("Audio-link recovery loop failed: " + ex.Message);
+            }
+            finally
+            {
+                if (ReferenceEquals(_audioLinkRecoveryCts?.Token, token) || _audioLinkRecoveryCts == null)
+                {
+                    _audioLinkRecoveryCts = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Starts a fresh scrcpy bound to the given device without the user-facing
+        /// MessageBox popups. Used by the recovery path so transient races don't
+        /// surface error dialogs.
+        /// </summary>
+        private void StartAudioLinkSilently(string device)
+        {
+            if (string.IsNullOrWhiteSpace(Config.Paths.Scrcpy) || !File.Exists(Config.Paths.Scrcpy))
+            {
+                Debugger.show("Audio-link recovery: scrcpy.exe not found, abandoning.");
+                _audioLinkDesired = false;
+                return;
+            }
+
+            try
+            {
+                var process = LaunchScrcpyProcess(device);
+                if (process == null)
+                {
+                    Debugger.show("Audio-link recovery: LaunchScrcpyProcess returned null, abandoning.");
+                    return;
+                }
+
+                _scrcpyProcess = process;
+                _scrcpyDeviceId = device;
+                _scrcpyDeviceIsUsb = !device.Contains(':');
+                _scrcpyProcess.EnableRaisingEvents = true;
+                _scrcpyProcess.Exited += ScrcpyProcessExited;
+                _isScrcpyRunning = true;
+                _trayIconManager?.SetScrcpyRunning(true);
+                UpdateTrayAudioSettings();
+                ApplyTrayState();
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("Audio-link recovery: launch failed: " + ex.Message);
+            }
         }
 
         protected override void OnExit(ExitEventArgs e)
@@ -792,8 +1106,13 @@ namespace musicpresense
 
         private void StopScrcpyOnExit()
         {
+            _audioLinkDesired = false;
+            CancelAudioLinkRecovery();
+
             var process = _scrcpyProcess;
             _scrcpyProcess = null;
+            _scrcpyDeviceId = null;
+            _scrcpyDeviceIsUsb = false;
             _isScrcpyRunning = false;
             _trayIconManager?.SetScrcpyRunning(false);
             UpdateTrayAudioSettings();
