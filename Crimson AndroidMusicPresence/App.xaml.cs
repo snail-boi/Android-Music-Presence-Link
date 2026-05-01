@@ -21,6 +21,8 @@ namespace musicpresense
     {
         internal static MusicConfig Config { get; private set; } = new MusicConfig();
 
+        private const string AppUserModelId = "Snail.AndroidMusicPresenceLink";
+
         private TrayIconManager? _trayIconManager;
         private MusicPresenceService? _presenceService;
         private MainWindow? _settingsWindow;
@@ -40,6 +42,8 @@ namespace musicpresense
         private const int VkVolumeDown = 0xAE;
         private const int WmHotkey = 0x0312;
         private const float ScrcpyVolumeStep = 0.05f;
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        private static extern int SetCurrentProcessExplicitAppUserModelID(string appID);
 
         private static readonly string version = "1.1.1.0";
 
@@ -60,6 +64,14 @@ namespace musicpresense
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            try
+            {
+                SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
+            }
+            catch
+            {
+            }
 
             Config = MusicConfigManager.Load();
             ApplyStartupRegistration(Config.StartWithWindows);
