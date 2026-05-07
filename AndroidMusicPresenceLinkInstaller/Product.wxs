@@ -67,24 +67,28 @@
 
 					<Directory Id="TrayIconsFolder" Name="Tray_Icons">
 						<Component Id="TrayIconsComponent" Guid="5f25fdb2-39f7-41e4-a6fe-df72a06a1e04">
-							<File Id="TrayActiveUsbIco"
-								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_Active_USB.ico"
+							<File Id="TrayUsbIco"
+								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_USB.ico"
 								  KeyPath="yes" Vital="yes" />
-							<File Id="TrayActiveWifiIco"
-								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_Active_WiFi.ico"
+							<File Id="TrayTCPIco"
+								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_TCP.ico"
+								  Vital="yes" />
+							<File Id="TrayWDIco"
+								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_WD.ico"
 								  Vital="yes" />
 							<File Id="TrayNoDeviceIco"
-								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_NoDevice.ico"
+								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_NoConnection.ico"
 								  Vital="yes" />
 							<File Id="TrayScrcpyUsbIco"
 								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_Scrcpy_USB.ico"
 								  Vital="yes" />
-							<File Id="TrayScrcpyWifiIco"
-								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_Scrcpy_WiFi.ico"
+							<File Id="TrayScrcpyTCPIco"
+								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_Scrcpy_TCP.ico"
 								  Vital="yes" />
-							<File Id="TrayWifiNoportIco"
-								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_WiFi_Noport.ico"
+							<File Id="TrayScrcpyWDIco"
+								  Source="..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0\Tray_Icons\Tray_Scrcpy_WD.ico"
 								  Vital="yes" />
+
 						</Component>
 					</Directory>
 
