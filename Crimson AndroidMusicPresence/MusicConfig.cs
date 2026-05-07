@@ -15,6 +15,18 @@ namespace musicpresense
         None = 5
     }
 
+    public enum WirelessMode
+    {
+        // Classic adb tcpip 5555 flow. Requires USB to re-enable after every reboot.
+        // Port is fixed and predictable, so reconnecting after an IP change is trivial.
+        TcpIp = 0,
+
+        // Android 11+ Wireless Debugging. One-time TLS pairing over USB-free network.
+        // Survives reboots (pairing persists), but the connection port is randomly
+        // assigned each time wireless debugging toggles on, so we need mDNS to find it.
+        WirelessDebugging = 1
+    }
+
     public sealed class EligibleAppConfig
     {
         public string PackageName { get; set; } = string.Empty;
@@ -26,8 +38,23 @@ namespace musicpresense
     {
         public PathsConfig Paths { get; set; } = new PathsConfig();
         public string SelectedDeviceUSB { get; set; } = string.Empty;
+
+        // For TcpIp mode:           "ip:5555" (or whatever fixed port)
+        // For WirelessDebugging:    last-known "ip:port" from the most recent successful connect.
+        //                           This may go stale, in which case we fall back to mDNS lookup
+        //                           via WifiMdnsServiceName.
         public string SelectedDeviceWiFi { get; set; } = string.Empty;
         public string SelectedDeviceName { get; set; } = string.Empty;
+
+        // Connection mode for the wireless link. Defaults to TcpIp so existing users are
+        // not surprised. Users opt in to WirelessDebugging via onboarding or settings.
+        public WirelessMode WifiMode { get; set; } = WirelessMode.TcpIp;
+
+        // mDNS service name reported by `adb mdns services`, e.g. "adb-XXXXXXXX-XXXXXX".
+        // Stable across reboots and IP changes once paired. Only used when WifiMode is
+        // WirelessDebugging. Empty for TcpIp.
+        public string WifiMdnsServiceName { get; set; } = string.Empty;
+
         public string MusicRemoteRoot { get; set; } = string.Empty;
         public List<string> MusicRemoteRoots { get; set; } = new List<string>();
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Fast;
@@ -41,8 +68,6 @@ namespace musicpresense
         public int ScrcpyAudioBuffer { get; set; } = 80;
         public int ScrcpyFlacCompressionLevel { get; set; } = 2;
         public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
-        // Display name of the last selected audio quality preset, or "Custom" / empty when
-        // no preset matches. Resolved by AudioQualityPresets at runtime when displayed.
         public string AudioQualityPresetName { get; set; } = string.Empty;
         public int SmtcPauseClearDelayMinutes { get; set; } = 0;
         public bool IsWifiEnabled { get; set; } = false;
@@ -56,16 +81,12 @@ namespace musicpresense
         public List<string> AllowedApps { get; set; } = new List<string> { };
         public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
 
-
-        // Configurable hotkeys (virtual key codes) and modifier.
-        // Modifier flags for RegisterHotKey: MOD_ALT=0x0001, MOD_CONTROL=0x0002, MOD_SHIFT=0x0004
-        // Defaults: Volume Up = 0xAF (VK_VOLUME_UP), Volume Down = 0xAE (VK_VOLUME_DOWN), Toggle Scrcpy = 'S' (0x53)
         public int HotkeyVolumeUpKey { get; set; } = 0xAF;
         public int HotkeyVolumeDownKey { get; set; } = 0xAE;
         public int HotkeyToggleScrcpyKey { get; set; } = 0x53;
         public int HotkeyToggleLyricsOverlayKey { get; set; } = 0x4C;
         public int HotkeyCopyTrackInfoKey { get; set; } = 0x43;
-        public int HotkeyModifier { get; set; } = 0x0004; // default SHIFT
+        public int HotkeyModifier { get; set; } = 0x0004;
     }
 
     public class PathsConfig
@@ -149,6 +170,7 @@ namespace musicpresense
             config.AllowedApps ??= new List<string>();
             config.EligibleApps ??= new List<EligibleAppConfig>();
             config.MusicRemoteRoots ??= new List<string>();
+            config.WifiMdnsServiceName ??= string.Empty;
 
             if (config.EligibleApps.Count == 0 && config.AllowedApps.Count > 0)
             {
@@ -254,7 +276,6 @@ namespace musicpresense
             if (config.SmtcPauseClearDelayMinutes < 0)
                 config.SmtcPauseClearDelayMinutes = 0;
 
-            // Ensure hotkey values are reasonable
             if (config.HotkeyVolumeUpKey < 0 || config.HotkeyVolumeUpKey > 0xFF)
                 config.HotkeyVolumeUpKey = 0xAF;
             if (config.HotkeyVolumeDownKey < 0 || config.HotkeyVolumeDownKey > 0xFF)
@@ -266,13 +287,14 @@ namespace musicpresense
             if (config.HotkeyCopyTrackInfoKey < 0 || config.HotkeyCopyTrackInfoKey > 0xFF)
                 config.HotkeyCopyTrackInfoKey = 0x43;
 
-            // Ensure modifier is one of allowed flags (ALT=0x0001, CONTROL=0x0002, SHIFT=0x0004)
             var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };
             if (!allowedMods.Contains(config.HotkeyModifier)) config.HotkeyModifier = 0x0004;
 
+            // Sanity: WirelessDebugging without a service name is functionally broken,
+            // but we don't auto-rewrite to TcpIp because the user may be mid-pairing.
+            // The presence service handles that gracefully.
+
             return config;
         }
-
-
     }
 }

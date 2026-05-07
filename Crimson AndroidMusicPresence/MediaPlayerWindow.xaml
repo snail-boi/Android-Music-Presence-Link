@@ -297,12 +297,16 @@
                                     <!-- Crossfade layer A (outgoing) -->
                                     <Image x:Name="ImgCoverA"
                                        Stretch="UniformToFill"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
                                        SnapsToDevicePixels="True"
                                        RenderOptions.BitmapScalingMode="HighQuality"
                                        Opacity="1" />
                                     <!-- Crossfade layer B (incoming) -->
                                     <Image x:Name="ImgCoverB"
                                        Stretch="UniformToFill"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
                                        SnapsToDevicePixels="True"
                                        RenderOptions.BitmapScalingMode="HighQuality"
                                        Opacity="0" />

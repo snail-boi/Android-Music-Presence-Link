@@ -14,10 +14,14 @@ namespace musicpresense
         InactiveUsb,
         ActiveWifi,
         InactiveWifi,
+        ActiveWifiDebug,
+        InactiveWifiDebug,
         ActiveUsbScrcpy,
         InactiveUsbScrcpy,
         ActiveWifiScrcpy,
         InactiveWifiScrcpy,
+        ActiveWifiDebugScrcpy,
+        InactiveWifiDebugScrcpy,
         NeedsUsbReconnect,
         NoDevice
     }
@@ -165,16 +169,22 @@ namespace musicpresense
                 }
 
                 var trayIconsDir = Path.Combine(exeDir, "Tray_Icons");
-                TryAddStateIcon(TrayIconState.ActiveUsb, trayIconsDir, "Tray_Active_USB.ico");
-                TryAddStateIcon(TrayIconState.InactiveUsb, trayIconsDir, "Tray_Active_USB.ico");
-                TryAddStateIcon(TrayIconState.ActiveWifi, trayIconsDir, "Tray_Active_WiFi.ico");
-                TryAddStateIcon(TrayIconState.InactiveWifi, trayIconsDir, "Tray_Active_WiFi.ico");
+                Debugger.show($"Tray icons dir: {trayIconsDir} (exists: {Directory.Exists(trayIconsDir)})");
+                TryAddStateIcon(TrayIconState.ActiveUsb, trayIconsDir, "Tray_USB.ico");
+                TryAddStateIcon(TrayIconState.InactiveUsb, trayIconsDir, "Tray_USB.ico");
+                TryAddStateIcon(TrayIconState.ActiveWifi, trayIconsDir, "Tray_TCP.ico");
+                TryAddStateIcon(TrayIconState.InactiveWifi, trayIconsDir, "Tray_TCP.ico");
+                TryAddStateIcon(TrayIconState.ActiveWifiDebug, trayIconsDir, "Tray_WD.ico");
+                TryAddStateIcon(TrayIconState.InactiveWifiDebug, trayIconsDir, "Tray_WD.ico");
+
                 TryAddStateIcon(TrayIconState.ActiveUsbScrcpy, trayIconsDir, "Tray_Scrcpy_USB.ico");
                 TryAddStateIcon(TrayIconState.InactiveUsbScrcpy, trayIconsDir, "Tray_Scrcpy_USB.ico");
-                TryAddStateIcon(TrayIconState.ActiveWifiScrcpy, trayIconsDir, "Tray_Scrcpy_WiFi.ico");
-                TryAddStateIcon(TrayIconState.InactiveWifiScrcpy, trayIconsDir, "Tray_Scrcpy_WiFi.ico");
-                TryAddStateIcon(TrayIconState.NeedsUsbReconnect, trayIconsDir, "Tray_WiFi_Noport.ico");
-                TryAddStateIcon(TrayIconState.NoDevice, trayIconsDir, "Tray_NoDevice.ico");
+                TryAddStateIcon(TrayIconState.ActiveWifiScrcpy, trayIconsDir, "Tray_Scrcpy_TCP.ico");
+                TryAddStateIcon(TrayIconState.InactiveWifiScrcpy, trayIconsDir, "Tray_Scrcpy_TCP.ico");
+                TryAddStateIcon(TrayIconState.ActiveWifiDebugScrcpy, trayIconsDir, "Tray_Scrcpy_WD.ico");
+                TryAddStateIcon(TrayIconState.InactiveWifiDebugScrcpy, trayIconsDir, "Tray_Scrcpy_WD.ico");
+                TryAddStateIcon(TrayIconState.NeedsUsbReconnect, trayIconsDir, "Tray_NoConnection.ico");
+                TryAddStateIcon(TrayIconState.NoDevice, trayIconsDir, "Tray_NoConnection.ico");
             }
             catch
             {
@@ -188,12 +198,16 @@ namespace musicpresense
             {
                 var path = Path.Combine(trayIconsDir, fileName);
                 if (!File.Exists(path))
+                {
+                    Debugger.show($"Tray icon missing for {state}: {path}");
                     return;
+                }
 
                 _stateIcons[state] = new Icon(path);
             }
-            catch
+            catch (Exception ex)
             {
+                Debugger.show($"Tray icon load failed for {state} ({fileName}): {ex.Message}");
             }
         }
 
@@ -203,20 +217,37 @@ namespace musicpresense
             {
                 _notifyIcon.Icon = icon;
             }
+            else
+            {
+                Debugger.show($"Tray icon state has no registered icon: {state} (loaded count: {_stateIcons.Count})");
+            }
 
             _lastState = state;
 
+            // Color spec:
+            //   USB                 -> green   (52, 201, 84)
+            //   TCP/IP              -> cyan    (0, 188, 212)
+            //   Wireless Debugging  -> blue    (0, 122, 255)
+            //   NeedsUsbReconnect   -> red     (255, 59, 48)
+            //   No device           -> red     (255, 59, 48)
+            // Active and inactive share a color per transport. Scrcpy variants
+            // also share the connection color here; the "audio link" indicator
+            // gets its own color in UpdateAudioLinkIndicator.
             var (text, color) = state switch
             {
                 TrayIconState.ActiveUsb => ("Connection: USB connected", Color.FromArgb(52, 201, 84)),
                 TrayIconState.InactiveUsb => ("Connection: USB connected", Color.FromArgb(52, 201, 84)),
                 TrayIconState.ActiveUsbScrcpy => ("Connection: USB connected", Color.FromArgb(52, 201, 84)),
                 TrayIconState.InactiveUsbScrcpy => ("Connection: USB connected", Color.FromArgb(52, 201, 84)),
-                TrayIconState.ActiveWifi => ("Connection: Wi-Fi connected", Color.FromArgb(0, 122, 255)),
-                TrayIconState.InactiveWifi => ("Connection: Wi-Fi connected", Color.FromArgb(0, 122, 255)),
-                TrayIconState.ActiveWifiScrcpy => ("Connection: Wi-Fi connected", Color.FromArgb(0, 122, 255)),
-                TrayIconState.InactiveWifiScrcpy => ("Connection: Wi-Fi connected", Color.FromArgb(0, 122, 255)),
-                TrayIconState.NeedsUsbReconnect => ("Connection: Wi-Fi port lost", Color.FromArgb(175, 82, 222)),
+                TrayIconState.ActiveWifi => ("Connection: TCP/IP connected", Color.FromArgb(0, 188, 212)),
+                TrayIconState.InactiveWifi => ("Connection: TCP/IP connected", Color.FromArgb(0, 188, 212)),
+                TrayIconState.ActiveWifiScrcpy => ("Connection: TCP/IP connected", Color.FromArgb(0, 188, 212)),
+                TrayIconState.InactiveWifiScrcpy => ("Connection: TCP/IP connected", Color.FromArgb(0, 188, 212)),
+                TrayIconState.ActiveWifiDebug => ("Connection: Wireless Debugging", Color.FromArgb(0, 122, 255)),
+                TrayIconState.InactiveWifiDebug => ("Connection: Wireless Debugging", Color.FromArgb(0, 122, 255)),
+                TrayIconState.ActiveWifiDebugScrcpy => ("Connection: Wireless Debugging", Color.FromArgb(0, 122, 255)),
+                TrayIconState.InactiveWifiDebugScrcpy => ("Connection: Wireless Debugging", Color.FromArgb(0, 122, 255)),
+                TrayIconState.NeedsUsbReconnect => ("Connection: Wi-Fi port lost", Color.FromArgb(255, 59, 48)),
                 _ => ("Connection: No device connected", Color.FromArgb(255, 59, 48))
             };
 
@@ -245,12 +276,18 @@ namespace musicpresense
             if (!_scrcpyRunning)
                 return;
 
+            // Audio-link color spec (only shown while scrcpy audio is active):
+            //   USB                 -> yellow  (255, 204, 0)
+            //   TCP/IP              -> orange  (255, 149, 0)
+            //   Wireless Debugging  -> purple  (175, 82, 222)
             var audioColor = _lastState switch
             {
                 TrayIconState.ActiveUsb or TrayIconState.InactiveUsb or TrayIconState.ActiveUsbScrcpy or TrayIconState.InactiveUsbScrcpy
                     => Color.FromArgb(255, 204, 0),
                 TrayIconState.ActiveWifi or TrayIconState.InactiveWifi or TrayIconState.ActiveWifiScrcpy or TrayIconState.InactiveWifiScrcpy
                     => Color.FromArgb(255, 149, 0),
+                TrayIconState.ActiveWifiDebug or TrayIconState.InactiveWifiDebug or TrayIconState.ActiveWifiDebugScrcpy or TrayIconState.InactiveWifiDebugScrcpy
+                    => Color.FromArgb(175, 82, 222),
                 _ => Color.Empty
             };
 

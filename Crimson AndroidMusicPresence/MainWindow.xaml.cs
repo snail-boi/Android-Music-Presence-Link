@@ -177,6 +177,10 @@ namespace musicpresense
             TxtUsbSerial.Text = _config.SelectedDeviceUSB;
             TxtWifi.Text = _config.SelectedDeviceWiFi;
             TxtDeviceName.Text = _config.SelectedDeviceName;
+            if (TxtMdnsService != null)
+                TxtMdnsService.Text = _config.WifiMdnsServiceName ?? string.Empty;
+            SelectWifiModeFromConfig();
+            UpdatePairButtonVisibility();
 
             _remoteRoots.Clear();
             foreach (var root in GetNormalizedRemoteRoots(_config))
@@ -264,7 +268,21 @@ namespace musicpresense
             TxtUsbSerial.Text = usbSerial;
             var port = 0;
             var ip = "none";
-            if (MessageBox.Show("do you want to enable WiFi", "May be incompatible with certain networks", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
+
+            // In WirelessDebugging mode, the wifi address comes from the pair
+            // flow (ip:random_port discovered via mDNS), not from
+            // service.adb.tcp.port. Don't overwrite it here.
+            var currentMode = GetSelectedWifiMode();
+            if (currentMode == WirelessMode.WirelessDebugging)
+            {
+                MessageBox.Show(
+                    "Auto-detect skipped Wi-Fi setup because Wireless Debugging mode is selected. "
+                    + "Use the 'Pair phone' button to set up wireless.",
+                    "Wireless Debugging Mode",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            else if (MessageBox.Show("do you want to enable WiFi", "May be incompatible with certain networks", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
             {
                 _config.IsWifiEnabled = false;
             }
@@ -276,29 +294,33 @@ namespace musicpresense
 
             }
 
-            if (!string.IsNullOrWhiteSpace(ip))
+            if (currentMode != WirelessMode.WirelessDebugging)
             {
-                if (_config.IsWifiEnabled == true)
+                if (!string.IsNullOrWhiteSpace(ip))
                 {
-                    TxtWifi.Text = $"{ip}:{port}";
+                    if (_config.IsWifiEnabled == true)
+                    {
+                        TxtWifi.Text = $"{ip}:{port}";
+                    }
+                    else
+                    {
+                        TxtWifi.Text = "";
+                    }
+
                 }
                 else
                 {
-                    TxtWifi.Text = "";
+                    MessageBox.Show("Could not read the device Wi-Fi IP address.", "Wi-Fi Info", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
-
-            }
-            else
-            {
-                MessageBox.Show("Could not read the device Wi-Fi IP address.", "Wi-Fi Info", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
             var deviceNamePrompt = string.IsNullOrWhiteSpace(TxtDeviceName.Text) ? "" : TxtDeviceName.Text.Trim();
 
-            var nameDialog = new NameInputDialogue("Enter a name for this device:", "Device Name")
+            var nameDialog = new NameInputDialogue("Enter a name for this device:", "Device Name");
+            if (IsLoaded && IsVisible)
             {
-                Owner = this
-            };
+                nameDialog.Owner = this;
+            }
 
             if (nameDialog.ShowDialog() != true)
             {
@@ -311,24 +333,34 @@ namespace musicpresense
             {
                 TxtDeviceName.Text = deviceName.Trim();
             }
+
+            SaveConfigFromUi(false);
         }
 
         private static async Task<string> GetConnectedUsbDeviceAsync()
         {
-            var devices = await AdbHelper.RunAdbCaptureAsync("devices");
-            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var entry in deviceList)
+            for (var attempt = 0; attempt < 8; attempt++)
             {
-                if (!entry.EndsWith("device", StringComparison.OrdinalIgnoreCase))
-                    continue;
+                var devices = await AdbHelper.RunAdbCaptureAsync("devices");
+                var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-                var serial = entry.Split('\t', ' ').FirstOrDefault();
-                if (string.IsNullOrWhiteSpace(serial))
-                    continue;
+                foreach (var entry in deviceList)
+                {
+                    if (!entry.EndsWith("device", StringComparison.OrdinalIgnoreCase))
+                        continue;
 
-                if (!serial.Contains(':'))
-                    return serial;
+                    var serial = entry.Split('\t', ' ').FirstOrDefault();
+                    if (string.IsNullOrWhiteSpace(serial))
+                        continue;
+
+                    if (!serial.Contains(':'))
+                        return serial;
+                }
+
+                if (attempt < 7)
+                {
+                    await Task.Delay(500);
+                }
             }
 
             return string.Empty;
@@ -353,6 +385,20 @@ namespace musicpresense
             var routeOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip route");
             match = Regex.Match(routeOutput, @"src\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
             return match.Success ? match.Groups["ip"].Value : string.Empty;
+        }
+
+        private static async Task<string> GetDeviceSerialAsync(string device)
+        {
+            if (string.IsNullOrWhiteSpace(device))
+                return string.Empty;
+
+            var serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.serialno");
+            serial = serial.Trim();
+            if (!string.IsNullOrWhiteSpace(serial))
+                return serial;
+
+            serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.boot.serialno");
+            return serial.Trim();
         }
 
         private async Task<string> GetCurrentDeviceForAppsAsync()
@@ -713,6 +759,39 @@ namespace musicpresense
             _config.SelectedDeviceUSB = TxtUsbSerial.Text.Trim();
             _config.SelectedDeviceWiFi = TxtWifi.Text.Trim();
             _config.SelectedDeviceName = TxtDeviceName.Text.Trim();
+            _config.WifiMode = GetSelectedWifiMode();
+            // WifiMdnsServiceName is updated by the pair flow only, never typed by hand.
+
+            // Mode-specific cleanup on save: drop fields that don't apply to
+            // the saved mode so they don't linger as stale values. The user's
+            // mode-switch is materialized at this point.
+            //   TcpIp mode:           drop WifiMdnsServiceName (WD-only).
+            //   WirelessDebugging:    SelectedDeviceWiFi from the pair flow
+            //                         is valid; keep both. But if the user
+            //                         switched FROM TcpIp without re-pairing,
+            //                         the stored ip:5555 would be stale, so
+            //                         we clear it unless the pair flow has
+            //                         since populated WifiMdnsServiceName
+            //                         (which means we have a real WD ip:port).
+            if (_config.WifiMode == WirelessMode.TcpIp)
+            {
+                if (!string.IsNullOrWhiteSpace(_config.WifiMdnsServiceName))
+                {
+                    _config.WifiMdnsServiceName = string.Empty;
+                    if (TxtMdnsService != null) TxtMdnsService.Text = string.Empty;
+                }
+            }
+            else // WirelessDebugging
+            {
+                if (string.IsNullOrWhiteSpace(_config.WifiMdnsServiceName))
+                {
+                    // No pair has happened yet, so any ip:port currently in
+                    // SelectedDeviceWiFi came from the old TcpIp config and
+                    // is meaningless here.
+                    _config.SelectedDeviceWiFi = string.Empty;
+                    if (TxtWifi != null) TxtWifi.Text = string.Empty;
+                }
+            }
             _config.MusicRemoteRoots = _remoteRoots
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
@@ -967,6 +1046,24 @@ namespace musicpresense
             config.SelectedDeviceUSB = TxtUsbSerial.Text.Trim();
             config.SelectedDeviceWiFi = TxtWifi.Text.Trim();
             config.SelectedDeviceName = TxtDeviceName.Text.Trim();
+            config.WifiMode = GetSelectedWifiMode();
+            config.WifiMdnsServiceName = _config.WifiMdnsServiceName ?? string.Empty;
+
+            // Mirror the cleanup that SaveConfigFromUi performs, so the
+            // unsaved-changes diff reflects the post-save state. Without this,
+            // toggling the mode dropdown would not register as "changed"
+            // because the stale fields would still equal the saved snapshot.
+            if (config.WifiMode == WirelessMode.TcpIp)
+            {
+                config.WifiMdnsServiceName = string.Empty;
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(config.WifiMdnsServiceName))
+                {
+                    config.SelectedDeviceWiFi = string.Empty;
+                }
+            }
             config.MusicRemoteRoots = _remoteRoots
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
@@ -1148,6 +1245,8 @@ namespace musicpresense
             if (!string.Equals(left.SelectedDeviceUSB, right.SelectedDeviceUSB, StringComparison.Ordinal)) return false;
             if (!string.Equals(left.SelectedDeviceWiFi, right.SelectedDeviceWiFi, StringComparison.Ordinal)) return false;
             if (!string.Equals(left.SelectedDeviceName, right.SelectedDeviceName, StringComparison.Ordinal)) return false;
+            if (left.WifiMode != right.WifiMode) return false;
+            if (!string.Equals(left.WifiMdnsServiceName ?? string.Empty, right.WifiMdnsServiceName ?? string.Empty, StringComparison.Ordinal)) return false;
 
             var leftRoots = (left.MusicRemoteRoots ?? new List<string>())
                 .Where(p => !string.IsNullOrWhiteSpace(p))
@@ -1250,6 +1349,8 @@ namespace musicpresense
                 SelectedDeviceUSB = source.SelectedDeviceUSB,
                 SelectedDeviceWiFi = source.SelectedDeviceWiFi,
                 SelectedDeviceName = source.SelectedDeviceName,
+                WifiMode = source.WifiMode,
+                WifiMdnsServiceName = source.WifiMdnsServiceName ?? string.Empty,
                 MusicRemoteRoot = source.MusicRemoteRoot,
                 MusicRemoteRoots = source.MusicRemoteRoots?.ToList() ?? new List<string>(),
                 CachClearInMB = source.CachClearInMB,
@@ -1287,6 +1388,162 @@ namespace musicpresense
             };
         }
 
+        // -------------------------------------------------------------------
+        // Wireless mode helpers (TcpIp vs WirelessDebugging)
+        // -------------------------------------------------------------------
+        private WirelessMode GetSelectedWifiMode()
+        {
+            if (CmbWifiMode?.SelectedItem is ComboBoxItem item
+                && item.Tag is string tag
+                && Enum.TryParse<WirelessMode>(tag, out var mode))
+            {
+                return mode;
+            }
+            return WirelessMode.TcpIp;
+        }
+
+        private void SelectWifiModeFromConfig()
+        {
+            if (CmbWifiMode == null) return;
+            foreach (var raw in CmbWifiMode.Items)
+            {
+                if (raw is ComboBoxItem item
+                    && item.Tag is string tag
+                    && Enum.TryParse<WirelessMode>(tag, out var mode)
+                    && mode == _config.WifiMode)
+                {
+                    CmbWifiMode.SelectedItem = item;
+                    return;
+                }
+            }
+            CmbWifiMode.SelectedIndex = 0;
+        }
+
+        private void UpdatePairButtonVisibility()
+        {
+            UpdateWifiFieldVisibility();
+        }
+
+        // Centralized show/hide for the wifi-related rows. Called whenever
+        // mode changes or config is reloaded.
+        //
+        // TcpIp mode:
+        //   - Wi-Fi (ip:port) row: visible
+        //   - mDNS service row:    hidden (irrelevant)
+        //   - Pair button row:     hidden
+        //
+        // WirelessDebugging mode:
+        //   - Wi-Fi (ip:port) row: hidden (managed by pair flow internally)
+        //   - mDNS service row:    visible only if a service name is known
+        //   - Pair button row:     visible. Label says "Pair phone..." if
+        //                          unpaired, "Re-pair phone..." if a service
+        //                          name is already stored.
+        private void UpdateWifiFieldVisibility()
+        {
+            if (CmbWifiMode == null) return;
+
+            var mode = GetSelectedWifiMode();
+            bool isWd = mode == WirelessMode.WirelessDebugging;
+
+            if (LblWifiAddress != null)
+                LblWifiAddress.Visibility = isWd ? Visibility.Collapsed : Visibility.Visible;
+            if (TxtWifi != null)
+                TxtWifi.Visibility = isWd ? Visibility.Collapsed : Visibility.Visible;
+
+            bool hasMdns = !string.IsNullOrWhiteSpace(_config?.WifiMdnsServiceName);
+            if (LblMdnsService != null)
+                LblMdnsService.Visibility = (isWd && hasMdns) ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtMdnsService != null)
+                TxtMdnsService.Visibility = (isWd && hasMdns) ? Visibility.Visible : Visibility.Collapsed;
+
+            if (BtnPairWireless != null)
+            {
+                BtnPairWireless.Visibility = isWd ? Visibility.Visible : Visibility.Collapsed;
+                BtnPairWireless.Content = hasMdns ? "Re-pair phone..." : "Pair phone...";
+            }
+        }
+
+        private void CmbWifiMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdatePairButtonVisibility();
+        }
+
+        private async void BtnPairWireless_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new WifiPairDialog();
+            if (IsLoaded && IsVisible)
+                dlg.Owner = this;
+            if (dlg.ShowDialog() != true) return;
+
+            // Pairing succeeded. Run an mDNS lookup to capture the current
+            // ip:port (the connection port differs from the pair port).
+            string ipPort = string.Empty;
+            if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
+            {
+                ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(dlg.ServiceName);
+            }
+
+            if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
+            {
+                _config.WifiMdnsServiceName = dlg.ServiceName;
+                if (TxtMdnsService != null)
+                    TxtMdnsService.Text = dlg.ServiceName;
+            }
+            if (!string.IsNullOrWhiteSpace(ipPort))
+            {
+                _config.SelectedDeviceWiFi = ipPort;
+                TxtWifi.Text = ipPort;
+                _config.IsWifiEnabled = true;
+            }
+
+            var usbSerial = await GetConnectedUsbDeviceAsync();
+            if (string.IsNullOrWhiteSpace(usbSerial) && !string.IsNullOrWhiteSpace(ipPort))
+            {
+                usbSerial = await GetDeviceSerialAsync(ipPort);
+            }
+            if (!string.IsNullOrWhiteSpace(usbSerial))
+            {
+                TxtUsbSerial.Text = usbSerial;
+                _config.SelectedDeviceUSB = usbSerial;
+            }
+
+            var nameDialog = new NameInputDialogue("Enter a name for this device:", "Device Name");
+            if (IsLoaded && IsVisible)
+            {
+                nameDialog.Owner = this;
+            }
+
+            if (nameDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(nameDialog.InputText))
+            {
+                TxtDeviceName.Text = nameDialog.InputText.Trim();
+                _config.SelectedDeviceName = TxtDeviceName.Text.Trim();
+            }
+
+            SaveConfigFromUi(false);
+
+            if (string.IsNullOrWhiteSpace(ipPort))
+            {
+                MessageBox.Show(
+                    "Pairing succeeded but I could not auto-discover the device on the network. "
+                    + "Make sure Wireless Debugging is still enabled on the phone, then click Save. "
+                    + "The app will retry on the next reconnect.",
+                    "Pairing Complete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show(
+                    $"Paired and connected at {ipPort}.",
+                    "Pairing Complete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            // mDNS row should now appear and the button should say "Re-pair...".
+            UpdateWifiFieldVisibility();
+        }
+
         internal void SyncRuntimeConfig(MusicConfig config)
         {
             _config = config;
@@ -1297,6 +1554,15 @@ namespace musicpresense
 
             if (TxtUsbSerial != null)
                 TxtUsbSerial.Text = _config.SelectedDeviceUSB ?? string.Empty;
+
+            if (TxtDeviceName != null)
+                TxtDeviceName.Text = _config.SelectedDeviceName ?? string.Empty;
+
+            if (TxtMdnsService != null)
+                TxtMdnsService.Text = _config.WifiMdnsServiceName ?? string.Empty;
+
+            SelectWifiModeFromConfig();
+            UpdatePairButtonVisibility();
 
             if (TxtLyricsFolderOverride != null)
                 TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;

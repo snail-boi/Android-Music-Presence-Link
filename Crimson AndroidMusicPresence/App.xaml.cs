@@ -182,6 +182,8 @@ namespace musicpresense
                     TrayIconState.InactiveUsb => TrayIconState.InactiveUsbScrcpy,
                     TrayIconState.ActiveWifi => TrayIconState.ActiveWifiScrcpy,
                     TrayIconState.InactiveWifi => TrayIconState.InactiveWifiScrcpy,
+                    TrayIconState.ActiveWifiDebug => TrayIconState.ActiveWifiDebugScrcpy,
+                    TrayIconState.InactiveWifiDebug => TrayIconState.InactiveWifiDebugScrcpy,
                     _ => state
                 };
             }
@@ -377,8 +379,13 @@ namespace musicpresense
         }
 
         // Pushes the current tray state to the media-player window's connection-info pill.
-        // Colors here are dedicated to the media player (per UX spec: USB green, Wi-Fi cyan,
-        // not-connected red) and are intentionally separate from the tray icon colors.
+        // Color spec (per UX):
+        //   USB                 -> green
+        //   TCP/IP              -> cyan
+        //   Wireless Debugging  -> blue
+        //   No connection       -> red
+        //   Wi-Fi port lost     -> red (same as no-connection; both signal "broken")
+        // Tray icon and tray-menu colors are kept in sync with this in TrayIconManager.
         private void ApplyConnectionStateToMediaPlayer()
         {
             var window = _mediaPlayerWindow;
@@ -392,12 +399,12 @@ namespace musicpresense
         {
             // USB green
             var usbColor = Color.FromRgb(0x34, 0xC9, 0x54);
-            // Wi-Fi cyan
-            var wifiColor = Color.FromRgb(0x00, 0xBC, 0xD4);
-            // Not connected red
+            // TCP/IP cyan
+            var tcpipColor = Color.FromRgb(0x00, 0xBC, 0xD4);
+            // Wireless Debugging blue
+            var wdColor = Color.FromRgb(0x00, 0x7A, 0xFF);
+            // No connection / port lost red
             var redColor = Color.FromRgb(0xFF, 0x3B, 0x30);
-            // Wi-Fi port lost (existing semantic: connected over Wi-Fi but USB tether dropped)
-            var purpleColor = Color.FromRgb(0xAF, 0x52, 0xDE);
 
             string scrcpySuffix = scrcpyRunning ? " · audio link active" : "";
 
@@ -413,10 +420,16 @@ namespace musicpresense
                 case TrayIconState.InactiveWifi:
                 case TrayIconState.ActiveWifiScrcpy:
                 case TrayIconState.InactiveWifiScrcpy:
-                    return ("Wi-Fi connected", "Device reachable over Wi-Fi" + scrcpySuffix, wifiColor);
+                    return ("TCP/IP connected", "Device reachable over Wi-Fi (tcpip)" + scrcpySuffix, tcpipColor);
+
+                case TrayIconState.ActiveWifiDebug:
+                case TrayIconState.InactiveWifiDebug:
+                case TrayIconState.ActiveWifiDebugScrcpy:
+                case TrayIconState.InactiveWifiDebugScrcpy:
+                    return ("Wireless Debugging", "Device reachable over Wireless Debugging" + scrcpySuffix, wdColor);
 
                 case TrayIconState.NeedsUsbReconnect:
-                    return ("Wi-Fi port lost", "Reconnect USB to restore the Wi-Fi bridge", purpleColor);
+                    return ("Wi-Fi port lost", "Reconnect USB to restore the Wi-Fi bridge", redColor);
 
                 default:
                     return ("Not connected", "No device detected", redColor);

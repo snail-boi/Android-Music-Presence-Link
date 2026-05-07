@@ -18,38 +18,51 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\adb.exe" />
     <None Remove="Resources\Musiclogo.png" />
     <None Remove="Tray_Icons\Tray_Active_USB.ico" />
     <None Remove="Tray_Icons\Tray_Active_WiFi.ico" />
+    <None Remove="Tray_Icons\Tray_NoConnection.ico" />
     <None Remove="Tray_Icons\Tray_NoDevice.ico" />
+    <None Remove="Tray_Icons\Tray_Scrcpy_TCP.ico" />
     <None Remove="Tray_Icons\Tray_Scrcpy_USB.ico" />
+    <None Remove="Tray_Icons\Tray_Scrcpy_WD.ico" />
     <None Remove="Tray_Icons\Tray_Scrcpy_WiFi.ico" />
+    <None Remove="Tray_Icons\Tray_TCP.ico" />
+    <None Remove="Tray_Icons\Tray_USB.ico" />
+    <None Remove="Tray_Icons\Tray_WD.ico" />
     <None Remove="Tray_Icons\Tray_WiFi_Noport.ico" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="Android_logo_2019(1).ico" />
+    <Content Include="Resources\adb.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\Musiclogo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </Content>
-    <Content Include="Tray_Icons\Tray_Active_USB.ico">
+    <Content Include="Tray_Icons\Tray_NoConnection.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Tray_Icons\Tray_Active_WiFi.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Tray_Icons\Tray_NoDevice.ico">
+    <Content Include="Tray_Icons\Tray_Scrcpy_TCP.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Tray_Icons\Tray_Scrcpy_USB.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Tray_Icons\Tray_Scrcpy_WiFi.ico">
+    <Content Include="Tray_Icons\Tray_Scrcpy_WD.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Tray_Icons\Tray_WiFi_Noport.ico">
+    <Content Include="Tray_Icons\Tray_TCP.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_USB.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Tray_Icons\Tray_WD.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -60,9 +73,6 @@
 
 
 	<ItemGroup>
-	  <None Update="Resources\adb.exe">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
 	  <None Update="Resources\AdbWinApi.dll">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>

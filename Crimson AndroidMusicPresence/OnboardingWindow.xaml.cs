@@ -67,6 +67,8 @@ namespace musicpresense
             TxtUsbSerial.Text = _workingConfig.SelectedDeviceUSB;
             TxtWifi.Text = _workingConfig.SelectedDeviceWiFi;
             TxtDeviceName.Text = _workingConfig.SelectedDeviceName;
+            SelectWifiModeFromConfig();
+            UpdatePairButtonVisibility();
             TxtLyricsFolderOverride.Text = _workingConfig.LyricsSearchFolderOverride ?? string.Empty;
 
             ChkOpenInTaskbar.IsChecked = _workingConfig.OpenInTaskbar;
@@ -200,6 +202,8 @@ namespace musicpresense
             _workingConfig.SelectedDeviceUSB = TxtUsbSerial.Text.Trim();
             _workingConfig.SelectedDeviceWiFi = TxtWifi.Text.Trim();
             _workingConfig.SelectedDeviceName = TxtDeviceName.Text.Trim();
+            _workingConfig.WifiMode = GetSelectedWifiMode();
+            // WifiMdnsServiceName is set by BtnPairWireless_Click on successful pair.
 
             _workingConfig.MusicRemoteRoots = _remoteRoots
                 .Where(p => !string.IsNullOrWhiteSpace(p))
@@ -260,6 +264,114 @@ namespace musicpresense
             }
         }
 
+        // -------------------------------------------------------------------
+        // Wireless mode helpers (TcpIp vs WirelessDebugging)
+        // -------------------------------------------------------------------
+        private WirelessMode GetSelectedWifiMode()
+        {
+            if (CmbWifiMode?.SelectedItem is ComboBoxItem item
+                && item.Tag is string tag
+                && Enum.TryParse<WirelessMode>(tag, out var mode))
+            {
+                return mode;
+            }
+            return WirelessMode.TcpIp;
+        }
+
+        private void SelectWifiModeFromConfig()
+        {
+            if (CmbWifiMode == null) return;
+            foreach (var raw in CmbWifiMode.Items)
+            {
+                if (raw is ComboBoxItem item
+                    && item.Tag is string tag
+                    && Enum.TryParse<WirelessMode>(tag, out var mode)
+                    && mode == _workingConfig.WifiMode)
+                {
+                    CmbWifiMode.SelectedItem = item;
+                    return;
+                }
+            }
+            CmbWifiMode.SelectedIndex = 0;
+        }
+
+        private void UpdatePairButtonVisibility()
+        {
+            if (BtnPairWireless == null) return;
+            BtnPairWireless.Visibility = GetSelectedWifiMode() == WirelessMode.WirelessDebugging
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void CmbWifiMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdatePairButtonVisibility();
+        }
+
+        private async void BtnPairWireless_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new WifiPairDialog();
+            if (IsLoaded && IsVisible)
+                dlg.Owner = this;
+            if (dlg.ShowDialog() != true) return;
+
+            // Pairing succeeded. Run an mDNS lookup to capture the current
+            // ip:port (the connection port differs from the pair port).
+            string ipPort = string.Empty;
+            if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
+            {
+                ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(dlg.ServiceName);
+            }
+
+            if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
+            {
+                _workingConfig.WifiMdnsServiceName = dlg.ServiceName;
+            }
+            if (!string.IsNullOrWhiteSpace(ipPort))
+            {
+                TxtWifi.Text = ipPort;
+                _workingConfig.SelectedDeviceWiFi = ipPort;
+                _workingConfig.IsWifiEnabled = true;
+            }
+
+            MusicConfigManager.Save(_workingConfig);
+            (Application.Current as App)?.UpdateConfig(_workingConfig);
+
+            var usbSerial = await GetConnectedUsbDeviceAsync();
+            if (string.IsNullOrWhiteSpace(usbSerial) && !string.IsNullOrWhiteSpace(ipPort))
+            {
+                usbSerial = await GetDeviceSerialAsync(ipPort);
+            }
+            if (!string.IsNullOrWhiteSpace(usbSerial))
+            {
+                TxtUsbSerial.Text = usbSerial;
+                _workingConfig.SelectedDeviceUSB = usbSerial;
+            }
+
+            var nameDialog = new NameInputDialogue("Enter a name for this device:", "Device Name");
+            if (IsLoaded && IsVisible)
+            {
+                nameDialog.Owner = this;
+            }
+
+            if (nameDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(nameDialog.InputText))
+            {
+                TxtDeviceName.Text = nameDialog.InputText.Trim();
+                _workingConfig.SelectedDeviceName = TxtDeviceName.Text.Trim();
+            }
+
+            MusicConfigManager.Save(_workingConfig);
+            (Application.Current as App)?.UpdateConfig(_workingConfig);
+
+            MessageBox.Show(
+                string.IsNullOrWhiteSpace(ipPort)
+                    ? "Pairing succeeded. The app will discover the connection port on the next reconnect."
+                    : $"Paired and connected at {ipPort}.",
+                "Pairing Complete",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
         private async void BtnAutoGather_Click(object sender, RoutedEventArgs e)
         {
             if (_isAutoGathering)
@@ -291,7 +403,20 @@ namespace musicpresense
             TxtUsbSerial.Text = usbSerial;
             var port = 0;
             var ip = "none";
-            if (MessageBox.Show("do you want to enable WiFi", "May be incompatible with certain networks", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
+
+            // In WirelessDebugging mode, the wifi address comes from the pair
+            // flow (ip:random_port discovered via mDNS), not from
+            // service.adb.tcp.port. Don't overwrite it here.
+            if (_workingConfig.WifiMode == WirelessMode.WirelessDebugging)
+            {
+                MessageBox.Show(
+                    "Auto-detect skipped Wi-Fi setup because Wireless Debugging mode is selected. "
+                    + "Use the 'Pair phone' button to set up wireless.",
+                    "Wireless Debugging Mode",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            else if (MessageBox.Show("do you want to enable WiFi", "May be incompatible with certain networks", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
             {
                 _workingConfig.IsWifiEnabled = false;
             }
@@ -302,13 +427,16 @@ namespace musicpresense
                 ip = await GetDeviceWifiIpAsync(usbSerial);
             }
 
-            if (!string.IsNullOrWhiteSpace(ip))
+            if (_workingConfig.WifiMode != WirelessMode.WirelessDebugging)
             {
-                TxtWifi.Text = _workingConfig.IsWifiEnabled ? $"{ip}:{port}" : string.Empty;
-            }
-            else
-            {
-                MessageBox.Show("Could not read the device Wi-Fi IP address.", "Wi-Fi Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+                if (!string.IsNullOrWhiteSpace(ip))
+                {
+                    TxtWifi.Text = _workingConfig.IsWifiEnabled ? $"{ip}:{port}" : string.Empty;
+                }
+                else
+                {
+                    MessageBox.Show("Could not read the device Wi-Fi IP address.", "Wi-Fi Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
 
             var nameDialog = new NameInputDialogue("Enter a name for this device:", "Device Name")
@@ -505,6 +633,27 @@ namespace musicpresense
             return device;
         }
 
+        private static async Task<int> GetWifiPortAsync(string usbSerial)
+        {
+            var output = await AdbHelper.RunAdbCaptureAsync($"-s {usbSerial} shell getprop service.adb.tcp.port");
+            if (int.TryParse(output.Trim(), out var port) && port > 0)
+                return port;
+
+            return 5555;
+        }
+
+        private static async Task<string> GetDeviceWifiIpAsync(string usbDevice)
+        {
+            var ipOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip -f inet addr show wlan0");
+            var match = Regex.Match(ipOutput, @"inet\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
+            if (match.Success)
+                return match.Groups["ip"].Value;
+
+            var routeOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip route");
+            match = Regex.Match(routeOutput, @"src\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
+            return match.Success ? match.Groups["ip"].Value : string.Empty;
+        }
+
         private static async Task<string> GetConnectedUsbDeviceAsync()
         {
             var devices = await AdbHelper.RunAdbCaptureAsync("devices");
@@ -526,25 +675,18 @@ namespace musicpresense
             return string.Empty;
         }
 
-        private static async Task<int> GetWifiPortAsync(string usbSerial)
+        private static async Task<string> GetDeviceSerialAsync(string device)
         {
-            var output = await AdbHelper.RunAdbCaptureAsync($"-s {usbSerial} shell getprop service.adb.tcp.port");
-            if (int.TryParse(output.Trim(), out var port) && port > 0)
-                return port;
+            if (string.IsNullOrWhiteSpace(device))
+                return string.Empty;
 
-            return 5555;
-        }
+            var serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.serialno");
+            serial = serial.Trim();
+            if (!string.IsNullOrWhiteSpace(serial))
+                return serial;
 
-        private static async Task<string> GetDeviceWifiIpAsync(string usbDevice)
-        {
-            var ipOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip -f inet addr show wlan0");
-            var match = Regex.Match(ipOutput, @"inet\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
-            if (match.Success)
-                return match.Groups["ip"].Value;
-
-            var routeOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip route");
-            match = Regex.Match(routeOutput, @"src\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
-            return match.Success ? match.Groups["ip"].Value : string.Empty;
+            serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.boot.serialno");
+            return serial.Trim();
         }
 
         private static List<string> GetNormalizedRemoteRoots(MusicConfig config)

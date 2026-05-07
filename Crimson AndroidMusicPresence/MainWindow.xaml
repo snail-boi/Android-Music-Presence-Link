@@ -522,6 +522,9 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="150" />
@@ -535,18 +538,51 @@
                                      Grid.Row="0" Grid.Column="1"
                                      Margin="0,0,0,8" />
 
-                            <TextBlock Text="Wi-Fi (ip:port)"
+                            <TextBlock Text="Wi-Fi mode"
                                        Grid.Row="1" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                            <TextBox x:Name="TxtWifi"
-                                     Grid.Row="1" Grid.Column="1"
-                                     Margin="0,0,0,8" />
+                            <ComboBox x:Name="CmbWifiMode"
+                                      Grid.Row="1" Grid.Column="1"
+                                      Margin="0,0,0,8"
+                                      SelectionChanged="CmbWifiMode_SelectionChanged">
+                                <ComboBoxItem Content="Classic (adb tcpip)" Tag="TcpIp" />
+                                <ComboBoxItem Content="Wireless Debugging (Android 11+)" Tag="WirelessDebugging" />
+                            </ComboBox>
 
-                            <TextBlock Text="Device name"
+                            <!-- TcpIp row: label + ip:port textbox. Hidden in WD mode. -->
+                            <TextBlock x:Name="LblWifiAddress"
+                                       Text="Wi-Fi (ip:port)"
                                        Grid.Row="2" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtWifi"
+                                     Grid.Row="2" Grid.Column="1"
+                                     Margin="0,0,0,8" />
+
+                            <!-- mDNS row: read-only display, only shown when paired in WD mode. -->
+                            <TextBlock x:Name="LblMdnsService"
+                                       Text="mDNS service"
+                                       Grid.Row="3" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox x:Name="TxtMdnsService"
+                                     Grid.Row="3" Grid.Column="1"
+                                     IsReadOnly="True"
+                                     Margin="0,0,0,8" />
+
+                            <!-- Pair button row: only shown in WD mode. Takes the full width. -->
+                            <Button x:Name="BtnPairWireless"
+                                    Grid.Row="4" Grid.Column="1"
+                                    Content="Pair phone..."
+                                    HorizontalAlignment="Left"
+                                    Padding="14,6"
+                                    Margin="0,0,0,8"
+                                    Visibility="Collapsed"
+                                    Click="BtnPairWireless_Click" />
+
+                            <TextBlock Text="Device name"
+                                       Grid.Row="5" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
                             <TextBox x:Name="TxtDeviceName"
-                                     Grid.Row="2" Grid.Column="1" />
+                                     Grid.Row="5" Grid.Column="1" />
                         </Grid>
                     </StackPanel>
                 </Border>

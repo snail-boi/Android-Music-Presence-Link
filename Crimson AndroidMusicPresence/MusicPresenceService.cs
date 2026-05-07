@@ -112,6 +112,46 @@ namespace musicpresense
             }
         }
 
+        // True if the given adb-devices serial is a wired USB device.
+        // Wireless serials come in two shapes:
+        //   - TCP/IP:             "192.168.1.50:5555"   (contains ':')
+        //   - Wireless Debugging: "adb-XXXXXX-XXXX._adb-tls-connect._tcp"
+        //                         (starts with "adb-", contains "._tcp" or "_adb-tls")
+        // Anything else is treated as USB.
+        private static bool IsWirelessSerial(string serial)
+        {
+            if (string.IsNullOrWhiteSpace(serial)) return false;
+            if (serial.Contains(':')) return true;
+            if (serial.StartsWith("adb-", StringComparison.OrdinalIgnoreCase)) return true;
+            if (serial.IndexOf("_adb-tls", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
+
+        // Returns the serial of the first online wireless device in the
+        // adb-devices output, or empty if none. Handles both transports.
+        private static string FindConnectedWifiSerial(string[] deviceList)
+        {
+            foreach (var entry in deviceList)
+            {
+                if (!entry.EndsWith("device"))
+                    continue;
+
+                var serial = entry.Split('\t', ' ').FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(serial))
+                    continue;
+
+                if (IsWirelessSerial(serial))
+                    return serial;
+            }
+            return string.Empty;
+        }
+
+        // True if any wireless device is currently online in adb devices.
+        private static bool IsWifiCurrentlyConnected(string[] deviceList)
+        {
+            return !string.IsNullOrEmpty(FindConnectedWifiSerial(deviceList));
+        }
+
         private async Task DetectDeviceAsync()
         {
             try
@@ -140,11 +180,16 @@ namespace musicpresense
                         if (string.IsNullOrWhiteSpace(serial))
                             continue;
 
-                        if (!serial.Contains(':'))
-                        {
-                            connectedUsb = serial;
-                            break;
-                        }
+                        // Skip wireless serials (TCP/IP ip:port and Wireless
+                        // Debugging mDNS service names). Wireless Debugging
+                        // shows up in `adb devices` with a long name like
+                        // adb-XXXXXX-XXXX._adb-tls-connect._tcp, which has no
+                        // colon, so a naive check would mistake it for USB.
+                        if (IsWirelessSerial(serial))
+                            continue;
+
+                        connectedUsb = serial;
+                        break;
                     }
                 }
 
@@ -154,20 +199,25 @@ namespace musicpresense
                     _currentDeviceIsUsb = true;
 
                     bool wifiConfigured = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None";
-                    bool wifiConnected = wifiConfigured && deviceList.Any(l => l.StartsWith(_config.SelectedDeviceWiFi) && l.EndsWith("device"));
+                    bool wifiConnected = wifiConfigured && IsWifiCurrentlyConnected(deviceList);
 
                     if (wifiConfigured && !wifiConnected && _config.IsWifiEnabled == true)
                     {
                         _wifiNeedsUsbReconnect = true;
                         await RecoverWirelessConnectionAsync().ConfigureAwait(false);
 
-                        if (!string.IsNullOrEmpty(_currentDevice))
+                        // Recovery may have set _currentDevice to a wireless
+                        // serial. Recheck using IsWirelessSerial rather than
+                        // a naive contains-':' check, since Wireless Debugging
+                        // serials have no colon.
+                        if (!string.IsNullOrEmpty(_currentDevice) && IsWirelessSerial(_currentDevice))
                         {
-                            _currentDeviceIsUsb = !_currentDevice.Contains(':');
-                            if (!_currentDeviceIsUsb)
-                            {
-                                _wifiNeedsUsbReconnect = false;
-                            }
+                            _currentDeviceIsUsb = false;
+                            _wifiNeedsUsbReconnect = false;
+                        }
+                        else
+                        {
+                            _currentDeviceIsUsb = true;
                         }
                     }
                     else
@@ -180,18 +230,54 @@ namespace musicpresense
 
                 if (!string.IsNullOrEmpty(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None")
                 {
-                    bool wifiConnected = deviceList.Any(l => l.StartsWith(_config.SelectedDeviceWiFi) && l.EndsWith("device"));
+                    bool wifiConnected = IsWifiCurrentlyConnected(deviceList);
                     if (!wifiConnected)
                     {
-                        await AdbHelper.RunAdbCaptureAsync($"connect {_config.SelectedDeviceWiFi}");
-                        devices = await AdbHelper.RunAdbCaptureAsync("devices");
-                        deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        wifiConnected = deviceList.Any(l => l.StartsWith(_config.SelectedDeviceWiFi) && l.EndsWith("device"));
+                        if (_config.WifiMode == WirelessMode.WirelessDebugging)
+                        {
+                            // The stored ip:port is likely stale (the wireless
+                            // debugging port changes every time it toggles),
+                            // so route through the recovery path which does
+                            // mDNS lookup, then last-known, then USB-assisted.
+                            await RecoverWirelessConnectionAsync().ConfigureAwait(false);
+                            if (!string.IsNullOrEmpty(_currentDevice) && IsWirelessSerial(_currentDevice))
+                            {
+                                _currentDeviceIsUsb = false;
+                                _wifiReconnectPromptShown = false;
+                                _wifiNeedsUsbReconnect = false;
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            // TcpIp: try a direct connect to the fixed port.
+                            await AdbHelper.RunAdbCaptureAsync($"connect {_config.SelectedDeviceWiFi}");
+                            devices = await AdbHelper.RunAdbCaptureAsync("devices");
+                            deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                            wifiConnected = IsWifiCurrentlyConnected(deviceList);
+                        }
                     }
 
                     if (wifiConnected)
                     {
-                        _currentDevice = _config.SelectedDeviceWiFi;
+                        if (deviceList.Any(l => l.StartsWith(_config.SelectedDeviceUSB) && l.EndsWith("device")))
+                        {
+                            _currentDevice = _config.SelectedDeviceUSB;
+                            _currentDeviceIsUsb = true;
+                            _wifiReconnectPromptShown = false;
+                            _wifiNeedsUsbReconnect = false;
+                            return;
+                        }
+
+                        // Use the actual serial as it appears in adb devices,
+                        // not the configured ip:port. For Wireless Debugging
+                        // the serial is the mDNS service name; for TCP/IP the
+                        // serial IS the ip:port. Either way, the live serial
+                        // is what other code needs to talk to the device.
+                        var liveSerial = FindConnectedWifiSerial(deviceList);
+                        _currentDevice = string.IsNullOrEmpty(liveSerial)
+                            ? _config.SelectedDeviceWiFi
+                            : liveSerial;
                         _currentDeviceIsUsb = false;
                         _wifiReconnectPromptShown = false;
                         _wifiNeedsUsbReconnect = false;
@@ -202,9 +288,9 @@ namespace musicpresense
                     {
                         _wifiNeedsUsbReconnect = true;
                         await RecoverWirelessConnectionAsync().ConfigureAwait(false);
-                        if (!string.IsNullOrEmpty(_currentDevice))
+                        if (!string.IsNullOrEmpty(_currentDevice) && IsWirelessSerial(_currentDevice))
                         {
-                            _currentDeviceIsUsb = !_currentDevice.Contains(':');
+                            _currentDeviceIsUsb = false;
                             return;
                         }
                     }
@@ -218,7 +304,8 @@ namespace musicpresense
                     NotifyLyricsPlayback(null, null, null, false, 0);
                 }
 
-                _currentDeviceIsUsb = false;
+                _currentDeviceIsUsb = !string.IsNullOrEmpty(_config.SelectedDeviceUSB)
+                    && deviceList.Any(l => l.StartsWith(_config.SelectedDeviceUSB) && l.EndsWith("device"));
                 if (!_wifiNeedsUsbReconnect)
                 {
                     _wifiNeedsUsbReconnect = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
@@ -239,43 +326,14 @@ namespace musicpresense
 
             try
             {
-                if (!_wifiReconnectPromptShown)
+                if (_config.WifiMode == WirelessMode.WirelessDebugging)
                 {
-                    await _dispatcher.InvokeAsync(() =>
-                    {
-                        MessageBox.Show(
-                            "Wireless connection failed. Please reconnect your phone via USB to re-setup wireless.",
-                            "Reconnect Device",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                    });
-                    _wifiReconnectPromptShown = true;
+                    await RecoverWirelessDebuggingAsync().ConfigureAwait(false);
                 }
-
-                var usbDevice = await GetUsbDeviceForRecoveryAsync().ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(usbDevice))
-                    return;
-
-                var newWifi = await SetupWirelessFromUsbAsync(usbDevice).ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(newWifi))
-                    return;
-
-                _config.SelectedDeviceWiFi = newWifi;
-                MusicConfigManager.Save(_config);
-                await _dispatcher.InvokeAsync(() =>
+                else
                 {
-                    (Application.Current as App)?.UpdateConfig(_config);
-                });
-                _wifiReconnectPromptShown = false;
-
-                await _dispatcher.InvokeAsync(() =>
-                {
-                    MessageBox.Show(
-                        $"Wireless device has been re-setup and saved as {newWifi}.\n\nIf you want to continue using USB, disconnect and reconnect the cable now (USB may stay unavailable right after Wi-Fi setup).",
-                        "Wireless Reconnected",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                });
+                    await RecoverTcpIpAsync().ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
@@ -285,6 +343,174 @@ namespace musicpresense
             {
                 _isRecoveringWifi = false;
             }
+        }
+
+        // -------------------------------------------------------------------
+        // TcpIp mode: classic adb tcpip 5555 flow. Needs USB to re-enable.
+        // This is the original behavior, untouched apart from being moved
+        // into its own method so the router above can pick a path.
+        // -------------------------------------------------------------------
+        private async Task RecoverTcpIpAsync()
+        {
+            if (!_wifiReconnectPromptShown)
+            {
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show(
+                        "Wireless connection failed. Please reconnect your phone via USB to re-setup wireless.",
+                        "Reconnect Device",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                });
+                _wifiReconnectPromptShown = true;
+            }
+
+            var usbDevice = await GetUsbDeviceForRecoveryAsync().ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(usbDevice))
+                return;
+
+            var newWifi = await SetupWirelessFromUsbAsync(usbDevice).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(newWifi))
+                return;
+
+            _config.SelectedDeviceWiFi = newWifi;
+            MusicConfigManager.Save(_config);
+            await _dispatcher.InvokeAsync(() =>
+            {
+                (Application.Current as App)?.UpdateConfig(_config);
+            });
+            _wifiReconnectPromptShown = false;
+
+            await _dispatcher.InvokeAsync(() =>
+            {
+                MessageBox.Show(
+                    $"Wireless device has been re-setup and saved as {newWifi}.\n\nIf you want to continue using USB, disconnect and reconnect the cable now (USB may stay unavailable right after Wi-Fi setup).",
+                    "Wireless Reconnected",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            });
+        }
+
+        // -------------------------------------------------------------------
+        // WirelessDebugging mode: try mDNS, then last-known ip:port, then
+        // fall back to USB-assisted recovery. We can't silently re-pair
+        // (that requires a code from the phone screen), but we can read a
+        // fresh IP via USB and try mDNS again now that the device is on
+        // the LAN.
+        // -------------------------------------------------------------------
+        private async Task RecoverWirelessDebuggingAsync()
+        {
+            // Step 1: mDNS lookup for the persisted service name.
+            if (!string.IsNullOrWhiteSpace(_config.WifiMdnsServiceName))
+            {
+                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.WifiMdnsServiceName).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(ipPort))
+                {
+                    _config.SelectedDeviceWiFi = ipPort;
+                    _currentDevice = ipPort;
+                    _currentDeviceIsUsb = false;
+                    _wifiNeedsUsbReconnect = false;
+                    _wifiReconnectPromptShown = false;
+                    MusicConfigManager.Save(_config);
+                    await _dispatcher.InvokeAsync(() =>
+                    {
+                        (Application.Current as App)?.UpdateConfig(_config);
+                    });
+                    return;
+                }
+            }
+
+            // Step 2: try the last-known ip:port directly. Cheap, sometimes
+            // works on networks where mDNS multicast is blocked but the
+            // phone happens to still be on the same port.
+            if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
+                && _config.SelectedDeviceWiFi != "None")
+            {
+                if (await WirelessDebuggingHelper.TryConnectLastKnownAsync(_config.SelectedDeviceWiFi).ConfigureAwait(false))
+                {
+                    _currentDevice = _config.SelectedDeviceWiFi;
+                    _currentDeviceIsUsb = false;
+                    _wifiNeedsUsbReconnect = false;
+                    _wifiReconnectPromptShown = false;
+                    return;
+                }
+            }
+
+            // Step 3: USB-assisted recovery. Prompt the user, get a USB
+            // device, retry mDNS once, and as a last resort try the last
+            // known port at the phone's current wlan0 IP.
+            if (!_wifiReconnectPromptShown)
+            {
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show(
+                        "Wireless connection failed. Make sure Wireless Debugging is still enabled on your phone "
+                        + "(Settings, Developer options, Wireless debugging). If it is, plug in USB so the app can "
+                        + "rediscover the device.",
+                        "Reconnect Device",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                });
+                _wifiReconnectPromptShown = true;
+            }
+
+            var usbDevice = await GetUsbDeviceForRecoveryAsync().ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(usbDevice))
+                return;
+
+            // Retry mDNS now that we have USB context. Some networks only
+            // surface the service after the phone has been actively used.
+            if (!string.IsNullOrWhiteSpace(_config.WifiMdnsServiceName))
+            {
+                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.WifiMdnsServiceName).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(ipPort))
+                {
+                    _config.SelectedDeviceWiFi = ipPort;
+                    _currentDevice = ipPort;
+                    _currentDeviceIsUsb = false;
+                    _wifiNeedsUsbReconnect = false;
+                    _wifiReconnectPromptShown = false;
+                    MusicConfigManager.Save(_config);
+                    await _dispatcher.InvokeAsync(() =>
+                    {
+                        (Application.Current as App)?.UpdateConfig(_config);
+                    });
+                    return;
+                }
+            }
+
+            // Last-ditch: read the phone's current wlan0 IP and try the
+            // last-known port at that IP. If THAT also fails, the user
+            // needs to re-pair, which we can't do silently.
+            var freshIp = await GetDeviceWifiIpAsync(usbDevice).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(freshIp) && !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi))
+            {
+                var lastPort = ExtractWifiPort(_config.SelectedDeviceWiFi);
+                var candidate = $"{freshIp}:{lastPort}";
+                if (await WirelessDebuggingHelper.TryConnectLastKnownAsync(candidate).ConfigureAwait(false))
+                {
+                    _config.SelectedDeviceWiFi = candidate;
+                    _currentDevice = candidate;
+                    _currentDeviceIsUsb = false;
+                    _wifiNeedsUsbReconnect = false;
+                    _wifiReconnectPromptShown = false;
+                    MusicConfigManager.Save(_config);
+                    await _dispatcher.InvokeAsync(() =>
+                    {
+                        (Application.Current as App)?.UpdateConfig(_config);
+                    });
+                    return;
+                }
+            }
+
+            await _dispatcher.InvokeAsync(() =>
+            {
+                MessageBox.Show(
+                    "Could not reconnect via Wireless Debugging. Please open Settings and use 'Pair phone' to re-pair.",
+                    "Reconnect Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            });
         }
 
         private async Task<string> GetUsbDeviceForRecoveryAsync()
@@ -733,6 +959,17 @@ namespace musicpresense
             {
                 if (_currentDeviceIsUsb)
                     return hasActiveSong ? TrayIconState.ActiveUsb : TrayIconState.InactiveUsb;
+
+                // We're on wifi. Trust the configured WifiMode first because
+                // the serial shape is NOT a reliable distinguisher: once a
+                // Wireless Debugging connection has been established via mDNS,
+                // adb caches it as "ip:port" in subsequent `adb devices`
+                // output, identical to a TCP/IP serial. So we can only fall
+                // back to serial-shape inference if WifiMode is somehow unset.
+                bool isWirelessDebugging = _config.WifiMode == WirelessMode.WirelessDebugging;
+
+                if (isWirelessDebugging)
+                    return hasActiveSong ? TrayIconState.ActiveWifiDebug : TrayIconState.InactiveWifiDebug;
 
                 return hasActiveSong ? TrayIconState.ActiveWifi : TrayIconState.InactiveWifi;
             }
