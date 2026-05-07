@@ -81,13 +81,14 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 ### Connection
 
 - USB connection support
-- Optional Wi-Fi connection (set up automatically from USB via ADB tcpip)
-- Automatic Wi-Fi recovery when the port is lost, prompts to reconnect USB and re-establishes the wireless bridge
+- Optional Wi-Fi connection via either classic ADB `tcpip` or Android 11+ Wireless Debugging
+- Wireless Debugging pairing support with mDNS-based reconnects after the device restarts or changes IP
+- Automatic Wi-Fi recovery when the port is lost, prompting you to reconnect USB and re-establish the wireless bridge
 - Auto-detect button in setup that finds your device, optionally configures Wi-Fi, and asks for a friendly device name
 
 ### Onboarding
 
-- Step-by-step setup wizard covering USB debugging, device connection, music folders, allowed apps, hotkeys, and startup options
+- Step-by-step setup wizard covering USB debugging, device connection, Wireless Debugging pairing, music folders, allowed apps, hotkeys, and startup options
 
 ---
 
@@ -97,6 +98,7 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 - No Apple or iOS support, and no plans for it
 - USB debugging must be enabled on your phone
 - Uses ADB (Android Debug Bridge) to establish the connection
+- Android 11+ is recommended for Wireless Debugging mode
 - scrcpy is required for the Audio Link feature
 
 Without USB debugging enabled, the app will not work.
