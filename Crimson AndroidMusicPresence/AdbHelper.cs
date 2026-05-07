@@ -246,7 +246,8 @@ namespace musicpresense
                         return string.Empty;
 
                     var commandNumber = ++_commandCounter;
-                    Debugger.show($"ADB shell session pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}, cmd#{commandNumber}");
+                    //hiding this one as it's too spammy and the session lifecycle is already logged at start/end
+                    //Debugger.show($"ADB shell session pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}, cmd#{commandNumber}");
 
                     var marker = "__ADB_HELPER_DONE__" + Guid.NewGuid().ToString("N");
                     var lineToSend = shellCommand + "; echo " + marker + ":$?";
@@ -357,7 +358,7 @@ namespace musicpresense
                 }
 
                 _commandCounter = 0;
-                Debugger.show($"ADB shell session started pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}");
+                Debugger.show($"[ADB HELPER] ADB shell session started pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}");
 
                 _process.ErrorDataReceived += (_, e) =>
                 {
@@ -395,7 +396,7 @@ namespace musicpresense
                             }
                         }
 
-                        Debugger.show($"ADB shell session ended pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}");
+                        Debugger.show($"[ADB HELPER] ADB shell session ended pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}");
                         _process.Dispose();
                     }
                 }

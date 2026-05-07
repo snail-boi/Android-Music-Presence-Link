@@ -79,6 +79,7 @@ namespace musicpresense
 
             _isRecordingHotkey = true;
             _onHotkeyRecorded = onRecorded;
+            Debugger.show("[HOTKEY] Started recording hotkey.");
 
             Title = "Press a key to record hotkey (Esc to cancel)...";
             Focus();
@@ -92,6 +93,7 @@ namespace musicpresense
             if (!_isRecordingHotkey)
                 return;
 
+            Debugger.show("[HOTKEY] Stopped recording hotkey.");
             _isRecordingHotkey = false;
             _onHotkeyRecorded = null;
             Title = "Music Presence Settings";
@@ -115,11 +117,13 @@ namespace musicpresense
 
                 if (e.Key == Key.Escape)
                 {
+                    Debugger.show("[HOTKEY] Recording cancelled with Escape.");
                     StopRecordingHotkey();
                     return;
                 }
 
                 int vk = KeyToVirtualKey(e);
+                Debugger.show($"[HOTKEY] Recorded key 0x{vk:X2}.");
 
                 _onHotkeyRecorded?.Invoke(vk);
                 StopRecordingHotkey();

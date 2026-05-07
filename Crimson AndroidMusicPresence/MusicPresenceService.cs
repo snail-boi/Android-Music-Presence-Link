@@ -602,7 +602,7 @@ namespace musicpresense
         {
             try
             {
-                Debugger.show($"[NotifParser] Fetching notification data for package: {packageName}");
+                Debugger.show($"[NOTIFPARSER] Fetching notification data for package: {packageName}");
                 // Server-side filtering: same rationale as media_session, cuts the notification
                 // dump (often the largest ADB payload we fetch) down to just the lines the
                 // parser consumes. We keep NotificationRecord( as the block delimiter, pkg= to
@@ -614,7 +614,7 @@ namespace musicpresense
 
                 if (string.IsNullOrWhiteSpace(notifOutput))
                 {
-                    Debugger.show("[NotifParser] No notification data available");
+                    Debugger.show("[NOTIFPARSER] No notification data available");
                     return (null, null, null, false);
                 }
 
@@ -627,7 +627,7 @@ namespace musicpresense
 
                 if (!blockMatch.Success)
                 {
-                    Debugger.show($"[NotifParser] No notification record found for {packageName}");
+                    Debugger.show($"[NOTIFPARSER] No notification record found for {packageName}");
                     return (null, null, null, false);
                 }
 
@@ -643,7 +643,7 @@ namespace musicpresense
 
                 if (!titleLen.HasValue || !artistLen.HasValue)
                 {
-                    Debugger.show($"[NotifParser] Missing required lengths (title={titleLen}, text={artistLen}, subText={albumLen})");
+                    Debugger.show($"[NOTIFPARSER] Missing required lengths (title={titleLen}, text={artistLen}, subText={albumLen})");
                     return (null, null, null, false);
                 }
 
@@ -654,7 +654,7 @@ namespace musicpresense
 
                 if (scrambledMetadata.Length < needed)
                 {
-                    Debugger.show($"[NotifParser] Scrambled string ({scrambledMetadata.Length}) shorter than expected ({needed})");
+                    Debugger.show($"[NOTIFPARSER] Scrambled string ({scrambledMetadata.Length}) shorter than expected ({needed})");
                     return (null, null, null, false);
                 }
 
@@ -664,12 +664,12 @@ namespace musicpresense
                     ? scrambledMetadata.Substring(titleLen.Value + sep + artistLen.Value + sep, albumLen.Value)
                     : string.Empty;
 
-                Debugger.show($"[NotifParser] ✓ Parsed via lengths (T={titleLen}, A={artistLen}, Al={albumLen}): Title='{title}', Artist='{artist}', Album='{album}'");
+                Debugger.show($"[NOTIFPARSER] ✓ Parsed via lengths (T={titleLen}, A={artistLen}, Al={albumLen}): Title='{title}', Artist='{artist}', Album='{album}'");
                 return (title, artist, album, true);
             }
             catch (Exception ex)
             {
-                Debugger.show($"[NotifParser] ✗ Exception: {ex.Message}");
+                Debugger.show($"[NOTIFPARSER] ✗ Exception: {ex.Message}");
                 return (null, null, null, false);
             }
         }
@@ -803,10 +803,10 @@ namespace musicpresense
                         parseResult = await TryParseMediaMetadataAsync(scrambledData, pkg).ConfigureAwait(false);
                         if (!parseResult.success)
                         {
-                            Debugger.show($"[NotifParser] Falling back to simple split for package: {pkg}");
+                            Debugger.show($"[NOTIFPARSER] Falling back to simple split for package: {pkg}");
                             parseResult = SimpleSplitFallback(scrambledData);
                             if (parseResult.success)
-                                Debugger.show($"[NotifParser] Fallback parsed - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
+                                Debugger.show($"[NOTIFPARSER] Fallback parsed - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
                         }
 
                         _lastScrambledMetadata = scrambledData;
@@ -870,7 +870,8 @@ namespace musicpresense
                             }
                             else if (_config.SmtcPauseClearDelayMinutes == 0)
                             {
-                                Debugger.show("not clearing value 0 is no timeout");
+                                // legacy logging, this probably won't be changed and if it is then just uncomment
+                                //Debugger.show("not clearing value 0 is no timeout");
                             }
 
                             if (_smtcPausedCleared)

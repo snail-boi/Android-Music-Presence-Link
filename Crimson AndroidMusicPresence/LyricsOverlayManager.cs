@@ -72,6 +72,8 @@ namespace musicpresense
         {
             _overlayVisible = !_overlayVisible;
 
+            Debugger.show(_overlayVisible ? "[LYRICS] Showing lyrics overlay." : "[LYRICS] Hiding lyrics overlay.");
+
             if (!_overlayVisible)
             {
                 _dispatcher.BeginInvoke(() => _overlay?.Hide());
@@ -83,6 +85,7 @@ namespace musicpresense
                 EnsureOverlay();
                 if (_lines.Count > 0)
                 {
+                    Debugger.show("[LYRICS] Displaying current lyric line.");
                     _overlay?.ShowLine(GetCurrentLineText(), true);
                 }
             });
@@ -151,6 +154,7 @@ namespace musicpresense
                 }
 
                 EnsureOverlay();
+                Debugger.show("[LYRICS] Updating lyric line display.");
                 _overlay?.ShowLine(GetCurrentLineText(), true);
 
                 if (!_timer.IsEnabled)

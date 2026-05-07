@@ -75,6 +75,7 @@ namespace musicpresense
         // before giving up on automatic reconnection.
         private const int AudioLinkRecoveryWindowMs = 8000;
         private TrayIconState _lastTrayState = TrayIconState.NoDevice;
+        private TrayIconState? _lastLoggedTrayState;
         private string? _lastNowPlayingArtist;
         private string? _lastNowPlayingTitle;
         private string? _lastNowPlayingAlbum;
@@ -160,6 +161,12 @@ namespace musicpresense
         private void OnTrayStateChanged(TrayIconState state)
         {
             _lastTrayState = state;
+
+            if (_lastLoggedTrayState != state)
+            {
+                Debugger.show($"[CONNECTION] Connection state changed: {state}.");
+                _lastLoggedTrayState = state;
+            }
 
             if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
                 return;
@@ -504,6 +511,8 @@ namespace musicpresense
 
         internal void ShowMediaPlayerWindowNow()
         {
+            Debugger.show("[MEDIAPLAYER] Opening media player window.");
+
             if (_mediaPlayerWindow == null)
             {
                 _mediaPlayerWindow = new MediaPlayerWindow(
@@ -538,6 +547,7 @@ namespace musicpresense
 
                 if (_settingsWindow.IsVisible)
                 {
+                    Debugger.show("[SETTINGS] Hiding settings window while media player is open.");
                     _settingsWindow.Hide();
                 }
             }
@@ -582,6 +592,7 @@ namespace musicpresense
             if (_mediaPlayerWindow == null)
                 return;
 
+            Debugger.show("[MEDIAPLAYER] Closing media player window.");
             var window = _mediaPlayerWindow;
             _mediaPlayerWindow = null;
 
@@ -599,6 +610,7 @@ namespace musicpresense
                 && !Dispatcher.HasShutdownFinished
                 && (forceShowSettings || !Config.OpenInTaskbar))
             {
+                Debugger.show("[SETTINGS] Showing settings window after media player closed.");
                 _settingsWindow.Show();
                 _settingsWindow.Activate();
             }
@@ -608,6 +620,11 @@ namespace musicpresense
 
         private void MediaPlayerWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (!_isExiting)
+            {
+                Debugger.show("[MEDIAPLAYER] Closing media player window.");
+            }
+
             if (_isExiting)
                 return;
 
@@ -750,6 +767,7 @@ namespace musicpresense
 
             if (!_settingsWindow.IsVisible)
             {
+                Debugger.show("[SETTINGS] Opening settings window.");
                 _settingsWindow.Show();
             }
 
@@ -1175,6 +1193,7 @@ namespace musicpresense
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.HotkeyModifier, Config.HotkeyToggleScrcpyKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay, Config.HotkeyModifier, Config.HotkeyToggleLyricsOverlayKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo, Config.HotkeyModifier, Config.HotkeyCopyTrackInfoKey); } catch { }
+            Debugger.show($"[HOTKEY] Hotkeys initialized with modifier 0x{Config.HotkeyModifier:X}.");
         }
 
         private void UpdateTrayAudioSettings()
@@ -1209,22 +1228,27 @@ namespace musicpresense
                 switch (id)
                 {
                     case HotkeyIdVolumeUp:
+                        Debugger.show("[HOTKEY] Global hotkey used: volume up.");
                         HandleVolumeHotkey(up: true);
                         handled = true;
                         break;
                     case HotkeyIdVolumeDown:
+                        Debugger.show("[HOTKEY] Global hotkey used: volume down.");
                         HandleVolumeHotkey(up: false);
                         handled = true;
                         break;
                     case HotkeyIdToggleScrcpy:
+                        Debugger.show("[HOTKEY] Global hotkey used: toggle scrcpy.");
                         ToggleScrcpyNoAudio();
                         handled = true;
                         break;
                     case HotkeyIdToggleLyricsOverlay:
+                        Debugger.show("[HOTKEY] Global hotkey used: toggle lyrics overlay.");
                         _lyricsOverlayManager?.ToggleVisibility();
                         handled = true;
                         break;
                     case HotkeyIdCopyTrackInfo:
+                        Debugger.show("[HOTKEY] Global hotkey used: copy track info.");
                         handled = TryCopyCurrentTrackInfoToClipboard();
                         break;
                 }

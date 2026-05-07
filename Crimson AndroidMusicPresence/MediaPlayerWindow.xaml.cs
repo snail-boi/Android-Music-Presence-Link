@@ -1342,6 +1342,7 @@ namespace musicpresense
                 Dispatcher.Invoke(() => SetConnectionStatus(status, detail, statusColor));
                 return;
             }
+
             _connectionStatusText = status;
             _connectionDetailText = detail;
             _connectionColor = statusColor;
@@ -1356,6 +1357,7 @@ namespace musicpresense
 
         private void BtnConnectionInfo_Click(object sender, RoutedEventArgs e)
         {
+            Debugger.show($"[CONNECTION] Connection pill clicked. Popup currently {(ConnectionInfoPopup.IsOpen ? "open" : "closed")}.");
             TxtConnectionStatus.Text = _connectionStatusText;
             TxtConnectionDetail.Text = _connectionDetailText;
             ConnectionInfoPopup.IsOpen = !ConnectionInfoPopup.IsOpen;
@@ -1366,6 +1368,7 @@ namespace musicpresense
         private void BtnAudioLink_Click(object sender, RoutedEventArgs e)
         {
             _audioLinkActive = !_audioLinkActive;
+            Debugger.show($"[MEDIAPLAYER] Audio link button pressed. New state: {_audioLinkActive}.");
             _setAudioLink?.Invoke(_audioLinkActive);
             RenderAudioLinkButton();
         }
@@ -1454,6 +1457,7 @@ namespace musicpresense
             if (AudioQualityPopup == null || AudioQualityMenuItems == null)
                 return;
 
+            Debugger.show("[MEDIAPLAYER] Audio quality pill pressed.");
             BuildAudioQualityMenu();
             AudioQualityPopup.IsOpen = !AudioQualityPopup.IsOpen;
         }
@@ -1674,6 +1678,7 @@ namespace musicpresense
 
         private void BtnFullscreen_Click(object sender, RoutedEventArgs e)
         {
+            Debugger.show("[MEDIAPLAYER] Fullscreen button pressed.");
             if (_isFullscreen)
             {
                 ExitFullscreen();
@@ -1738,6 +1743,7 @@ namespace musicpresense
         private void BtnAlwaysOnTop_Click(object sender, RoutedEventArgs e)
         {
             _alwaysOnTop = !_alwaysOnTop;
+            Debugger.show($"[MEDIAPLAYER] Always on top button pressed. New state: {_alwaysOnTop}.");
             // While in fullscreen we still let the user toggle this, but the
             // restore-from-fullscreen path will OR it back in either way.
             Topmost = _alwaysOnTop;

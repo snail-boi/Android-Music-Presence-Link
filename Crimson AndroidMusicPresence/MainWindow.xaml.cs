@@ -73,6 +73,8 @@ namespace musicpresense
         {
             if (_allowClose) return;
 
+            Debugger.show("[SETTINGS] Closing settings window (hiding to tray/taskbar behavior).");
+
             if (HasUnsavedChanges())
             {
                 var result = MessageBox.Show(
@@ -981,6 +983,8 @@ namespace musicpresense
             MusicConfigManager.Save(_config);
             (Application.Current as App)?.UpdateConfig(_config);
             _savedConfig = CloneConfig(_config);
+
+            Debugger.show("[SETTINGS] Settings saved.");
 
             if (showConfirmation)
             {

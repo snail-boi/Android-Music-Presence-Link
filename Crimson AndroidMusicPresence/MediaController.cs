@@ -630,24 +630,24 @@ namespace musicpresense
 
             try
             {
-                Debugger.show($"Starting cover art search for: '{fileNameWithoutExtension}' by '{artist}'");
+                Debugger.show($"[COVERART] Starting cover art search for: '{fileNameWithoutExtension}' by '{artist}'");
 
                 var device = getCurrentDevice();
                 if (string.IsNullOrEmpty(device))
                 {
-                    Debugger.show("No device selected for cover lookup");
+                    Debugger.show("[COVERART] No device selected for cover lookup");
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, _defaultImagePath);
                 }
 
                 if (localRemoteRoots.Count == 0)
                 {
-                    Debugger.show("No remote roots configured for cover lookup");
+                    Debugger.show("[COVERART] No remote roots configured for cover lookup");
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, _defaultImagePath);
                 }
 
-                Debugger.show($"Searching in remote roots: {string.Join("; ", localRemoteRoots)}");
+                Debugger.show($"[COVERART] Searching in remote roots: {string.Join("; ", localRemoteRoots)}");
 
                 // Declared here (not in the scoring block below) because the hybrid scan
                 // strategy uses it to build the phone-side glob before we ever run `find`.
@@ -687,9 +687,9 @@ namespace musicpresense
                     var globArg = $"'*{escapedForGlob}*'";
 
                     if (titleSafe)
-                        Debugger.show($"Fast path (full title): glob {globArg}");
+                        Debugger.show($"[COVERART] Fast path (full title): glob {globArg}");
                     else
-                        Debugger.show($"Fast path (fragment of '{titleStr}'): glob {globArg}");
+                        Debugger.show($"[COVERART] Fast path (fragment of '{titleStr}'): glob {globArg}");
 
                     foreach (var root in localRemoteRoots)
                     {
@@ -698,12 +698,12 @@ namespace musicpresense
                             $"-s {device} shell find '{escapedRoot}' -type f -iname {globArg}");
                         if (string.IsNullOrWhiteSpace(findOutput))
                         {
-                            Debugger.show($"  Fast path: no matches in {root}");
+                            Debugger.show($"[COVERART] Fast path: no matches in {root}");
                             continue;
                         }
 
                         var lines = findOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        Debugger.show($"  Fast path: {lines.Length} matches in {root}");
+                        Debugger.show($"[COVERART] Fast path: {lines.Length} matches in {root}");
                         foreach (var raw in lines)
                         {
                             var path = raw.Trim();
@@ -717,16 +717,16 @@ namespace musicpresense
                     if (allFiles.Count > 0)
                     {
                         usedFastPath = true;
-                        Debugger.show($"Fast path succeeded: {allFiles.Count} candidates (skipped full scan)");
+                        Debugger.show($"[COVERART] Fast path succeeded: {allFiles.Count} candidates (skipped full scan)");
                     }
                     else
                     {
-                        Debugger.show("Fast path returned zero matches across all roots; falling back to full scan");
+                        Debugger.show("[COVERART] Fast path returned zero matches across all roots; falling back to full scan");
                     }
                 }
                 else
                 {
-                    Debugger.show($"Title '{titleStr}' yielded no usable glob fragment; using full scan");
+                    Debugger.show($"[COVERART] Title '{titleStr}' yielded no usable glob fragment; using full scan");
                 }
 
                 if (!usedFastPath)
@@ -734,16 +734,16 @@ namespace musicpresense
                     foreach (var root in localRemoteRoots)
                     {
                         var escapedRoot = root.Replace("\"", "\\\"");
-                        Debugger.show($"Scanning root: {root}");
+                        Debugger.show($"[COVERART] Scanning root: {root}");
                         var findOutput = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell find \"{escapedRoot}\" -type f");
                         if (string.IsNullOrWhiteSpace(findOutput))
                         {
-                            Debugger.show($"  No files found in this root");
+                            Debugger.show($"[COVERART] No files found in this root");
                             continue;
                         }
 
                         var lines = findOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        Debugger.show($"  Found {lines.Length} files in this root");
+                        Debugger.show($"[COVERART] Found {lines.Length} files in this root");
                         foreach (var raw in lines)
                         {
                             var path = raw.Trim();
@@ -755,11 +755,11 @@ namespace musicpresense
                     }
                 }
 
-                Debugger.show($"Total files found: {allFiles.Count} (fast path: {usedFastPath})");
+                Debugger.show($"[COVERART] Total files found: {allFiles.Count} (fast path: {usedFastPath})");
 
                 if (allFiles.Count == 0)
                 {
-                    Debugger.show("No files found in configured remote roots");
+                    Debugger.show("[COVERART] No files found in configured remote roots");
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, _defaultImagePath);
                 }
@@ -824,7 +824,7 @@ namespace musicpresense
 
                 if (matched.Count == 0)
                 {
-                    Debugger.show($"No filename contains the title '{titleStr}' (normalized: '{normTitle}')");
+                    Debugger.show($"[COVERART] No filename contains the title '{titleStr}' (normalized: '{normTitle}')");
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, _defaultImagePath);
                 }
@@ -868,7 +868,7 @@ namespace musicpresense
                 List<(string path, int score, string breakdown, int originalIndex, long size)> sized;
                 if (topGroup.Count > 1)
                 {
-                    Debugger.show($"Tie at score {topScore} between {topGroup.Count} files, comparing sizes");
+                    Debugger.show($"[COVERART] Tie at score {topScore} between {topGroup.Count} files, comparing sizes");
                     var sizeTasks = topGroup.Select(async r =>
                     {
                         long sz = await GetRemoteFileSizeAsync(device, r.path).ConfigureAwait(false);
@@ -896,7 +896,7 @@ namespace musicpresense
 
                 var filesToProcess = ordered.Select(o => o.path).Concat(rest).Take(20).ToList();
 
-                Debugger.show($"Files to process for cover art lookup (ranked): {filesToProcess.Count}");
+                Debugger.show($"[COVERART] Files to process for cover art lookup (ranked): {filesToProcess.Count}");
                 for (int i = 0; i < ranked.Count; i++)
                 {
                     var r = ranked[i];
@@ -915,7 +915,7 @@ namespace musicpresense
 
                 foreach (var remotePath in filesToProcess)
                 {
-                    Debugger.show($"Processing remote file for cover art: {remotePath}");
+                    Debugger.show($"[COVERART] Processing remote file for cover art: {remotePath}");
 
                     var result = await cacheManager.GetImagePathForNowPlayingAsync(device, remotePath, deviceName).ConfigureAwait(false);
                     string imagePath = result.ImagePath;
@@ -928,7 +928,7 @@ namespace musicpresense
                     {
 
 
-                        Debugger.show($"Found cached image at {imagePath}, setting SMTC thumbnail");
+                        Debugger.show($"[COVERARTCACHE] Found cached image at {imagePath}, setting SMTC thumbnail");
                         var imageFile = await StorageFile.GetFileFromPathAsync(imagePath).AsTask().ConfigureAwait(false);
 
                         await dispatcher.InvokeAsync(() =>
@@ -937,11 +937,11 @@ namespace musicpresense
                             {
                                 smtcDisplayUpdater.Thumbnail = RandomAccessStreamReference.CreateFromFile(imageFile);
                                 smtcDisplayUpdater.Update();
-                                Debugger.show($"Thumbnail set from cached file: {imagePath}");
+                                Debugger.show($"[COVERARTCACHE] Thumbnail set from cached file: {imagePath}");
                             }
                             catch (Exception ex)
                             {
-                                Debugger.show($"Failed to set thumbnail on dispatcher: {ex.Message}");
+                                Debugger.show($"[COVERART] Failed to set thumbnail on dispatcher: {ex.Message}");
                             }
                         }).Task.ConfigureAwait(false);
 
@@ -949,17 +949,17 @@ namespace musicpresense
                     }
                     else
                     {
-                        Debugger.show($"No image returned for {remotePath}, continuing to next candidate");
+                        Debugger.show($"[COVERART] No image returned for {remotePath}, continuing to next candidate");
                     }
                 }
 
-                Debugger.show("No cover art found for any candidates; using default image");
+                Debugger.show("[COVERART] No cover art found for any candidates; using default image");
                 await SetDefaultImage().ConfigureAwait(false);
                 return (duration, metadata, _defaultImagePath);
             }
             catch (Exception ex)
             {
-                Debugger.show($"Critical error in SetSMTCImageAsync: {ex.Message}");
+                Debugger.show($"[COVERART] Critical error in SetSMTCImageAsync: {ex.Message}");
                 await SetDefaultImage().ConfigureAwait(false);
                 return (null, null, _defaultImagePath);
             }
@@ -969,7 +969,7 @@ namespace musicpresense
         {
             try
             {
-                Debugger.show($"Setting default image from: {_defaultImagePath}");
+                Debugger.show($"[COVERART] Setting default image from: {_defaultImagePath}");
 
                 var imageFile = await StorageFile.GetFileFromPathAsync(_defaultImagePath).AsTask().ConfigureAwait(false);
                 await dispatcher.InvokeAsync(() =>
@@ -979,17 +979,17 @@ namespace musicpresense
                         smtcDisplayUpdater!.Thumbnail = RandomAccessStreamReference.CreateFromFile(imageFile);
                         smtcDisplayUpdater.Update();
                         CurrentCoverPath = _defaultImagePath;
-                        Debugger.show("Default thumbnail set successfully");
+                        Debugger.show("[COVERART] Default thumbnail set successfully");
                     }
                     catch (Exception ex)
                     {
-                        Debugger.show($"Failed to set default thumbnail on dispatcher: {ex.Message}");
+                        Debugger.show($"[COVERART] Failed to set default thumbnail on dispatcher: {ex.Message}");
                     }
                 }).Task.ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                Debugger.show($"Failed to set default image: {ex.Message}");
+                Debugger.show($"[COVERART] Failed to set default image: {ex.Message}");
             }
         }
     }

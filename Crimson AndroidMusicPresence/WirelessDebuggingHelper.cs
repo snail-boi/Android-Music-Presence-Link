@@ -146,6 +146,8 @@ namespace musicpresense
         {
             if (string.IsNullOrWhiteSpace(serviceName)) return null;
 
+            Debugger.show($"[MDNS] Looking up service '{serviceName}'.");
+
             var all = await ListServicesAsync().ConfigureAwait(false);
 
             // Prefer _adb-tls-connect._tcp matches. These are the ports we can
@@ -191,10 +193,19 @@ namespace musicpresense
         /// </summary>
         public static async Task<string> ReconnectViaMdnsAsync(string serviceName)
         {
+            Debugger.show($"[MDNS] ReconnectViaMdnsAsync called for '{serviceName}'.");
             var service = await FindServiceAsync(serviceName).ConfigureAwait(false);
-            if (service == null) return string.Empty;
+            if (service == null)
+            {
+                Debugger.show($"[MDNS] No service found for '{serviceName}'.");
+                return string.Empty;
+            }
 
+            Debugger.show($"[MDNS] Found service '{service.Name}' at {service.IpPort}. Connecting.");
             var ok = await ConnectAsync(service.IpPort).ConfigureAwait(false);
+            Debugger.show(ok
+                ? $"[MDNS] Connected to {service.IpPort}."
+                : $"[MDNS] Failed to connect to {service.IpPort}.");
             return ok ? service.IpPort : string.Empty;
         }
 
