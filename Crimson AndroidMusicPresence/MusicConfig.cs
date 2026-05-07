@@ -288,7 +288,7 @@ namespace musicpresense
                 config.HotkeyCopyTrackInfoKey = 0x43;
 
             var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };
-            if (!allowedMods.Contains(config.HotkeyModifier)) config.HotkeyModifier = 0x0004;
+            if (!allowedMods.Contains(config.HotkeyModifier)) config.HotkeyModifier = 0x0001;
 
             // Sanity: WirelessDebugging without a service name is functionally broken,
             // but we don't auto-rewrite to TcpIp because the user may be mid-pairing.
