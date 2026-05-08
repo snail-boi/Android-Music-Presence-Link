@@ -183,10 +183,39 @@ namespace musicpresense
             };
         }
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            var config = App.Config;
+            Width = config.MediaPlayerWindowWidth;
+            Height = config.MediaPlayerWindowHeight;
+            Top = config.MediaPlayerWindowTop;
+            Left = config.MediaPlayerWindowLeft;
+            WindowState = config.MediaPlayerWindowState;
+        }
+
         private void MediaPlayerWindow_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (!e.WidthChanged) return;
             UpdateSettingsColumnMaxWidth();
+        }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            base.OnClosing(e);
+
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+
+            var config = App.Config;
+            config.MediaPlayerWindowState = WindowState;
+            config.MediaPlayerWindowWidth = RestoreBounds.Width;
+            config.MediaPlayerWindowHeight = RestoreBounds.Height;
+            config.MediaPlayerWindowTop = RestoreBounds.Top;
+            config.MediaPlayerWindowLeft = RestoreBounds.Left;
+
+            MusicConfigManager.Save(config);
         }
 
         protected override void OnClosed(EventArgs e)

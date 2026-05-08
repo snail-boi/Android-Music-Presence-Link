@@ -536,6 +536,13 @@ namespace musicpresense
                 _mediaPlayerWindow.SetAudioLinkState(_isScrcpyRunning);
             }
 
+            var config = Config;
+            _mediaPlayerWindow.Width = config.MediaPlayerWindowWidth;
+            _mediaPlayerWindow.Height = config.MediaPlayerWindowHeight;
+            _mediaPlayerWindow.Top = config.MediaPlayerWindowTop;
+            _mediaPlayerWindow.Left = config.MediaPlayerWindowLeft;
+            _mediaPlayerWindow.WindowState = config.MediaPlayerWindowState;
+
             if (_settingsWindow != null)
             {
                 if (_settingsWindow.Content is FrameworkElement rootContent)

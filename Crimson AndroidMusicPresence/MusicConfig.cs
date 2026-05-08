@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Windows;
 
 namespace musicpresense
 {
@@ -63,6 +64,11 @@ namespace musicpresense
         public bool OpenInTaskbar { get; set; } = false;
         public bool StartWithWindows { get; set; } = false;
         public bool ShowMediaPlayerWindow { get; set; } = false;
+        public double MediaPlayerWindowWidth { get; set; } = 1080;
+        public double MediaPlayerWindowHeight { get; set; } = 760;
+        public double MediaPlayerWindowTop { get; set; } = 100;
+        public double MediaPlayerWindowLeft { get; set; } = 100;
+        public System.Windows.WindowState MediaPlayerWindowState { get; set; } = System.Windows.WindowState.Normal;
         public string ScrcpyAudioCodec { get; set; } = "raw";
         public string ScrcpyAudioBitrate { get; set; } = string.Empty;
         public int ScrcpyAudioBuffer { get; set; } = 80;

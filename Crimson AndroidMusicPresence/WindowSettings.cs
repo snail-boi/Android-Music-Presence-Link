@@ -17,6 +17,12 @@ namespace Crimson_AndroidMusicPresence
         public double WindowTop { get; set; } = 100;
         public double WindowLeft { get; set; } = 100;
         public WindowState WindowState { get; set; } = WindowState.Normal;
+
+        public double MediaPlayerWindowWidth { get; set; } = 1080;
+        public double MediaPlayerWindowHeight { get; set; } = 760;
+        public double MediaPlayerWindowTop { get; set; } = 100;
+        public double MediaPlayerWindowLeft { get; set; } = 100;
+        public WindowState MediaPlayerWindowState { get; set; } = WindowState.Normal;
     }
 
     public static class Config
