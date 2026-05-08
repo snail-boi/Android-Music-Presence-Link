@@ -33,6 +33,8 @@ namespace musicpresense
 
         public static async Task RunAdbAsync(string args)
         {
+            //in case of checking induvidual commands
+            //Debugger.show("[AdbAsync]" + args);
             if (!IsAdbConfigured())
                 return;
 
@@ -63,6 +65,8 @@ namespace musicpresense
 
         public static async Task<string> RunAdbCaptureAsync(string args)
         {
+            //in case of checking induvidual commands
+            //Debugger.show("[CaptureAsync]" + args);
             if (!IsAdbConfigured())
                 return string.Empty;
 
