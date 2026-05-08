@@ -21,9 +21,19 @@ namespace musicpresense
     /// </summary>
 
     /*
-        idees for future features:
+        idea's for future features:
         Now Playing Notifications
         Embedded lyrics fallback (USLT/SYLT tags in FLAC/MP3)
+        
+        effieciency pathes to try
+        we already ask the mediasession data, so if i were to check whetether this command keeps succeeding, 
+        when it stops succeeding we check using adb devices to look if it is no longer available,
+        if it is assume the command didn't go thorugh and continue like usual,
+        else if we check adb devices for alternative connection method
+
+        this can only be used for USB to wifi as reverse would need adb device ran to update back to USB
+
+        use the ffmpeg dll instead of running a sperate process
 
     */
     public partial class MainWindow : Window
