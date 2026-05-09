@@ -51,6 +51,7 @@ namespace musicpresense
             _lyricsCachePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Snail",
+                "AndroidMusicPresenceLink",
                 "LyricsCache");
 
             try

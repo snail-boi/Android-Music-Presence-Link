@@ -462,10 +462,7 @@ namespace musicpresense
                 return;
             }
 
-            var picker = new RemoteFolderPicker(device)
-            {
-                Owner = this
-            };
+            var picker = RemoteFolderPicker.Create(device, this);
 
             if (picker.ShowDialog() == true)
             {

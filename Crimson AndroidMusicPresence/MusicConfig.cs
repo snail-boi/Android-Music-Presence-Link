@@ -119,6 +119,7 @@ namespace musicpresense
         public string CoverCachePath { get; set; } = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Snail",
+            "AndroidMusicPresenceLink",
             "CoverCache");
     }
 
@@ -131,7 +132,8 @@ namespace musicpresense
 
         public static string ConfigPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Snail",
+            "Snail", 
+            "AndroidMusicPresenceLink",
             "musicconfig.json");
 
         public static MusicConfig Load()

@@ -12,6 +12,19 @@ namespace musicpresense
 
         private readonly string _device;
 
+        public static RemoteFolderPicker Create(string device, DependencyObject? ownerSource = null)
+        {
+            var picker = new RemoteFolderPicker(device);
+            var owner = ownerSource as Window ?? (ownerSource != null ? Window.GetWindow(ownerSource) : null) ?? Application.Current?.MainWindow;
+
+            if (owner != null)
+            {
+                picker.Owner = owner;
+            }
+
+            return picker;
+        }
+
         public RemoteFolderPicker(string device)
         {
             InitializeComponent();

@@ -29,7 +29,7 @@ namespace musicpresense
     {
         private static readonly string FolderPath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                            "CrimsonAndroidMusicPresence");
+                            "Snail", "AndroidMusicPresenceLink");
 
         private static readonly string FilePath =
             Path.Combine(FolderPath, "config.json");

@@ -10,6 +10,7 @@ namespace musicpresense
         private static readonly string logDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Snail",
+            "AndroidMusicPresenceLink",
             "logs");
 
         private const int MaxLogFiles = 5;

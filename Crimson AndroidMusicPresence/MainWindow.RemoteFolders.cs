@@ -21,10 +21,7 @@ namespace musicpresense
                     return;
                 }
 
-                var picker = new RemoteFolderPicker(device)
-                {
-                    Owner = this
-                };
+                var picker = RemoteFolderPicker.Create(device, sender as DependencyObject ?? this);
 
                 if (picker.ShowDialog() == true)
                 {
@@ -66,10 +63,7 @@ namespace musicpresense
                 return;
             }
 
-            var picker = new RemoteFolderPicker(device)
-            {
-                Owner = this
-            };
+            var picker = RemoteFolderPicker.Create(device, sender as DependencyObject ?? this);
 
             if (picker.ShowDialog() == true)
             {
