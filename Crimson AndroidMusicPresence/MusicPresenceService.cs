@@ -152,6 +152,32 @@ namespace musicpresense
             return !string.IsNullOrEmpty(FindConnectedWifiSerial(deviceList));
         }
 
+        private static string GetOnlineSerial(string entry)
+        {
+            if (string.IsNullOrWhiteSpace(entry))
+                return string.Empty;
+
+            var parts = entry.Trim().Split(new[] { '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2)
+                return string.Empty;
+
+            return parts[^1].Equals("device", StringComparison.OrdinalIgnoreCase)
+                ? parts[0].Trim()
+                : string.Empty;
+        }
+
+        private static string FindConnectedWirelessSerial(string[] deviceList)
+        {
+            foreach (var entry in deviceList)
+            {
+                var serial = GetOnlineSerial(entry);
+                if (IsWirelessSerial(serial))
+                    return serial;
+            }
+
+            return string.Empty;
+        }
+
         private async Task DetectDeviceAsync()
         {
             try
@@ -159,10 +185,20 @@ namespace musicpresense
                 var devices = await AdbHelper.RunAdbCaptureAsync("devices");
                 var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
+                var connectedWireless = FindConnectedWirelessSerial(deviceList);
+                if (!string.IsNullOrWhiteSpace(connectedWireless))
+                {
+                    _currentDevice = connectedWireless;
+                    _currentDeviceIsUsb = false;
+                    _wifiReconnectPromptShown = false;
+                    _wifiNeedsUsbReconnect = false;
+                    return;
+                }
+
                 string connectedUsb = string.Empty;
                 if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB))
                 {
-                    bool selectedUsbConnected = deviceList.Any(l => l.StartsWith(_config.SelectedDeviceUSB) && l.EndsWith("device"));
+                    bool selectedUsbConnected = deviceList.Any(l => GetOnlineSerial(l).Equals(_config.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase));
                     if (selectedUsbConnected)
                     {
                         connectedUsb = _config.SelectedDeviceUSB;
@@ -173,19 +209,8 @@ namespace musicpresense
                 {
                     foreach (var entry in deviceList)
                     {
-                        if (!entry.EndsWith("device"))
-                            continue;
-
-                        var serial = entry.Split('\t', ' ').FirstOrDefault();
+                        var serial = GetOnlineSerial(entry);
                         if (string.IsNullOrWhiteSpace(serial))
-                            continue;
-
-                        // Skip wireless serials (TCP/IP ip:port and Wireless
-                        // Debugging mDNS service names). Wireless Debugging
-                        // shows up in `adb devices` with a long name like
-                        // adb-XXXXXX-XXXX._adb-tls-connect._tcp, which has no
-                        // colon, so a naive check would mistake it for USB.
-                        if (IsWirelessSerial(serial))
                             continue;
 
                         connectedUsb = serial;
