@@ -450,7 +450,19 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="Music Presence" Style="{StaticResource HeaderTitleStyle}" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Music Presence" Style="{StaticResource HeaderTitleStyle}" />
+                        <TextBlock x:Name="TxtVersionInfo"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Bottom"
+                                   FontSize="11"
+                                   Opacity="0.7" />
+                        <TextBlock x:Name="TxtUpdateStatus"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Bottom"
+                                   FontSize="11"
+                                   Opacity="0.7" />
+                    </StackPanel>
                     <TextBlock Text="Configure how your Android device shares music with your PC."
                                Style="{StaticResource HeaderSubtitleStyle}" />
                 </StackPanel>
@@ -490,6 +502,15 @@
         <!-- ============ MAIN SCROLLABLE CONTENT ============ -->
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="20,18,20,18" Orientation="Vertical">
+
+                <Border Margin="0,0,0,12">
+                    <Button x:Name="BtnUpdate"
+                            Content="Update"
+                            Visibility="Collapsed"
+                            HorizontalAlignment="Stretch"
+                            Height="34"
+                            Click="BtnUpdate_Click" />
+                </Border>
 
                 <!-- ====== DEVICE CARD (open by default for new users) ====== -->
                 <Border CornerRadius="6"

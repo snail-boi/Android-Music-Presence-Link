@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Net.Http;
+using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -18,12 +19,19 @@ namespace musicpresense
         private const string RepoOwner = "snail-boi";
         private const string RepoName = "Android-Music-Presence-Link";
         private const string InstallerPrefix = "Android.Music.Presence.Link";
+        private static readonly SemaphoreSlim PromptSemaphore = new(1, 1);
+
+        public static event Action<bool, string?, string?>? UpdateStatusChanged;
+
+        public static bool IsUpdateAvailable { get; private set; }
+        public static string? LatestVersion { get; private set; }
+        public static string? LatestPatchNotes { get; private set; }
 
         /// <summary>
         /// Call this at app startup (Option 1: fire-and-forget) or in Loaded event.
         /// </summary>
         /// <param name="currentVersion">Your current app version string, e.g., "v1.2-beta 10"</param>
-        public static async Task CheckForUpdateAsync(string currentVersion)
+        public static async Task CheckForUpdateAsync(string currentVersion, bool showPrompt = true, bool allowRemindLater = false, string? ignoredVersion = null, Action<string>? onDismissed = null)
         {
             try
             {
@@ -69,8 +77,18 @@ namespace musicpresense
                     return;
 
                 string latestVersion = latestRelease.Value.GetProperty("tag_name").GetString() ?? string.Empty;
+                LatestVersion = latestVersion;
+                LatestPatchNotes = GetReleaseNotes(latestRelease.Value);
+
                 if (!IsNewerVersion(latestVersion, currentVersion))
+                {
+                    IsUpdateAvailable = false;
+                    UpdateStatusChanged?.Invoke(false, latestVersion, LatestPatchNotes);
                     return;
+                }
+
+                IsUpdateAvailable = true;
+                UpdateStatusChanged?.Invoke(true, latestVersion, LatestPatchNotes);
 
                 if (!latestRelease.Value.TryGetProperty("assets", out JsonElement assetsElem) || assetsElem.ValueKind != JsonValueKind.Array)
                     return;
@@ -99,27 +117,57 @@ namespace musicpresense
                 string installerName = installerAsset.Value.GetProperty("name").GetString() ?? "";
                 string downloadUrl = installerAsset.Value.GetProperty("browser_download_url").GetString() ?? "";
 
-                string patchNotes = GetReleaseNotes(latestRelease.Value);
+                var patchNotes = LatestPatchNotes ?? GetReleaseNotes(latestRelease.Value);
 
-                var result = MessageBox.Show(
-                    $"A new version {latestVersion} is available!\n\nPatch notes:\n\n{patchNotes}\n\nDo you want to download and install it?",
-                    "Update Available",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Information);
+                if (!showPrompt)
+                {
+                    UpdateStatusChanged?.Invoke(true, latestVersion, LatestPatchNotes);
+                    return;
+                }
 
-                if (result != MessageBoxResult.Yes)
+                if (!string.IsNullOrWhiteSpace(ignoredVersion) && string.Equals(ignoredVersion, latestVersion, StringComparison.OrdinalIgnoreCase))
                     return;
 
-                string tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), installerName);
-                byte[] data = await client.GetByteArrayAsync(downloadUrl);
-                await System.IO.File.WriteAllBytesAsync(tempPath, data);
+                if (!await PromptSemaphore.WaitAsync(0))
+                    return;
 
-                Process.Start(new ProcessStartInfo(tempPath) { UseShellExecute = true });
-                Application.Current.Shutdown();
+                try
+                {
+                    var prompt = new UpdatePromptWindow(latestVersion, patchNotes, allowRemindLater);
+                    var owner = GetPromptOwner();
+                    if (owner != null)
+                    {
+                        prompt.Owner = owner;
+                    }
+
+                    bool? result = prompt.ShowDialog();
+
+                    if (prompt.Choice == UpdatePromptChoice.Ignore)
+                    {
+                        onDismissed?.Invoke(latestVersion);
+                        return;
+                    }
+
+                    if (prompt.Choice != UpdatePromptChoice.Install || result != true)
+                        return;
+
+                    string tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), installerName);
+                    byte[] data = await client.GetByteArrayAsync(downloadUrl);
+                    await System.IO.File.WriteAllBytesAsync(tempPath, data);
+
+                    Process.Start(new ProcessStartInfo(tempPath) { UseShellExecute = true });
+                    Application.Current.Shutdown();
+                }
+                finally
+                {
+                    PromptSemaphore.Release();
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Update check failed:\n{ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                IsUpdateAvailable = false;
+                UpdateStatusChanged?.Invoke(false, LatestVersion, LatestPatchNotes);
             }
         }
 
@@ -131,6 +179,20 @@ namespace musicpresense
                 return notes.Trim();
             }
             return "No patch notes available.";
+        }
+
+        private static Window? GetPromptOwner()
+        {
+            var app = Application.Current;
+            if (app == null)
+                return null;
+
+            return app.Windows
+                .OfType<Window>()
+                .FirstOrDefault(w => w.IsVisible && w.IsActive)
+                ?? app.Windows
+                    .OfType<Window>()
+                    .FirstOrDefault(w => w.IsVisible);
         }
 
         /// <summary>

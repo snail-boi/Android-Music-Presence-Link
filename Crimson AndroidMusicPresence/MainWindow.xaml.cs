@@ -136,8 +136,11 @@ namespace musicpresense
             BtnToggleMediaPlayerView.Click += BtnToggleMediaPlayerView_Click;
             ChkOpenInTaskbar.Checked += ChkOpenInTaskbar_CheckedChanged;
             ChkOpenInTaskbar.Unchecked += ChkOpenInTaskbar_CheckedChanged;
+            BtnUpdate.Click += BtnUpdate_Click;
+            Updater.UpdateStatusChanged += Updater_UpdateStatusChanged;
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
+            UpdateUpdateBanner(Updater.IsUpdateAvailable, Updater.LatestVersion, Updater.LatestPatchNotes);
             UpdateMediaPlayerModeButton((Application.Current as App)?.IsMediaPlayerModeActive() == true);
             _isInitializing = false;
         }
@@ -179,6 +182,11 @@ namespace musicpresense
         private void BtnToggleTheme_Click(object sender, RoutedEventArgs e)
         {
             ChkDarkMode.IsChecked = !(ChkDarkMode.IsChecked == true);
+        }
+
+        private void BtnUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            _ = Updater.CheckForUpdateAsync(App.CurrentVersion, showPrompt: true, allowRemindLater: false);
         }
 
         private void BtnRedoOnboarding_Click(object sender, RoutedEventArgs e)
@@ -237,6 +245,29 @@ namespace musicpresense
                 return;
 
             BtnToggleTheme.Content = useDarkMode ? "Switch to Light" : "Switch to Dark";
+        }
+
+        private void Updater_UpdateStatusChanged(bool isUpdateAvailable, string? latestVersion, string? patchNotes)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => UpdateUpdateBanner(isUpdateAvailable, latestVersion, patchNotes)));
+                return;
+            }
+
+            UpdateUpdateBanner(isUpdateAvailable, latestVersion, patchNotes);
+        }
+
+        private void UpdateUpdateBanner(bool isUpdateAvailable, string? latestVersion, string? patchNotes)
+        {
+            if (TxtVersionInfo != null)
+                TxtVersionInfo.Text = $"v{App.CurrentVersion}";
+
+            if (TxtUpdateStatus != null)
+                TxtUpdateStatus.Text = isUpdateAvailable ? "· Update available" : "· Up to date";
+
+            if (BtnUpdate != null)
+                BtnUpdate.Visibility = isUpdateAvailable ? Visibility.Visible : Visibility.Collapsed;
         }
         #endregion
 

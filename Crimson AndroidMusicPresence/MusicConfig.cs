@@ -59,6 +59,7 @@ namespace musicpresense
         public string MusicRemoteRoot { get; set; } = string.Empty;
         public List<string> MusicRemoteRoots { get; set; } = new List<string>();
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Fast;
+        public string IgnoredUpdateVersion { get; set; } = string.Empty;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
         public bool OpenInTaskbar { get; set; } = false;

@@ -45,6 +45,8 @@ namespace musicpresense
 
         private static readonly string version = GetAppVersion();
 
+        internal static string CurrentVersion => version;
+
 
 
 
@@ -136,7 +138,11 @@ namespace musicpresense
 
             InitializeHotkeys();
 
-            _ = Updater.CheckForUpdateAsync(version);
+            _ = Updater.CheckForUpdateAsync(version, showPrompt: Config.OpenInTaskbar, allowRemindLater: Config.OpenInTaskbar, ignoredVersion: Config.IgnoredUpdateVersion, onDismissed: ignoredVersion =>
+            {
+                Config.IgnoredUpdateVersion = ignoredVersion;
+                MusicConfigManager.Save(Config);
+            });
         }
 
         private static string GetAppVersion()
