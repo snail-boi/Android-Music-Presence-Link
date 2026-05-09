@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using musicpresense;
 
-namespace Crimson_AndroidMusicPresence
+namespace musicpresense
 {
     public partial class WifiPairDialog : Window
     {

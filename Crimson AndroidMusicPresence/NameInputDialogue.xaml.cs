@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 
-namespace Crimson_AndroidMusicPresence
+namespace musicpresense
 {
     public partial class NameInputDialogue : Window
     {
