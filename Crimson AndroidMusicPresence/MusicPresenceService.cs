@@ -185,16 +185,6 @@ namespace musicpresense
                 var devices = await AdbHelper.RunAdbCaptureAsync("devices");
                 var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-                var connectedWireless = FindConnectedWirelessSerial(deviceList);
-                if (!string.IsNullOrWhiteSpace(connectedWireless))
-                {
-                    _currentDevice = connectedWireless;
-                    _currentDeviceIsUsb = false;
-                    _wifiReconnectPromptShown = false;
-                    _wifiNeedsUsbReconnect = false;
-                    return;
-                }
-
                 string connectedUsb = string.Empty;
                 if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB))
                 {
@@ -211,6 +201,9 @@ namespace musicpresense
                     {
                         var serial = GetOnlineSerial(entry);
                         if (string.IsNullOrWhiteSpace(serial))
+                            continue;
+
+                        if (IsWirelessSerial(serial))
                             continue;
 
                         connectedUsb = serial;
@@ -250,6 +243,16 @@ namespace musicpresense
                         _wifiNeedsUsbReconnect = false;
                     }
 
+                    return;
+                }
+
+                var connectedWireless = FindConnectedWirelessSerial(deviceList);
+                if (!string.IsNullOrWhiteSpace(connectedWireless))
+                {
+                    _currentDevice = connectedWireless;
+                    _currentDeviceIsUsb = false;
+                    _wifiReconnectPromptShown = false;
+                    _wifiNeedsUsbReconnect = false;
                     return;
                 }
 
