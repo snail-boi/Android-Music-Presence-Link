@@ -9,13 +9,16 @@ namespace musicpresense
         private static readonly object syncRoot = new();
         private static readonly string logDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Snail");
+            "Snail",
+            "logs");
 
         private const int MaxLogFiles = 5;
         private static readonly string latestLogPath = Path.Combine(logDirectory, "musicpresence_latest.log");
         private static bool rotated;
 
         public static bool IsEnabled { get; set; }
+
+        internal static string LogDirectory => logDirectory;
 
         public static void show(string message)
         {

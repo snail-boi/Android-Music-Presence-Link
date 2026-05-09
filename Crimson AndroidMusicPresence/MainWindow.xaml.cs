@@ -128,9 +128,13 @@ namespace musicpresense
             BtnPickRemoteRoot.Click += BtnPickRemoteRoot_Click;
             BtnClearCoverCache.Click += BtnClearCoverCache_Click;
             BtnOpenCoverCache.Click += BtnOpenCoverCache_Click;
+            BtnOpenLogFolder.Click += BtnOpenLogFolder_Click;
+            BtnResetDevice.Click += BtnResetDevice_Click;
             LstAudioCodecs.SelectionChanged += LstAudioCodecs_SelectionChanged;
             ChkDarkMode.Checked += ChkDarkMode_CheckedChanged;
             ChkDarkMode.Unchecked += ChkDarkMode_CheckedChanged;
+            ChkDebugMode.Checked += ChkDebugMode_CheckedChanged;
+            ChkDebugMode.Unchecked += ChkDebugMode_CheckedChanged;
             BtnToggleTheme.Click += BtnToggleTheme_Click;
             BtnRedoOnboarding.Click += BtnRedoOnboarding_Click;
             BtnToggleMediaPlayerView.Click += BtnToggleMediaPlayerView_Click;
@@ -308,6 +312,44 @@ namespace musicpresense
             {
                 MessageBox.Show($"Failed to open cover cache folder: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void BtnOpenLogFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var logPath = Debugger.LogDirectory;
+                Directory.CreateDirectory(logPath);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = logPath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open log folder: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnResetDevice_Click(object sender, RoutedEventArgs e)
+        {
+            TxtUsbSerial.Text = string.Empty;
+            TxtWifi.Text = string.Empty;
+            if (TxtMdnsService != null)
+                TxtMdnsService.Text = string.Empty;
+            TxtDeviceName.Text = string.Empty;
+
+            _config.SelectedDeviceUSB = string.Empty;
+            _config.SelectedDeviceWiFi = string.Empty;
+            _config.SelectedDeviceName = string.Empty;
+            _config.WifiMdnsServiceName = string.Empty;
+            _config.IsWifiEnabled = false;
+        }
+
+        private void ChkDebugMode_CheckedChanged(object sender, RoutedEventArgs e)
+        {
+            Debugger.IsEnabled = ChkDebugMode.IsChecked == true;
         }
 
 

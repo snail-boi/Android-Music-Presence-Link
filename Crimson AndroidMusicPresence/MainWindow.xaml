@@ -531,11 +531,18 @@
                                            Style="{StaticResource HintTextStyle}"
                                            Margin="0,2,0,0" />
                             </StackPanel>
-                            <Button Grid.Column="1"
-                                    x:Name="BtnAutoGather"
-                                    Content="Auto-detect"
-                                    Width="130"
-                                    VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="BtnAutoGather"
+                                        Content="Auto-detect"
+                                        Width="130"
+                                        VerticalAlignment="Center" />
+                                <Button x:Name="BtnResetDevice"
+                                        Content="Reset"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="90"
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center" />
+                            </StackPanel>
                         </Grid>
 
                         <Grid Margin="0,8,0,0">
@@ -1029,6 +1036,12 @@
                         </Grid>
 
                         <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,8" />
+                        <Button x:Name="BtnOpenLogFolder"
+                                Content="Open log folder"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Width="160"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,12" />
                         <CheckBox x:Name="ChkOpenInTaskbar" Content="Hide in taskbar on startup" Margin="0,0,0,8" />
                         <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,0,0,12" />
 
