@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing.Printing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -130,22 +131,9 @@ namespace musicpresense
         // ── Help / What's this? ───────────────────────────────────────────────
         private void BtnHelp_Click(object sender, RoutedEventArgs e)
         {
-            // Plain MessageBox keeps things simple and consistent with the rest of the app.
-            const string body =
-                "Media Player buttons:\n\n" +
-                "• Cover art: shows current track artwork. Right-click to save the image or copy track info.\n" +
-                "• Connection pill: shows USB/Wi-Fi status. Click for details.\n" +
-                "• Audio Link: starts/stops scrcpy so audio plays through this PC.\n" +
-                "• Audio quality: shows the current preset (or \"Custom\"). Click to switch presets without opening Settings. Changes take effect on the next Audio Link start; if Audio Link is on, it restarts automatically.\n" +
-                "• Volume icon: opens a volume slider when scrcpy audio is reachable, or +/- buttons otherwise.\n" +
-                "• Skip-back / Skip-forward 30s: appear only on tracks longer than 10 minutes.\n" +
-                "• Lyrics icon: toggles the inline lyrics view in place of the cover.\n" +
-                "• Position label (left of the progress bar): click to switch between elapsed and time-left.\n" +
-                "• Full screen icon (top right): hides the window's title bar and borders. Click again to restore. The window keeps its size and stays resizable from the edges; while decorations are hidden you can drag the window by clicking and holding any empty area.\n" +
-                "• Always on top: keeps the window above other windows.\n\n" +
-                "Right-side panel: open the full settings by clicking the arrow on the right edge.";
-
-            MessageBox.Show(this, body, "Media Player Help", MessageBoxButton.OK, MessageBoxImage.Information);
+            var window = new MediaPlayerHelpWindow();
+            window.Owner = this;
+            window.ShowDialog();
         }
         private void RenderHelpButtonIcon()
         {

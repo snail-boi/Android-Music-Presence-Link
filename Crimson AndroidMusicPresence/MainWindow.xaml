@@ -1042,7 +1042,7 @@
                                 Width="160"
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,12" />
-                        <CheckBox x:Name="ChkOpenInTaskbar" Content="Hide in taskbar on startup" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ChkOpenInTaskbar" Content="Start minimized to tray" Margin="0,0,0,8" />
                         <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,0,0,12" />
 
                         <Button x:Name="BtnToggleMediaPlayerView"

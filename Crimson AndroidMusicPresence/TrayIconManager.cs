@@ -78,7 +78,7 @@ namespace musicpresense
             _settingsItem.Click += (s, e) => _showSettings();
             _menu.Items.Add(_settingsItem);
 
-            _scrcpyItem = new ToolStripMenuItem("Start Scrcpy (No Audio)");
+            _scrcpyItem = new ToolStripMenuItem("Start audio link");
             _scrcpyItem.Click += (s, e) => _toggleScrcpy();
             _menu.Items.Add(_scrcpyItem);
 
@@ -262,7 +262,7 @@ namespace musicpresense
         public void SetScrcpyRunning(bool running)
         {
             _scrcpyRunning = running;
-            _scrcpyItem.Text = running ? "Stop Scrcpy" : "Start Scrcpy (No Audio)";
+            _scrcpyItem.Text = running ? "Stop audio link" : "Start audio link";
             _audioLinkItem.Text = running ? "Audio Link: Active" : "Audio Link: Inactive";
             UpdateAudioLinkIndicator();
         }
