@@ -7,6 +7,34 @@ using System.Windows;
 
 namespace musicpresense
 {
+    internal static class AppPaths
+    {
+        private const string CompanyFolder = "Snail";
+        private const string ProductFolder = "AndroidMusicPresenceLink";
+
+        internal static bool IsPortable => File.Exists(Path.Combine(BaseDirectory, "portable.mode"));
+
+        internal static string BaseDirectory => Path.GetFullPath(AppContext.BaseDirectory);
+
+        internal static string DataRoot => IsPortable
+            ? BaseDirectory
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), CompanyFolder, ProductFolder);
+
+        internal static string ResourceRoot => IsPortable
+            ? Path.Combine(BaseDirectory, "Resources")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), CompanyFolder, "Resources");
+
+        internal static string GetDataPath(params string[] parts)
+        {
+            return parts.Length == 0 ? DataRoot : Path.Combine(new[] { DataRoot }.Concat(parts).ToArray());
+        }
+
+        internal static string GetResourcePath(string fileName)
+        {
+            return Path.Combine(ResourceRoot, fileName);
+        }
+    }
+
     public enum UpdateIntervalMode
     {
         Extreme = 1,
@@ -98,29 +126,13 @@ namespace musicpresense
 
     public class PathsConfig
     {
-        public string Adb { get; set; } = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Snail",
-            "Resources",
-            "adb.exe");
+        public string Adb { get; set; } = AppPaths.GetResourcePath("adb.exe");
 
-        public string FfmpegPath { get; set; } = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Snail",
-            "Resources",
-            "ffmpeg.exe");
+        public string FfmpegPath { get; set; } = AppPaths.GetResourcePath("ffmpeg.exe");
 
-        public string Scrcpy { get; set; } = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Snail",
-            "Resources",
-            "scrcpy.exe");
+        public string Scrcpy { get; set; } = AppPaths.GetResourcePath("scrcpy.exe");
 
-        public string CoverCachePath { get; set; } = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Snail",
-            "AndroidMusicPresenceLink",
-            "CoverCache");
+        public string CoverCachePath { get; set; } = AppPaths.GetDataPath("CoverCache");
     }
 
     public static class MusicConfigManager
@@ -130,11 +142,7 @@ namespace musicpresense
             WriteIndented = true
         };
 
-        public static string ConfigPath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Snail", 
-            "AndroidMusicPresenceLink",
-            "musicconfig.json");
+        public static string ConfigPath => AppPaths.GetDataPath("musicconfig.json");
 
         public static MusicConfig Load()
         {

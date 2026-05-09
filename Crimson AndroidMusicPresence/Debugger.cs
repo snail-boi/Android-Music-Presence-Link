@@ -7,11 +7,7 @@ namespace musicpresense
     internal static class Debugger
     {
         private static readonly object syncRoot = new();
-        private static readonly string logDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Snail",
-            "AndroidMusicPresenceLink",
-            "logs");
+        private static readonly string logDirectory = AppPaths.GetDataPath("logs");
 
         private const int MaxLogFiles = 5;
         private static readonly string latestLogPath = Path.Combine(logDirectory, "musicpresence_latest.log");

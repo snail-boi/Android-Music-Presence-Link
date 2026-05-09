@@ -48,11 +48,7 @@ namespace musicpresense
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _timer.Tick += Timer_Tick;
 
-            _lyricsCachePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Snail",
-                "AndroidMusicPresenceLink",
-                "LyricsCache");
+            _lyricsCachePath = AppPaths.GetDataPath("LyricsCache");
 
             try
             {

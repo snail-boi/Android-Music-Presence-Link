@@ -4,9 +4,9 @@
     <OutputType>WinExe</OutputType>
 	  <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
 	  <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <Version>1.2.1.0</Version>
-	<AssemblyVersion>1.2.1.0</AssemblyVersion>
-	<FileVersion>1.2.1.0</FileVersion>
+    <Version>1.3.0.0</Version>
+	<AssemblyVersion>1.3.0.0</AssemblyVersion>
+	<FileVersion>1.3.0.0</FileVersion>
     <RootNamespace>Crimson_AndroidMusicPresence</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -70,6 +70,28 @@
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
 	</ItemGroup>
+
+  <Target Name="CreatePortablePackage" AfterTargets="Build">
+    <PropertyGroup>
+      <PortableStageDir>$(TargetDir)portable-package\</PortableStageDir>
+      <PortableZipPath>$(TargetDir)Android.Music.Presence.Link.Portable.zip</PortableZipPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll" />
+      <PortableResourceFiles Include="$(TargetDir)Resources\**\*" />
+      <PortableTrayFiles Include="$(TargetDir)Tray_Icons\**\*" />
+    </ItemGroup>
+
+    <RemoveDir Directories="$(PortableStageDir)" Condition="Exists('$(PortableStageDir)')" />
+    <MakeDir Directories="$(PortableStageDir)" />
+    <Copy SourceFiles="@(PortableRootFiles)" DestinationFolder="$(PortableStageDir)" />
+    <Copy SourceFiles="@(PortableResourceFiles)" DestinationFiles="@(PortableResourceFiles->'$(PortableStageDir)Resources\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(PortableTrayFiles)" DestinationFiles="@(PortableTrayFiles->'$(PortableStageDir)Tray_Icons\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <WriteLinesToFile File="$(PortableStageDir)portable.mode" Lines="portable" Overwrite="true" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;if (Test-Path '$(PortableZipPath)') { Remove-Item '$(PortableZipPath)' -Force }; Compress-Archive -Path '$(PortableStageDir)*' -DestinationPath '$(PortableZipPath)' -Force&quot;" />
+    <RemoveDir Directories="$(PortableStageDir)" />
+  </Target>
 
 
 	<ItemGroup>

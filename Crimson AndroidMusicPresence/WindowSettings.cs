@@ -27,9 +27,7 @@ namespace musicpresense
 
     public static class Config
     {
-        private static readonly string FolderPath =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                            "Snail", "AndroidMusicPresenceLink");
+        private static readonly string FolderPath = AppPaths.GetDataPath();
 
         private static readonly string FilePath =
             Path.Combine(FolderPath, "config.json");

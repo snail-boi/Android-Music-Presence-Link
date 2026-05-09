@@ -19,6 +19,7 @@ namespace musicpresense
         private const string RepoOwner = "snail-boi";
         private const string RepoName = "Android-Music-Presence-Link";
         private const string InstallerPrefix = "Android.Music.Presence.Link";
+        private const string ReleasesPageUrl = "https://github.com/snail-boi/Android-Music-Presence-Link/releases";
         private static readonly SemaphoreSlim PromptSemaphore = new(1, 1);
 
         public static event Action<bool, string?, string?>? UpdateStatusChanged;
@@ -90,33 +91,6 @@ namespace musicpresense
                 IsUpdateAvailable = true;
                 UpdateStatusChanged?.Invoke(true, latestVersion, LatestPatchNotes);
 
-                if (!latestRelease.Value.TryGetProperty("assets", out JsonElement assetsElem) || assetsElem.ValueKind != JsonValueKind.Array)
-                    return;
-
-                JsonElement? installerAsset = null;
-                foreach (JsonElement asset in assetsElem.EnumerateArray())
-                {
-                    if (!asset.TryGetProperty("name", out JsonElement nameElem))
-                        continue;
-
-                    string? name = nameElem.GetString();
-                    if (string.IsNullOrEmpty(name))
-                        continue;
-
-                    if (name.StartsWith(InstallerPrefix, StringComparison.OrdinalIgnoreCase) &&
-                        name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
-                    {
-                        installerAsset = asset;
-                        break;
-                    }
-                }
-
-                if (installerAsset == null)
-                    return;
-
-                string installerName = installerAsset.Value.GetProperty("name").GetString() ?? "";
-                string downloadUrl = installerAsset.Value.GetProperty("browser_download_url").GetString() ?? "";
-
                 var patchNotes = LatestPatchNotes ?? GetReleaseNotes(latestRelease.Value);
 
                 if (!showPrompt)
@@ -150,6 +124,39 @@ namespace musicpresense
 
                     if (prompt.Choice != UpdatePromptChoice.Install || result != true)
                         return;
+
+                    if (AppPaths.IsPortable)
+                    {
+                        Process.Start(new ProcessStartInfo(ReleasesPageUrl) { UseShellExecute = true });
+                        return;
+                    }
+
+                    if (!latestRelease.Value.TryGetProperty("assets", out JsonElement assetsElem) || assetsElem.ValueKind != JsonValueKind.Array)
+                        return;
+
+                    JsonElement? installerAsset = null;
+                    foreach (JsonElement asset in assetsElem.EnumerateArray())
+                    {
+                        if (!asset.TryGetProperty("name", out JsonElement nameElem))
+                            continue;
+
+                        string? name = nameElem.GetString();
+                        if (string.IsNullOrEmpty(name))
+                            continue;
+
+                        if (name.StartsWith(InstallerPrefix, StringComparison.OrdinalIgnoreCase) &&
+                            name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
+                        {
+                            installerAsset = asset;
+                            break;
+                        }
+                    }
+
+                    if (installerAsset == null)
+                        return;
+
+                    string installerName = installerAsset.Value.GetProperty("name").GetString() ?? "";
+                    string downloadUrl = installerAsset.Value.GetProperty("browser_download_url").GetString() ?? "";
 
                     string tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), installerName);
                     byte[] data = await client.GetByteArrayAsync(downloadUrl);
