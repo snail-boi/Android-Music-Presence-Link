@@ -240,16 +240,6 @@
             <ContentControl x:Name="SettingsHost" />
         </Border>
 
-        <GridSplitter Grid.Column="1"
-                      Width="8"
-                      HorizontalAlignment="Stretch"
-                      VerticalAlignment="Stretch"
-                      ResizeBehavior="PreviousAndNext"
-                      ResizeDirection="Columns"
-                      Background="Transparent"
-                      DragDelta="SettingsSplitter_DragDelta"
-                      DragCompleted="SettingsSplitter_DragCompleted" />
-
         <Border x:Name="PlayerPaneBorder"
                 Grid.Column="2"
                 Grid.ColumnSpan="1"
@@ -693,6 +683,36 @@
                         </Grid>
                     </StackPanel>
 
+                    <!-- Collapse settings arrow: left edge of player pane, vertically centred.
+                         Visible when the settings pane is open. -->
+                    <Button x:Name="BtnCollapseSettingsPane"
+                            Grid.Row="0"
+                            Grid.RowSpan="6"
+                            Style="{StaticResource PaneToggleArrowButtonStyle}"
+                            Width="28"
+                            Height="36"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Panel.ZIndex="10"
+                            Visibility="Collapsed"
+                            ToolTip="Hide settings"
+                            Click="BtnCollapseSettingsPane_Click" />
+
+                    <!-- Open settings arrow: left edge of player pane, vertically centred.
+                         Visible when the settings pane is closed. -->
+                    <Button x:Name="BtnShowSettingsPane"
+                            Grid.Row="0"
+                            Grid.RowSpan="6"
+                            Style="{StaticResource PaneToggleArrowButtonStyle}"
+                            Width="28"
+                            Height="36"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Panel.ZIndex="10"
+                            Visibility="Collapsed"
+                            ToolTip="Show settings"
+                            Click="BtnShowSettingsPane_Click" />
+
                     <!-- Help / What's this? button, top-LEFT corner of the player pane -->
                     <Button x:Name="BtnHelp"
                             Grid.Row="0"
@@ -723,16 +743,6 @@
             </Grid>
         </Border>
 
-        <Button x:Name="BtnShowSettingsPane"
-                Grid.Column="2"
-                Style="{StaticResource PaneToggleArrowButtonStyle}"
-                Width="28"
-                Height="36"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Center"
-                Margin="8,8,0,0"
-                Visibility="Collapsed"
-                ToolTip="Show settings"
-                Click="BtnShowSettingsPane_Click" />
     </Grid>
 </Window>
+

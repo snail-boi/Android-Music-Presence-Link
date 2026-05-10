@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -162,6 +161,26 @@ namespace musicpresense
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             _ = LoadInstalledAppsAsync();
+            UpdateScrollIndicator();
+        }
+
+        private void MainScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            UpdateScrollIndicator();
+        }
+
+        private void UpdateScrollIndicator()
+        {
+            if (ScrollIndicator == null || MainScrollViewer == null) return;
+
+            double remaining = MainScrollViewer.ScrollableHeight - MainScrollViewer.VerticalOffset;
+            bool atBottom = remaining < 8;
+
+            double targetOpacity = atBottom ? 0 : 1;
+            if (Math.Abs(ScrollIndicator.Opacity - targetOpacity) < 0.01) return;
+
+            var anim = new DoubleAnimation(targetOpacity, new Duration(TimeSpan.FromMilliseconds(180)));
+            ScrollIndicator.BeginAnimation(UIElement.OpacityProperty, anim);
         }
 
         #region Theme & Appearance

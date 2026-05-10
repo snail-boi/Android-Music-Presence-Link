@@ -153,6 +153,8 @@ namespace musicpresense
         {
             var iconBrush = TryFindResource("ThemeControlForegroundBrush") as Brush ?? Brushes.White;
             BtnShowSettingsPane.Content = BuildRevealSettingsArrowIcon(iconBrush);
+            if (BtnCollapseSettingsPane != null)
+                BtnCollapseSettingsPane.Content = BuildCollapseSettingsArrowIcon(iconBrush);
         }
         private void RenderTransportIcons(bool isPlaying)
         {

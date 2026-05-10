@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -17,23 +16,23 @@ namespace musicpresense
 {
     public partial class MediaPlayerWindow : Window
     {
-        // Settings pane snaps to collapsed when dragged below this width.
-        // Set well above 0 so the embedded UserControl never visibly squashes
-        // before disappearing.
-        private const double CollapsedThreshold = 500;
-
-        // Settings pane MaxWidth is computed dynamically as this fraction of
-        // the window's client width on each SizeChanged.
-        private const double SettingsMaxWidthFraction = 0.55;
-
-        // Floor for MaxWidth, prevents the cap collapsing on very small windows
-        // and locking the user out of their last drag width.
-        private const double SettingsMaxWidthFloor = 320;
+        // Duration for the settings pane slide-in / slide-out animation.
+        private static readonly Duration SettingsPaneAnimDuration = new Duration(TimeSpan.FromMilliseconds(220));
 
         // Crossfade duration for cover-art gradient transitions.
         private static readonly Duration GradientFadeDuration = new Duration(TimeSpan.FromMilliseconds(450));
 
+        // ── Settings pane layout ──────────────────────────────────────────────
+        // Default width of the settings pane when opened.
         private const double DefaultSettingsWidth = 500;
+        // Maximum fraction of the window width the settings pane may occupy.
+        private const double SettingsMaxWidthFraction = 0.75;
+        // Window width below which the settings pane auto-collapses.
+        private const double SettingsAutoCollapseThreshold = 950;
+        // Window width the window expands to when opening the pane on a narrow window.
+        private const double SettingsAutoExpandWidth = 950;
+        // ─────────────────────────────────────────────────────────────────────
+
         private readonly Func<Task> _pauseAction;
         private readonly Func<Task> _nextAction;
         private readonly Func<Task> _previousAction;
@@ -67,6 +66,9 @@ namespace musicpresense
         private bool _showTimeLeft = false;
         private long _lastPositionMs;
         private long _lastDurationMs;
+
+        // Settings pane open/closed state — used by SizeChanged to decide whether to clamp or auto-collapse.
+        private bool _settingsPaneOpen = false;
 
         // Audio link toggle state
         private bool _audioLinkActive = false;
@@ -173,7 +175,7 @@ namespace musicpresense
             PlayerPaneBorder.SizeChanged += (_, _) => UpdateGradientClip();
             Loaded += (_, _) =>
             {
-                UpdateSettingsColumnMaxWidth();
+                ClampSettingsColumnWidth();
                 RefreshVolumeIcon();
                 UpdateGradientClip();
                 RefreshConnectionButton();
@@ -198,7 +200,29 @@ namespace musicpresense
         private void MediaPlayerWindow_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (!e.WidthChanged) return;
-            UpdateSettingsColumnMaxWidth();
+
+            if (_settingsPaneOpen)
+            {
+                // Auto-collapse if the window becomes too narrow to show both panes.
+                if (ActualWidth < SettingsAutoCollapseThreshold)
+                    CollapseSettingsPane();
+                else
+                    ClampSettingsColumnWidth();
+            }
+        }
+
+        private void ClampSettingsColumnWidth()
+        {
+            if (!_settingsPaneOpen) return;
+
+            double available = ActualWidth - 28;
+            if (available <= 0) return;
+
+            double max = Math.Min(DefaultSettingsWidth, available * SettingsMaxWidthFraction);
+            if (max <= 0) return;
+
+            SettingsColumn.MaxWidth = max;
+            SettingsColumn.Width = new GridLength(max, GridUnitType.Pixel);
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -244,36 +268,17 @@ namespace musicpresense
             GradientGrid.Clip = new RectangleGeometry(new Rect(0, 0, w, h), radius, radius);
         }
 
-        private void UpdateSettingsColumnMaxWidth()
-        {
-            // Compute as a fraction of the window's available width so the
-            // settings pane scales with the window and never pushes the
-            // player pane off screen.
-            double available = ActualWidth;
-            if (available <= 0) return;
-
-            double max = Math.Max(SettingsMaxWidthFloor, available * SettingsMaxWidthFraction);
-            SettingsColumn.MaxWidth = max;
-
-            // If the column is already wider than the new max (e.g. user shrank
-            // the window), clamp it down.
-            if (SettingsColumn.Width.IsAbsolute && SettingsColumn.Width.Value > max)
-            {
-                SettingsColumn.Width = new GridLength(max, GridUnitType.Pixel);
-            }
-        }
-
         public void SetSettingsContent(object? content)
         {
             SettingsHost.Content = content;
-            ShowSettingsPane(restoreDefaultWidth: false);
+            ShowSettingsPane();
         }
 
         public object? TakeSettingsContent()
         {
             var content = SettingsHost.Content;
             SettingsHost.Content = null;
-            ShowSettingsPane(restoreDefaultWidth: false);
+            ShowSettingsPane();
             return content;
         }
 
@@ -282,67 +287,61 @@ namespace musicpresense
             SettingsHost.Content = null;
         }
 
-        private void SettingsSplitter_DragDelta(object sender, DragDeltaEventArgs e)
+        private void BtnCollapseSettingsPane_Click(object sender, RoutedEventArgs e)
         {
-            // Fade the pane out as it shrinks toward the collapse threshold so it
-            // visually disappears before the column actually hits 0. Gives a
-            // smoother "snap to closed" feel without the content squashing.
-            double w = SettingsColumn.ActualWidth;
-            if (w >= CollapsedThreshold)
-            {
-                SettingsPaneBorder.Opacity = 1;
-            }
-            else
-            {
-                // Linear fade from 1 at threshold to 0 at width 0.
-                SettingsPaneBorder.Opacity = Math.Clamp(w / CollapsedThreshold, 0, 1);
-            }
-        }
-
-        private void SettingsSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
-        {
-            SettingsPaneBorder.Opacity = 1;
-
-            if (SettingsColumn.ActualWidth <= CollapsedThreshold)
-            {
-                CollapseSettingsPane();
-            }
-            else
-            {
-                ShowSettingsPane(restoreDefaultWidth: false);
-            }
+            CollapseSettingsPane();
         }
 
         private void BtnShowSettingsPane_Click(object sender, RoutedEventArgs e)
         {
-            ShowSettingsPane(restoreDefaultWidth: true);
+            ShowSettingsPane();
         }
 
         private void CollapseSettingsPane()
         {
-            SettingsPaneBorder.Visibility = Visibility.Collapsed;
-            SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
-            SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
-            BtnShowSettingsPane.Visibility = Visibility.Visible;
-            BtnShowSettingsPane.IsEnabled = true;
+            _settingsPaneOpen = false;
+            double fromWidth = SettingsColumn.Width.IsAbsolute ? SettingsColumn.Width.Value : DefaultSettingsWidth;
 
-            // Expand player to fill the full grid area with rounded corners.
-            Grid.SetColumnSpan(PlayerPaneBorder, 3);
-            PlayerPaneBorder.CornerRadius = new CornerRadius(12);
-            PlayerPaneBorder.BorderThickness = new Thickness(0);
-            UpdateGradientClip();
+            BtnCollapseSettingsPane.IsEnabled = false;
+            BtnShowSettingsPane.Visibility = Visibility.Collapsed;
+
+            var anim = new GridLengthAnimation
+            {
+                From = new GridLength(fromWidth, GridUnitType.Pixel),
+                To = new GridLength(0, GridUnitType.Pixel),
+                Duration = SettingsPaneAnimDuration,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+            };
+
+            anim.Completed += (_, _) =>
+            {
+                // Release the animation hold so width can be set directly again.
+                SettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+                SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
+                SettingsPaneBorder.Visibility = Visibility.Collapsed;
+                SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
+                Grid.SetColumnSpan(PlayerPaneBorder, 3);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(12);
+                PlayerPaneBorder.BorderThickness = new Thickness(0);
+                UpdateGradientClip();
+
+                BtnCollapseSettingsPane.Visibility = Visibility.Collapsed;
+                BtnShowSettingsPane.Visibility = Visibility.Visible;
+                BtnShowSettingsPane.IsEnabled = true;
+            };
+
+            SettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
         }
 
-        private void ShowSettingsPane(bool restoreDefaultWidth)
+        private void ShowSettingsPane()
         {
-            var hasSettingsContent = SettingsHost.Content != null;
-
-            if (!hasSettingsContent)
+            if (SettingsHost.Content == null)
             {
                 SettingsPaneBorder.Visibility = Visibility.Collapsed;
                 SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
                 SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
                 BtnShowSettingsPane.Visibility = Visibility.Collapsed;
+                BtnCollapseSettingsPane.Visibility = Visibility.Collapsed;
                 Grid.SetColumnSpan(PlayerPaneBorder, 3);
                 PlayerPaneBorder.CornerRadius = new CornerRadius(12);
                 PlayerPaneBorder.BorderThickness = new Thickness(0);
@@ -350,21 +349,44 @@ namespace musicpresense
                 return;
             }
 
-            SettingsPaneBorder.Visibility = Visibility.Visible;
-            SplitterColumn.Width = new GridLength(8, GridUnitType.Pixel);
-            PlayerPaneBorder.BorderThickness = new Thickness(1);
+            // If the window is too narrow to show both panes, grow it first.
+            if (ActualWidth < SettingsAutoCollapseThreshold)
+                Width = SettingsAutoExpandWidth;
 
-            // Restore player to its own column with original corner radius.
+            // Restore player column layout before animating.
             Grid.SetColumnSpan(PlayerPaneBorder, 1);
             PlayerPaneBorder.CornerRadius = new CornerRadius(6);
-            UpdateGradientClip();
-
-            if (restoreDefaultWidth || SettingsColumn.Width.Value <= CollapsedThreshold)
-            {
-                SettingsColumn.Width = new GridLength(DefaultSettingsWidth, GridUnitType.Pixel);
-            }
-
+            PlayerPaneBorder.BorderThickness = new Thickness(1);
+            SplitterColumn.Width = new GridLength(8, GridUnitType.Pixel);
+            SettingsPaneBorder.Visibility = Visibility.Visible;
             BtnShowSettingsPane.Visibility = Visibility.Collapsed;
+            BtnCollapseSettingsPane.Visibility = Visibility.Visible;
+            BtnCollapseSettingsPane.IsEnabled = false;
+
+            ClampSettingsColumnWidth();
+            double targetWidth = Math.Min(DefaultSettingsWidth, SettingsColumn.MaxWidth > 0 ? SettingsColumn.MaxWidth : DefaultSettingsWidth);
+            double fromWidth = SettingsColumn.Width.IsAbsolute && SettingsColumn.Width.Value > 0
+                ? SettingsColumn.Width.Value
+                : 0;
+
+            var anim = new GridLengthAnimation
+            {
+                From = new GridLength(fromWidth, GridUnitType.Pixel),
+                To = new GridLength(targetWidth, GridUnitType.Pixel),
+                Duration = SettingsPaneAnimDuration,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+            };
+
+            anim.Completed += (_, _) =>
+            {
+                SettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+                SettingsColumn.Width = new GridLength(targetWidth, GridUnitType.Pixel);
+                _settingsPaneOpen = true;
+                BtnCollapseSettingsPane.IsEnabled = true;
+                UpdateGradientClip();
+            };
+
+            SettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
         }
 
         // Track the last cover path shown so we never re-fade the same image on each update tick

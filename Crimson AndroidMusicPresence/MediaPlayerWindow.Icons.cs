@@ -191,6 +191,32 @@ namespace musicpresense
         }
 
         /// <summary>
+        /// Left-pointing chevron: shown on the collapse button when the settings pane is open.
+        /// Mirror of <see cref="BuildRevealSettingsArrowIcon"/>.
+        /// </summary>
+        private static Viewbox BuildCollapseSettingsArrowIcon(Brush brush)
+        {
+            var canvas = new Canvas { Width = 14, Height = 20 };
+
+            var chevron = new Polygon
+            {
+                Fill = brush,
+                Points = new PointCollection
+                {
+                    new Point(11, 3),
+                    new Point(3, 10),
+                    new Point(11, 17),
+                    new Point(8, 17),
+                    new Point(0, 10),
+                    new Point(8, 3)
+                }
+            };
+
+            canvas.Children.Add(chevron);
+            return new Viewbox { Width = 14, Height = 20, Child = canvas };
+        }
+
+        /// <summary>
         /// Builds the speaker glyph with 0, 1, or 2 sound-wave arcs depending on level.
         /// Muted gets a small slash through the speaker.
         /// </summary>
