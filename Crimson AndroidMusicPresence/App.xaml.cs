@@ -229,6 +229,8 @@ namespace musicpresense
             if (_scrcpySwitchInProgress) return;
             if (_scrcpyProcess == null || _scrcpyProcess.HasExited) return;
             if (string.IsNullOrEmpty(_scrcpyDeviceId)) return;
+            // Auto-switching requires a fast enough update cycle to be reliable.
+            if (Config.UpdateIntervalMode > UpdateIntervalMode.Fast) return;
 
             var liveDevice = _presenceService?.CurrentDevice ?? string.Empty;
 
@@ -323,6 +325,7 @@ namespace musicpresense
                 if (enable)
                 {
                     _audioLinkDesired = true;
+                    _audioLinkRecoveryAttempts = 0;
                     if (_scrcpyProcess == null || _scrcpyProcess.HasExited)
                     {
                         StartScrcpyNoAudio();
@@ -331,6 +334,7 @@ namespace musicpresense
                 else
                 {
                     _audioLinkDesired = false;
+                    _audioLinkRecoveryAttempts = 0;
                     CancelAudioLinkRecovery();
                     if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
                     {
@@ -803,12 +807,14 @@ namespace musicpresense
             if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
             {
                 _audioLinkDesired = false;
+                _audioLinkRecoveryAttempts = 0;
                 CancelAudioLinkRecovery();
                 _ = StopScrcpyAsync();
             }
             else
             {
                 _audioLinkDesired = true;
+                _audioLinkRecoveryAttempts = 0;
                 StartScrcpyNoAudio();
             }
         }
@@ -1024,11 +1030,25 @@ namespace musicpresense
                 // the recovery wait for the device to be present and start fresh.
                 if (wasDesired && !_isExiting && !_scrcpySwitchInProgress)
                 {
-                    Debugger.show($"Audio-link: scrcpy exited unexpectedly (was on {(wasUsb ? "USB" : "WiFi")} as {oldDevice ?? "<null>"}), arming recovery.");
-                    ArmAudioLinkRecovery();
+                    if (Config.UpdateIntervalMode > UpdateIntervalMode.Fast)
+                    {
+                        Debugger.show($"Audio-link: scrcpy exited unexpectedly (was on {(wasUsb ? "USB" : "WiFi")} as {oldDevice ?? "<null>"}), auto-recovery disabled at this update interval.");
+                    }
+                    else
+                    {
+                        Debugger.show($"Audio-link: scrcpy exited unexpectedly (was on {(wasUsb ? "USB" : "WiFi")} as {oldDevice ?? "<null>"}), arming recovery.");
+                        ArmAudioLinkRecovery();
+                    }
                 }
             });
         }
+
+        // Counts how many times scrcpy has been (re)started by the recovery path
+        // since the last successful stable session. Reset when the user explicitly
+        // starts/stops. Prevents infinite restart storms when Wi-Fi is unavailable
+        // after a USB disconnect.
+        private int _audioLinkRecoveryAttempts;
+        private const int AudioLinkRecoveryMaxAttempts = 40;
 
         /// <summary>
         /// Starts polling for a usable device to restart the audio link on. Used after
@@ -1037,6 +1057,16 @@ namespace musicpresense
         /// </summary>
         private void ArmAudioLinkRecovery()
         {
+            _audioLinkRecoveryAttempts++;
+            if (_audioLinkRecoveryAttempts > AudioLinkRecoveryMaxAttempts)
+            {
+                Debugger.show($"Audio-link recovery: reached {AudioLinkRecoveryMaxAttempts} attempts, giving up. Toggle audio link to retry.");
+                _audioLinkDesired = false;
+                _audioLinkRecoveryAttempts = 0;
+                return;
+            }
+
+            Debugger.show($"Audio-link recovery: attempt {_audioLinkRecoveryAttempts}/{AudioLinkRecoveryMaxAttempts}.");
             CancelAudioLinkRecovery();
             var cts = new CancellationTokenSource();
             _audioLinkRecoveryCts = cts;

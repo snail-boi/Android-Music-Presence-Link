@@ -30,6 +30,7 @@ namespace musicpresense
             int mode = (int)_config.UpdateIntervalMode;
             if (mode < 1 || mode > 4) mode = 1;
             CmbUpdateInterval.SelectedIndex = mode - 1;
+            UpdateIntervalWarningVisibility();
 
             ChkDebugMode.IsChecked = _config.DebugMode;
             ChkDarkMode.IsChecked = _config.UseDarkMode;
@@ -71,6 +72,19 @@ namespace musicpresense
             }
             catch { }
         }
+        private void CmbUpdateInterval_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            UpdateIntervalWarningVisibility();
+        }
+
+        private void UpdateIntervalWarningVisibility()
+        {
+            if (TxtUpdateIntervalWarning == null) return;
+            // Indices 0=1sec, 1=3sec, 2=5sec, 3=10sec. Warn for index >= 2 (5 sec and above).
+            bool slow = CmbUpdateInterval.SelectedIndex >= 2;
+            TxtUpdateIntervalWarning.Visibility = slow ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        }
+
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             SaveConfigFromUi(true);

@@ -990,13 +990,21 @@
                             <TextBlock Text="Update interval"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                            <ComboBox x:Name="CmbUpdateInterval" Grid.Column="1">
+                            <ComboBox x:Name="CmbUpdateInterval" Grid.Column="1"
+                                      SelectionChanged="CmbUpdateInterval_SelectionChanged">
                                 <ComboBoxItem>1 sec</ComboBoxItem>
                                 <ComboBoxItem>3 sec</ComboBoxItem>
                                 <ComboBoxItem>5 sec</ComboBoxItem>
                                 <ComboBoxItem>10 sec</ComboBoxItem>
                             </ComboBox>
                         </Grid>
+
+                        <TextBlock x:Name="TxtUpdateIntervalWarning"
+                                   Visibility="Collapsed"
+                                   Text="Intervals above 3 sec disable audio link hotswap recovery and may cause the mediaplayer to update slowly."
+                                   Style="{StaticResource HintTextStyle}"
+                                   Foreground="#E6A020"
+                                   Margin="0,0,0,8" />
 
                         <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
