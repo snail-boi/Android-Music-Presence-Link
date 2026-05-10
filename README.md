@@ -5,8 +5,11 @@ Built primarily to work alongside [MusicPresence](https://github.com/ungive/disc
 
 ---
 
-<!-- Replace the line below with an actual screenshot path once available -->
-![Media Player](docs/mediaplayer.png)
+<!-- Replace the paths below with actual screenshot paths once available -->
+<p>
+  <img src="docs/mediaplayer_settings_collapsed.png" width="48%" />
+  <img src="docs/mediaplayer_settings_opened.png" width="48%" />
+</p>
 
 ---
 
