@@ -28,7 +28,7 @@ namespace musicpresense
             ApplyAllowedAppsSelection();
 
             int mode = (int)_config.UpdateIntervalMode;
-            if (mode < 1 || mode > 5) mode = 3;
+            if (mode < 1 || mode > 4) mode = 1;
             CmbUpdateInterval.SelectedIndex = mode - 1;
 
             ChkDebugMode.IsChecked = _config.DebugMode;
@@ -676,32 +676,8 @@ namespace musicpresense
         {
             _config = config;
             _savedConfig = CloneConfig(config);
-
-            if (TxtWifi != null)
-                TxtWifi.Text = _config.SelectedDeviceWiFi ?? string.Empty;
-
-            if (TxtUsbSerial != null)
-                TxtUsbSerial.Text = _config.SelectedDeviceUSB ?? string.Empty;
-
-            if (TxtDeviceName != null)
-                TxtDeviceName.Text = _config.SelectedDeviceName ?? string.Empty;
-
-            if (TxtMdnsService != null)
-                TxtMdnsService.Text = _config.WifiMdnsServiceName ?? string.Empty;
-
-            SelectWifiModeFromConfig();
-            UpdatePairButtonVisibility();
-
-            if (TxtLyricsFolderOverride != null)
-                TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
-
+            ApplyConfigToUI();
             UpdateMediaPlayerModeButton((Application.Current as App)?.IsMediaPlayerModeActive() == true);
-
-            if (TxtCoverPatterns != null)
-                TxtCoverPatterns.Text = _config.CoverArtFileNamePatterns ?? string.Empty;
-
-            if (TxtCopyTrackTemplate != null)
-                TxtCopyTrackTemplate.Text = _config.CopyTrackInfoTemplate ?? string.Empty;
         }
     }
 }

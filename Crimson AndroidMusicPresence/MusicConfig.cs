@@ -40,8 +40,7 @@ namespace musicpresense
         Extreme = 1,
         Fast = 2,
         Medium = 3,
-        Slow = 4,
-        None = 5
+        Slow = 4
     }
 
     public enum WirelessMode
@@ -86,7 +85,7 @@ namespace musicpresense
 
         public string MusicRemoteRoot { get; set; } = string.Empty;
         public List<string> MusicRemoteRoots { get; set; } = new List<string>();
-        public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Fast;
+        public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Extreme;
         public string IgnoredUpdateVersion { get; set; } = string.Empty;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
@@ -121,7 +120,7 @@ namespace musicpresense
         public int HotkeyToggleScrcpyKey { get; set; } = 0x53;
         public int HotkeyToggleLyricsOverlayKey { get; set; } = 0x4C;
         public int HotkeyCopyTrackInfoKey { get; set; } = 0x43;
-        public int HotkeyModifier { get; set; } = 0x0004;
+        public int HotkeyModifier { get; set; } = 0x0001;
     }
 
     public class PathsConfig
@@ -188,6 +187,10 @@ namespace musicpresense
             config.EligibleApps ??= new List<EligibleAppConfig>();
             config.MusicRemoteRoots ??= new List<string>();
             config.WifiMdnsServiceName ??= string.Empty;
+            if (!Enum.IsDefined(typeof(UpdateIntervalMode), config.UpdateIntervalMode))
+            {
+                config.UpdateIntervalMode = UpdateIntervalMode.Extreme;
+            }
 
             if (config.EligibleApps.Count == 0 && config.AllowedApps.Count > 0)
             {

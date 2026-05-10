@@ -151,14 +151,6 @@ namespace musicpresense
 
         private void InitializeCmbBoxes()
         {
-            CmbUpdateInterval.ItemsSource = new[]
-            {
-                "Extreme (1s)",
-                "Fast (5s)",
-                "Medium (15s)",
-                "Slow (30s)",
-                "No automatic update"
-            };
             CmbQualityPresets.ItemsSource = AudioQualityPresets.All
                 .Select(p => p.Name)
                 .ToArray();

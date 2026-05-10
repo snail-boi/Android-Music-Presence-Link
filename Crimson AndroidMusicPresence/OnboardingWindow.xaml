@@ -798,9 +798,9 @@
 
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Modifier key" Style="{StaticResource FieldLabel}" />
                         <ComboBox x:Name="CmbHotkeyModifier" Grid.Row="1" Grid.Column="1" Margin="0,0,0,12">
-                            <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
-                            <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
                             <ComboBoxItem Tag="0x0001">Alt</ComboBoxItem>
+                            <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
+                            <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
                         </ComboBox>
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Volume Up" Style="{StaticResource FieldLabel}" />

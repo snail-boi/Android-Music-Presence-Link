@@ -1031,11 +1031,10 @@ namespace musicpresense
             return mode switch
             {
                 UpdateIntervalMode.Extreme => TimeSpan.FromSeconds(1),
-                UpdateIntervalMode.Fast => TimeSpan.FromSeconds(5),
-                UpdateIntervalMode.Medium => TimeSpan.FromSeconds(15),
-                UpdateIntervalMode.Slow => TimeSpan.FromSeconds(30),
-                UpdateIntervalMode.None => TimeSpan.FromSeconds(0),
-                _ => TimeSpan.FromSeconds(15)
+                UpdateIntervalMode.Fast => TimeSpan.FromSeconds(3),
+                UpdateIntervalMode.Medium => TimeSpan.FromSeconds(5),
+                UpdateIntervalMode.Slow => TimeSpan.FromSeconds(10),
+                _ => TimeSpan.FromSeconds(1)
             };
         }
 
