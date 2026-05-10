@@ -27,7 +27,7 @@ namespace musicpresense
 
     public static class Config
     {
-        private static readonly string FolderPath = AppPaths.GetDataPath();
+        private static readonly string FolderPath = Path.GetDirectoryName(MusicConfigManager.ConfigPath) ?? AppPaths.GetDataPath();
 
         private static readonly string FilePath =
             Path.Combine(FolderPath, "config.json");
