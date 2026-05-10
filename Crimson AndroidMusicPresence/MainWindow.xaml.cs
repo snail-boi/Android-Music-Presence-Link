@@ -324,8 +324,21 @@ namespace musicpresense
             }
         }
 
-        private void BtnResetDevice_Click(object sender, RoutedEventArgs e)
+        private async void BtnResetDevice_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi))
+                {
+                    await AdbHelper.RunAdbAsync($"disconnect");
+                    Debugger.show("[RESET] SUCCESFULLY RESET");
+                }
+            }
+            catch
+            {
+                Debugger.show("[RESET] RESET FAILED");
+            }
+
             TxtUsbSerial.Text = string.Empty;
             TxtWifi.Text = string.Empty;
             if (TxtMdnsService != null)
