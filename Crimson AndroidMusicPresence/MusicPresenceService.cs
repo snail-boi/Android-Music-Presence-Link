@@ -856,15 +856,21 @@ namespace musicpresense
                     if (!parseSuccess)
                         continue;
 
-                    var stateMatch = Regex.Match(block, @"state=PlaybackState\s*\{[^}]*state=(\w+)\((\d+)\),\s*position=(-?\d+)", RegexOptions.Singleline);
+                    var stateMatch = Regex.Match(block, @"state=PlaybackState\s*\{[^}]*state=(?:(\w+)\((\d+)\)|(\d+)),\s*position=(-?\d+)", RegexOptions.Singleline);
                     bool isPlaying = false;
                     long adbPositionMs = 0;
 
                     if (stateMatch.Success)
                     {
                         string stateText = stateMatch.Groups[1].Value.Trim().ToUpper();
-                        isPlaying = stateText == "PLAYING";
-                        _ = long.TryParse(stateMatch.Groups[3].Value, out adbPositionMs);
+                        string stateNumStr = string.IsNullOrEmpty(stateMatch.Groups[2].Value)
+                            ? stateMatch.Groups[3].Value
+                            : stateMatch.Groups[2].Value;
+                        if (!string.IsNullOrEmpty(stateText))
+                            isPlaying = stateText == "PLAYING";
+                        else if (int.TryParse(stateNumStr, out int stateNum))
+                            isPlaying = stateNum == 3;
+                        _ = long.TryParse(stateMatch.Groups[4].Value, out adbPositionMs);
                     }
 
                     if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
