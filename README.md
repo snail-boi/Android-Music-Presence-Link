@@ -5,6 +5,11 @@ Built primarily to work alongside [MusicPresence](https://github.com/ungive/disc
 
 ---
 
+<!-- Replace the line below with an actual screenshot path once available -->
+![Media Player](docs/mediaplayer.png)
+
+---
+
 ## Who Is This For?
 
 This app is made for:
@@ -24,6 +29,7 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 - Passes currently playing media from Android to Windows
 - Can be forwarded to Discord using MusicPresence
 - Reads title, artist, and album from the active Android media session
+- Forwards presence to Windows SMTC (System Media Transport Controls), making it available to any app that reads SMTC
 
 ### Cover Art
 
@@ -40,6 +46,7 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 - Also shows lyrics inline inside the media player window
 - Plain-text lyrics files (no timestamps) are supported as a fallback
 - Lyrics are cached locally to avoid re-fetching on every track change
+- A custom lyrics folder override can be configured separately from music folders
 
 ### Audio Link
 
@@ -72,11 +79,15 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 - Inline lyrics panel replaces the cover art area when toggled
 - Dark mode and light mode
 - Always-on-top toggle
-- Hide-decorations toggle (removes title bar and borders, window stays movable and resizable)
+- Hide-decorations toggle (removes title bar and borders; window stays movable and resizable)
 - Connection status pill showing USB/Wi-Fi state
 - Audio quality button showing current preset, with a popup to switch presets without opening settings
 - System tray icon with state-specific icons for USB, Wi-Fi, audio link active, and no device
 - Now Playing shown in the tray tooltip and tray menu
+- Start minimized to tray option
+- Start with Windows option
+- Debug logging with a log folder shortcut in settings
+- SMTC paused-clear delay: clears the Windows media session after a configurable number of minutes when paused (0 = disabled)
 
 ### Connection
 
@@ -92,13 +103,23 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 
 ---
 
+## Devices tested and known working
+
+- Redmi note 13
+- Redmi note 15
+- Samsung s25 edge
+- Samsung s10 (Audio link doesn't work due to android 12)
+
+---
+
 ## Requirements
 
-- Android phone
+- Android phone running **Android 13 or newer** (will work for 12 and 11, but audio link will not function and other parts may cease to function right)
+- Android 14 and 15 are currently untested. If you encounter any issues on those versions, please open an issue.
 - No Apple or iOS support, and no plans for it
 - USB debugging must be enabled on your phone
 - Uses ADB (Android Debug Bridge) to establish the connection
-- Android 11+ is recommended for Wireless Debugging mode
+- Wireless Debugging mode requires Android 13+
 - scrcpy is required for the Audio Link feature
 
 Without USB debugging enabled, the app will not work.
@@ -120,16 +141,16 @@ Tested structure:
 ```
 Main Folder
 ├── Random Unsorted Music
-└── Albums
-    └── Album Name
-        ├── track1.mp3
-        ├── track2.mp3
-        └── cover.png or cover.jpg
+└── Album Name
+    ├── track1.mp3
+    ├── track2.mp3
+    └── cover.png or cover.jpg
 ```
 
 Notes:
 
 - No guarantee for deeply nested folder structures
+- of title and filename do not match then wrong or no cover will be pulled
 - If all songs contain embedded cover art in metadata, it should work reliably
 - Multiple music root folders can be configured
 
