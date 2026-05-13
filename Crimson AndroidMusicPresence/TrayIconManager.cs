@@ -8,6 +8,140 @@ using System.Windows.Forms;
 
 namespace musicpresense
 {
+    /// <summary>
+    /// Custom renderer that gives the tray menu the same clean aesthetic as the
+    /// rest of the app: flat background, no chunky selection borders, accent-colored
+    /// hover on action items, and dimmed non-interactive info rows.
+    /// </summary>
+    internal sealed class AppTrayMenuRenderer : ToolStripProfessionalRenderer
+    {
+        private readonly Color _back;
+        private readonly Color _fore;
+        private readonly Color _dimFore;
+        private readonly Color _hover;
+        private readonly Color _separatorColor;
+
+        public AppTrayMenuRenderer(Color back, Color fore)
+            : base(new AppTrayColorTable(back, fore))
+        {
+            _back = back;
+            _fore = fore;
+            _dimFore = Color.FromArgb(
+                (int)(fore.R * 0.55 + back.R * 0.45),
+                (int)(fore.G * 0.55 + back.G * 0.45),
+                (int)(fore.B * 0.55 + back.B * 0.45));
+            // Subtle blue-tinted hover matching the app accent (#2D6CDF)
+            _hover = Color.FromArgb(
+                (int)(back.R * 0.82 + 45 * 0.18),
+                (int)(back.G * 0.82 + 108 * 0.18),
+                (int)(back.B * 0.82 + 223 * 0.18));
+            _separatorColor = Color.FromArgb(
+                (int)(fore.R * 0.12 + back.R * 0.88),
+                (int)(fore.G * 0.12 + back.G * 0.88),
+                (int)(fore.B * 0.12 + back.B * 0.88));
+        }
+
+        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+        {
+            var item = e.Item;
+            var g = e.Graphics;
+            var rect = new Rectangle(2, 1, item.Width - 4, item.Height - 2);
+
+            // Info items: no hover highlight, just plain background
+            if (item.Tag as string == "info")
+            {
+                using var br = new SolidBrush(_back);
+                g.FillRectangle(br, rect);
+                return;
+            }
+
+            if (item.Selected)
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                using var path = RoundedRect(rect, 4);
+                using var br = new SolidBrush(_hover);
+                g.FillPath(br, path);
+            }
+            else
+            {
+                using var br = new SolidBrush(_back);
+                g.FillRectangle(br, rect);
+            }
+        }
+
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+        {
+            e.TextColor = e.Item.Tag as string == "info" ? _dimFore : _fore;
+            base.OnRenderItemText(e);
+        }
+
+        protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+        {
+            int y = e.Item.Height / 2;
+            using var pen = new Pen(_separatorColor, 1f);
+            e.Graphics.DrawLine(pen, 8, y, e.Item.Width - 8, y);
+        }
+
+        protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
+        {
+            using var br = new SolidBrush(_back);
+            e.Graphics.FillRectangle(br, e.AffectedBounds);
+        }
+
+        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+        {
+            var rect = new Rectangle(
+                e.AffectedBounds.X, e.AffectedBounds.Y,
+                e.AffectedBounds.Width - 1, e.AffectedBounds.Height - 1);
+            using var pen = new Pen(_separatorColor, 1f);
+            e.Graphics.DrawRectangle(pen, rect);
+        }
+
+        protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
+        {
+            // No image gutter stripe
+        }
+
+        private static GraphicsPath RoundedRect(Rectangle r, int radius)
+        {
+            var path = new GraphicsPath();
+            path.AddArc(r.X, r.Y, radius * 2, radius * 2, 180, 90);
+            path.AddArc(r.Right - radius * 2, r.Y, radius * 2, radius * 2, 270, 90);
+            path.AddArc(r.Right - radius * 2, r.Bottom - radius * 2, radius * 2, radius * 2, 0, 90);
+            path.AddArc(r.X, r.Bottom - radius * 2, radius * 2, radius * 2, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
+    internal sealed class AppTrayColorTable : ProfessionalColorTable
+    {
+        private readonly Color _back;
+        private readonly Color _border;
+
+        public AppTrayColorTable(Color back, Color fore)
+        {
+            _back = back;
+            _border = Color.FromArgb(
+                (int)(fore.R * 0.12 + back.R * 0.88),
+                (int)(fore.G * 0.12 + back.G * 0.88),
+                (int)(fore.B * 0.12 + back.B * 0.88));
+        }
+
+        public override Color MenuBorder => _border;
+        public override Color MenuItemBorder => Color.Transparent;
+        public override Color MenuItemSelected => Color.Transparent;
+        public override Color MenuItemSelectedGradientBegin => Color.Transparent;
+        public override Color MenuItemSelectedGradientEnd => Color.Transparent;
+        public override Color MenuItemPressedGradientBegin => Color.Transparent;
+        public override Color MenuItemPressedGradientEnd => Color.Transparent;
+        public override Color ToolStripDropDownBackground => _back;
+        public override Color ImageMarginGradientBegin => _back;
+        public override Color ImageMarginGradientMiddle => _back;
+        public override Color ImageMarginGradientEnd => _back;
+    }
+
+
     internal enum TrayIconState
     {
         ActiveUsb,
@@ -61,6 +195,7 @@ namespace musicpresense
             TryLoadIcon();
 
             _menu = new ContextMenuStrip();
+            _menu.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
 
             _connectionItem = CreateInfoItem("Connection: No device connected");
             _audioLinkItem = CreateInfoItem("Audio Link: Inactive");
@@ -103,7 +238,8 @@ namespace musicpresense
         {
             return new ToolStripMenuItem(text)
             {
-                Enabled = true
+                Enabled = true,
+                Tag = "info"
             };
         }
 
@@ -317,24 +453,26 @@ namespace musicpresense
                 return;
             }
 
+            var displayArtist = artist.Trim();
+            if (displayArtist.Length > 50)
+                displayArtist = displayArtist[..50] + "...";
+
             var displayTitle = title.Trim();
             if (displayTitle.Length > 50)
-            {
                 displayTitle = displayTitle[..50] + "...";
-            }
 
-            _nowPlayingItem.Text = $"Now Playing: {artist} - {displayTitle}";
+            _nowPlayingItem.Text = $"Now Playing: {displayArtist} - {displayTitle}";
             _nowPlayingItem.Visible = true;
         }
 
         public void SetDarkMode(bool useDarkMode)
         {
-            var back = useDarkMode ? Color.FromArgb(32, 32, 32) : Color.White;
-            var fore = useDarkMode ? Color.FromArgb(235, 235, 235) : Color.FromArgb(24, 24, 24);
+            var back = useDarkMode ? Color.FromArgb(28, 28, 30) : Color.FromArgb(250, 250, 252);
+            var fore = useDarkMode ? Color.FromArgb(235, 235, 237) : Color.FromArgb(24, 24, 28);
 
             _menu.BackColor = back;
             _menu.ForeColor = fore;
-            _menu.RenderMode = ToolStripRenderMode.System;
+            _menu.Renderer = new AppTrayMenuRenderer(back, fore);
 
             foreach (ToolStripItem item in _menu.Items)
             {
