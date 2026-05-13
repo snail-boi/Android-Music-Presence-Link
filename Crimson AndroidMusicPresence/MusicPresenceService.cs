@@ -467,24 +467,13 @@ namespace musicpresense
             // Step 3: USB-assisted recovery. Prompt the user, get a USB
             // device, retry mDNS once, and as a last resort try the last
             // known port at the phone's current wlan0 IP.
-            if (!_wifiReconnectPromptShown)
-            {
-                await _dispatcher.InvokeAsync(() =>
-                {
-                    MessageBox.Show(
-                        "Wireless connection failed. Make sure Wireless Debugging is still enabled on your phone "
-                        + "(Settings, Developer options, Wireless debugging). If it is, plug in USB so the app can "
-                        + "rediscover the device.",
-                        "Reconnect Device",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                });
-                _wifiReconnectPromptShown = true;
-            }
-
             var usbDevice = await GetUsbDeviceForRecoveryAsync().ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(usbDevice))
+            {
+                _wifiNeedsUsbReconnect = false;
+                _wifiReconnectPromptShown = false;
                 return;
+            }
 
             // Retry mDNS now that we have USB context. Some networks only
             // surface the service after the phone has been actively used.
@@ -533,12 +522,10 @@ namespace musicpresense
 
             await _dispatcher.InvokeAsync(() =>
             {
-                MessageBox.Show(
-                    "Could not reconnect via Wireless Debugging. Please open Settings and use 'Pair phone' to re-pair.",
-                    "Reconnect Failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                Debugger.show("Wireless Debugging reconnect failed; clearing connection state.");
             });
+            _wifiNeedsUsbReconnect = false;
+            _wifiReconnectPromptShown = false;
         }
 
         private async Task<string> GetUsbDeviceForRecoveryAsync()
