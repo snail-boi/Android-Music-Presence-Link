@@ -18,6 +18,7 @@ namespace musicpresense
         private readonly MediaController _mediaController;
         private string _currentDevice = string.Empty;
         private bool _wifiReconnectPromptShown;
+        private bool _wifiReconnectFailurePromptShown;
         private bool _isRecoveringWifi;
         private DateTimeOffset? _pausedSince;
         private string? _pausedSignature;
@@ -439,6 +440,7 @@ namespace musicpresense
                     _currentDeviceIsUsb = false;
                     _wifiNeedsUsbReconnect = false;
                     _wifiReconnectPromptShown = false;
+                    _wifiReconnectFailurePromptShown = false;
                     MusicConfigManager.Save(_config);
                     await _dispatcher.InvokeAsync(() =>
                     {
@@ -460,6 +462,7 @@ namespace musicpresense
                     _currentDeviceIsUsb = false;
                     _wifiNeedsUsbReconnect = false;
                     _wifiReconnectPromptShown = false;
+                    _wifiReconnectFailurePromptShown = false;
                     return;
                 }
             }
@@ -467,11 +470,27 @@ namespace musicpresense
             // Step 3: USB-assisted recovery. Prompt the user, get a USB
             // device, retry mDNS once, and as a last resort try the last
             // known port at the phone's current wlan0 IP.
+            if (!_wifiReconnectFailurePromptShown)
+            {
+                _wifiReconnectFailurePromptShown = true;
+                await _dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show(
+                        "Wireless connection failed. Make sure Wireless Debugging is still enabled on your phone "
+                        + "(Settings, Developer options, Wireless debugging). If it is, plug in USB so the app can "
+                        + "rediscover the device.",
+                        "Reconnect Device",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                });
+            }
+
             var usbDevice = await GetUsbDeviceForRecoveryAsync().ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(usbDevice))
             {
+                _currentDevice = string.Empty;
+                _currentDeviceIsUsb = false;
                 _wifiNeedsUsbReconnect = false;
-                _wifiReconnectPromptShown = false;
                 return;
             }
 
@@ -487,6 +506,7 @@ namespace musicpresense
                     _currentDeviceIsUsb = false;
                     _wifiNeedsUsbReconnect = false;
                     _wifiReconnectPromptShown = false;
+                    _wifiReconnectFailurePromptShown = false;
                     MusicConfigManager.Save(_config);
                     await _dispatcher.InvokeAsync(() =>
                     {
@@ -511,6 +531,7 @@ namespace musicpresense
                     _currentDeviceIsUsb = false;
                     _wifiNeedsUsbReconnect = false;
                     _wifiReconnectPromptShown = false;
+                    _wifiReconnectFailurePromptShown = false;
                     MusicConfigManager.Save(_config);
                     await _dispatcher.InvokeAsync(() =>
                     {
@@ -520,12 +541,9 @@ namespace musicpresense
                 }
             }
 
-            await _dispatcher.InvokeAsync(() =>
-            {
-                Debugger.show("Wireless Debugging reconnect failed; clearing connection state.");
-            });
+            _currentDevice = string.Empty;
+            _currentDeviceIsUsb = false;
             _wifiNeedsUsbReconnect = false;
-            _wifiReconnectPromptShown = false;
         }
 
         private async Task<string> GetUsbDeviceForRecoveryAsync()

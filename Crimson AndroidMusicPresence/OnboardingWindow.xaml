@@ -586,8 +586,8 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Wi-Fi Address" Style="{StaticResource FieldLabel}" />
-                                <TextBlock Text="Optional, format ip:port." Style="{StaticResource HelperText}" Margin="0,2,8,0" />
+                                <TextBlock x:Name="LblWifiAddress" Text="Wi-Fi Address" Style="{StaticResource FieldLabel}" />
+                                <TextBlock x:Name="LblWifiAddressHelp" Text="Optional, format ip:port." Style="{StaticResource HelperText}" Margin="0,2,8,0" />
                             </StackPanel>
                             <TextBox Grid.Column="1" x:Name="TxtWifi" />
                         </Grid>

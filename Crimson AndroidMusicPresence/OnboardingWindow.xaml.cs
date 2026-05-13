@@ -64,7 +64,7 @@ namespace musicpresense
             }
 
             TxtUsbSerial.Text = _workingConfig.SelectedDeviceUSB;
-            TxtWifi.Text = _workingConfig.SelectedDeviceWiFi;
+            SetWifiDisplayFromConfig();
             TxtDeviceName.Text = _workingConfig.SelectedDeviceName;
             SelectWifiModeFromConfig();
             UpdatePairButtonVisibility();
@@ -300,6 +300,40 @@ namespace musicpresense
             BtnPairWireless.Visibility = GetSelectedWifiMode() == WirelessMode.WirelessDebugging
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            UpdateWifiFieldPresentation();
+        }
+
+        private void UpdateWifiFieldPresentation()
+        {
+            bool isWd = GetSelectedWifiMode() == WirelessMode.WirelessDebugging;
+
+            if (FindName("LblWifiAddress") is TextBlock wifiLabel)
+                wifiLabel.Text = isWd ? "mDNS" : "Wi-Fi Address";
+
+            if (FindName("LblWifiAddressHelp") is TextBlock wifiHelp)
+                wifiHelp.Text = isWd
+                    ? "mDNS service name discovered by pairing." 
+                    : "Optional, format ip:port.";
+
+            if (TxtWifi != null && !isWd)
+            {
+                TxtWifi.Text = _workingConfig.SelectedDeviceWiFi;
+            }
+        }
+
+        private void SetWifiDisplayFromConfig()
+        {
+            if (TxtWifi == null) return;
+
+            if (GetSelectedWifiMode() == WirelessMode.WirelessDebugging)
+            {
+                TxtWifi.Text = _workingConfig.WifiMdnsServiceName ?? string.Empty;
+            }
+            else
+            {
+                TxtWifi.Text = _workingConfig.SelectedDeviceWiFi;
+            }
         }
 
         private void CmbWifiMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -319,28 +353,29 @@ namespace musicpresense
             string ipPort = string.Empty;
             if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
             {
-                ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(dlg.ServiceName);
+                ipPort = await ReconnectViaMdnsWithRetryAsync(dlg.ServiceName);
             }
 
             if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
             {
                 _workingConfig.WifiMdnsServiceName = dlg.ServiceName;
+                TxtWifi.Text = dlg.ServiceName;
             }
             if (!string.IsNullOrWhiteSpace(ipPort))
             {
-                TxtWifi.Text = ipPort;
                 _workingConfig.SelectedDeviceWiFi = ipPort;
                 _workingConfig.IsWifiEnabled = true;
             }
 
-            MusicConfigManager.Save(_workingConfig);
-            (Application.Current as App)?.UpdateConfig(_workingConfig);
-
-            var usbSerial = await GetConnectedUsbDeviceAsync();
-            if (string.IsNullOrWhiteSpace(usbSerial) && !string.IsNullOrWhiteSpace(ipPort))
+            // Prefer the Wireless Debugging connection itself to read the real
+            // hardware serial, rather than trying to infer it from whatever USB
+            // device happens to be attached right now.
+            string usbSerial = string.Empty;
+            if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
             {
-                usbSerial = await GetDeviceSerialAsync(ipPort);
+                usbSerial = await GetWirelessDebuggingSerialAsync(dlg.ServiceName, ipPort).ConfigureAwait(true);
             }
+
             if (!string.IsNullOrWhiteSpace(usbSerial))
             {
                 TxtUsbSerial.Text = usbSerial;
@@ -364,11 +399,28 @@ namespace musicpresense
 
             MessageBox.Show(
                 string.IsNullOrWhiteSpace(ipPort)
-                    ? "Pairing succeeded. The app will discover the connection port on the next reconnect."
+                    ? "Pairing succeeded."
                     : $"Paired and connected at {ipPort}.",
                 "Pairing Complete",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+        }
+
+        private static async Task<string> ReconnectViaMdnsWithRetryAsync(string serviceName)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName))
+                return string.Empty;
+
+            for (int attempt = 0; attempt < 8; attempt++)
+            {
+                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(serviceName).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(ipPort))
+                    return ipPort;
+
+                await Task.Delay(500).ConfigureAwait(false);
+            }
+
+            return string.Empty;
         }
 
         private async void BtnAutoGather_Click(object sender, RoutedEventArgs e)
@@ -600,18 +652,61 @@ namespace musicpresense
 
         private async Task<string> GetCurrentDeviceForAppsAsync()
         {
-            string device = string.Empty;
-
             var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
             var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
             bool IsDeviceConnected(string id) => deviceList.Any(l => l.StartsWith(id) && l.EndsWith("device"));
 
+            bool IsWirelessSerial(string serial)
+            {
+                if (string.IsNullOrWhiteSpace(serial))
+                    return false;
+
+                return serial.Contains(':')
+                    || serial.StartsWith("adb-", StringComparison.OrdinalIgnoreCase)
+                    || serial.IndexOf("_adb-tls", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+
+            string FindConnectedWirelessSerial()
+            {
+                foreach (var entry in deviceList)
+                {
+                    if (!entry.EndsWith("device", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var serial = entry.Split('\t', ' ').FirstOrDefault();
+                    if (IsWirelessSerial(serial))
+                        return serial ?? string.Empty;
+                }
+
+                return string.Empty;
+            }
+
             if (!string.IsNullOrWhiteSpace(_workingConfig.SelectedDeviceUSB) && IsDeviceConnected(_workingConfig.SelectedDeviceUSB))
             {
-                device = _workingConfig.SelectedDeviceUSB;
+                return _workingConfig.SelectedDeviceUSB;
             }
-            else if (!string.IsNullOrWhiteSpace(_workingConfig.SelectedDeviceWiFi) && _workingConfig.SelectedDeviceWiFi != "None")
+
+            if (_workingConfig.WifiMode == WirelessMode.WirelessDebugging && !string.IsNullOrWhiteSpace(_workingConfig.WifiMdnsServiceName))
+            {
+                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_workingConfig.WifiMdnsServiceName).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(ipPort))
+                {
+                    devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
+                    deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+                    var liveWireless = FindConnectedWirelessSerial();
+                    if (!string.IsNullOrWhiteSpace(liveWireless))
+                        return liveWireless;
+
+                    if (IsDeviceConnected(ipPort))
+                        return ipPort;
+                }
+
+                return string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_workingConfig.SelectedDeviceWiFi) && _workingConfig.SelectedDeviceWiFi != "None")
             {
                 if (!IsDeviceConnected(_workingConfig.SelectedDeviceWiFi))
                 {
@@ -621,12 +716,10 @@ namespace musicpresense
                 }
 
                 if (IsDeviceConnected(_workingConfig.SelectedDeviceWiFi))
-                {
-                    device = _workingConfig.SelectedDeviceWiFi;
-                }
+                    return _workingConfig.SelectedDeviceWiFi;
             }
 
-            return device;
+            return string.Empty;
         }
 
         private static async Task<int> GetWifiPortAsync(string usbSerial)
@@ -637,6 +730,8 @@ namespace musicpresense
 
             return 5555;
         }
+
+
 
         private static async Task<string> GetDeviceWifiIpAsync(string usbDevice)
         {
@@ -671,6 +766,57 @@ namespace musicpresense
             return string.Empty;
         }
 
+        private static async Task<string> GetWirelessDebuggingSerialAsync(string serviceName, string ipPort)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName) && string.IsNullOrWhiteSpace(ipPort))
+                return string.Empty;
+
+            for (int attempt = 0; attempt < 8; attempt++)
+            {
+                if (!string.IsNullOrWhiteSpace(serviceName))
+                {
+                    var connectedIpPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(serviceName).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(connectedIpPort))
+                    {
+                        var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
+                        var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+                        foreach (var entry in deviceList)
+                        {
+                            if (!entry.EndsWith("device", StringComparison.OrdinalIgnoreCase))
+                                continue;
+
+                            var serial = entry.Split('\t', ' ').FirstOrDefault();
+                            if (string.IsNullOrWhiteSpace(serial))
+                                continue;
+
+                            if (serial.Contains(':') || serial.StartsWith("adb-", StringComparison.OrdinalIgnoreCase) || serial.IndexOf("_adb-tls", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                var liveSerial = await GetDeviceSerialAsync(serial).ConfigureAwait(false);
+                                if (!string.IsNullOrWhiteSpace(liveSerial))
+                                    return liveSerial;
+                            }
+                        }
+
+                        var serialFromIpPort = await GetDeviceSerialAsync(connectedIpPort).ConfigureAwait(false);
+                        if (!string.IsNullOrWhiteSpace(serialFromIpPort))
+                            return serialFromIpPort;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(ipPort))
+                {
+                    var serial = await GetDeviceSerialAsync(ipPort).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(serial))
+                        return serial;
+                }
+
+                await Task.Delay(500).ConfigureAwait(false);
+            }
+
+            return string.Empty;
+        }
+
         private static async Task<string> GetDeviceSerialAsync(string device)
         {
             if (string.IsNullOrWhiteSpace(device))
@@ -683,6 +829,23 @@ namespace musicpresense
 
             serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.boot.serialno");
             return serial.Trim();
+        }
+
+        private static async Task<string> GetDeviceSerialWithRetryAsync(string device)
+        {
+            if (string.IsNullOrWhiteSpace(device))
+                return string.Empty;
+
+            for (int attempt = 0; attempt < 8; attempt++)
+            {
+                var serial = await GetDeviceSerialAsync(device).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(serial))
+                    return serial;
+
+                await Task.Delay(500).ConfigureAwait(false);
+            }
+
+            return string.Empty;
         }
 
         private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
