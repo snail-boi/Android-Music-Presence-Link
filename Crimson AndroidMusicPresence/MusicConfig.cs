@@ -92,6 +92,9 @@ namespace musicpresense
         public bool OpenInTaskbar { get; set; } = false;
         public bool StartWithWindows { get; set; } = false;
         public bool ShowMediaPlayerWindow { get; set; } = false;
+        public bool MediaPlayerSettingsPaneOpen { get; set; } = false;
+        public bool MediaPlayerInlineLyricsViewActive { get; set; } = false;
+        public bool MediaPlayerFullscreenActive { get; set; } = false;
         public double MediaPlayerWindowWidth { get; set; } = 1080;
         public double MediaPlayerWindowHeight { get; set; } = 760;
         public double MediaPlayerWindowTop { get; set; } = 100;

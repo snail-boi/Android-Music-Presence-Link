@@ -18,15 +18,30 @@ namespace musicpresense
         private void BtnFullscreen_Click(object sender, RoutedEventArgs e)
         {
             Debugger.show("[MEDIAPLAYER] Fullscreen button pressed.");
-            if (_isFullscreen)
+            SetFullscreenActive(!_isFullscreen);
+        }
+        public void SetFullscreenActive(bool active)
+        {
+            if (!Dispatcher.CheckAccess())
             {
-                ExitFullscreen();
+                Dispatcher.Invoke(() => SetFullscreenActive(active));
+                return;
             }
-            else
+
+            if (_isFullscreen == active)
+                return;
+
+            if (active)
             {
                 EnterFullscreen();
             }
+            else
+            {
+                ExitFullscreen();
+            }
+
             RenderFullscreenButtonIcon();
+            PersistRuntimeState();
         }
         private void EnterFullscreen()
         {

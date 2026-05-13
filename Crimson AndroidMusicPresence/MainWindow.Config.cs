@@ -553,6 +553,9 @@ namespace musicpresense
             if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
             if (left.StartWithWindows != right.StartWithWindows) return false;
             if (left.ShowMediaPlayerWindow != right.ShowMediaPlayerWindow) return false;
+            if (left.MediaPlayerSettingsPaneOpen != right.MediaPlayerSettingsPaneOpen) return false;
+            if (left.MediaPlayerInlineLyricsViewActive != right.MediaPlayerInlineLyricsViewActive) return false;
+            if (left.MediaPlayerFullscreenActive != right.MediaPlayerFullscreenActive) return false;
             if (left.OnboardingCompleted != right.OnboardingCompleted) return false;
             if (!string.Equals(left.ScrcpyAudioCodec, right.ScrcpyAudioCodec, StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(left.ScrcpyAudioBitrate ?? string.Empty, right.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)) return false;
@@ -650,6 +653,9 @@ namespace musicpresense
                 OpenInTaskbar = source.OpenInTaskbar,
                 StartWithWindows = source.StartWithWindows,
                 ShowMediaPlayerWindow = source.ShowMediaPlayerWindow,
+                MediaPlayerSettingsPaneOpen = source.MediaPlayerSettingsPaneOpen,
+                MediaPlayerInlineLyricsViewActive = source.MediaPlayerInlineLyricsViewActive,
+                MediaPlayerFullscreenActive = source.MediaPlayerFullscreenActive,
                 ScrcpyAudioCodec = source.ScrcpyAudioCodec,
                 ScrcpyAudioBitrate = source.ScrcpyAudioBitrate ?? string.Empty,
                 ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,

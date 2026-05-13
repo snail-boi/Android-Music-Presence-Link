@@ -182,6 +182,7 @@ namespace musicpresense
                 RefreshAudioQualityButton();
                 RenderFullscreenButtonIcon();
                 RefreshAlwaysOnTopButton();
+                ApplySavedRuntimeState();
             };
         }
 
@@ -233,6 +234,9 @@ namespace musicpresense
                 WindowState = WindowState.Normal;
 
             var config = App.Config;
+            config.MediaPlayerSettingsPaneOpen = _settingsPaneOpen;
+            config.MediaPlayerInlineLyricsViewActive = _lyricsViewActive;
+            config.MediaPlayerFullscreenActive = _isFullscreen;
             config.MediaPlayerWindowState = WindowState;
             config.MediaPlayerWindowWidth = RestoreBounds.Width;
             config.MediaPlayerWindowHeight = RestoreBounds.Height;
@@ -272,20 +276,39 @@ namespace musicpresense
         public void SetSettingsContent(object? content)
         {
             SettingsHost.Content = content;
-            ShowSettingsPane();
         }
 
         public object? TakeSettingsContent()
         {
             var content = SettingsHost.Content;
             SettingsHost.Content = null;
-            ShowSettingsPane();
             return content;
         }
 
         public void ClearSettingsContent()
         {
             SettingsHost.Content = null;
+        }
+
+        public void ApplySavedRuntimeState()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(ApplySavedRuntimeState);
+                return;
+            }
+
+            var config = App.Config;
+
+            if (config.MediaPlayerSettingsPaneOpen)
+                ShowSettingsPane();
+            else
+                CollapseSettingsPane();
+
+            if (_lyricsViewActive != config.MediaPlayerInlineLyricsViewActive)
+                ToggleInlineLyricsView();
+
+            SetFullscreenActive(config.MediaPlayerFullscreenActive);
         }
 
         private void BtnCollapseSettingsPane_Click(object sender, RoutedEventArgs e)
@@ -301,6 +324,7 @@ namespace musicpresense
         private void CollapseSettingsPane()
         {
             _settingsPaneOpen = false;
+            PersistRuntimeState();
             double fromWidth = SettingsColumn.Width.IsAbsolute ? SettingsColumn.Width.Value : DefaultSettingsWidth;
 
             BtnCollapseSettingsPane.IsEnabled = false;
@@ -338,6 +362,8 @@ namespace musicpresense
         {
             if (SettingsHost.Content == null)
             {
+                _settingsPaneOpen = false;
+                PersistRuntimeState();
                 SettingsPaneBorder.Visibility = Visibility.Collapsed;
                 SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
                 SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
@@ -355,6 +381,8 @@ namespace musicpresense
                 Width = SettingsAutoExpandWidth;
 
             // Restore player column layout before animating.
+            _settingsPaneOpen = true;
+            PersistRuntimeState();
             Grid.SetColumnSpan(PlayerPaneBorder, 1);
             PlayerPaneBorder.CornerRadius = new CornerRadius(6);
             PlayerPaneBorder.BorderThickness = new Thickness(1);
@@ -382,7 +410,6 @@ namespace musicpresense
             {
                 SettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
                 SettingsColumn.Width = new GridLength(targetWidth, GridUnitType.Pixel);
-                _settingsPaneOpen = true;
                 BtnCollapseSettingsPane.IsEnabled = true;
                 UpdateGradientClip();
             };
@@ -511,6 +538,21 @@ namespace musicpresense
             // Lyrics panel uses theme-aware brushes; rebuild colors.
             if (_lyricsViewActive && _lyricsLines.Count > 0)
                 AdoptLyricsData(new LyricsOverlayManager.LyricsTrackData(_lyricsLines, _lyricsAreTimed));
+        }
+
+        private void PersistRuntimeState()
+        {
+            try
+            {
+                App.Config.MediaPlayerSettingsPaneOpen = _settingsPaneOpen;
+                App.Config.MediaPlayerInlineLyricsViewActive = _lyricsViewActive;
+                App.Config.MediaPlayerFullscreenActive = _isFullscreen;
+                MusicConfigManager.Save(App.Config);
+                (Application.Current as App)?.UpdateConfig(App.Config);
+            }
+            catch
+            {
+            }
         }
 
         /// <summary>

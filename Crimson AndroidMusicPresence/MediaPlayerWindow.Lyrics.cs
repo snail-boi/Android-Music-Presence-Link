@@ -19,6 +19,7 @@ namespace musicpresense
         private void ToggleInlineLyricsView()
         {
             _lyricsViewActive = !_lyricsViewActive;
+            PersistRuntimeState();
             ApplyLyricsViewVisibility();
             RenderAuxiliaryIcons();
 
