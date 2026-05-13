@@ -115,10 +115,20 @@ namespace musicpresense
                 _config.IsWifiEnabled = true;
             }
 
-            var usbSerial = await GetConnectedUsbDeviceAsync();
-            if (string.IsNullOrWhiteSpace(usbSerial) && !string.IsNullOrWhiteSpace(ipPort))
+            // Prefer querying ro.serialno directly from the paired device (via ipPort)
+            // so we always get the real hardware serial, not an ADB transport name
+            // (mDNS serials like "adb-XXXXXXXX" would otherwise slip through the
+            // GetConnectedUsbDeviceAsync filter and land in the USB serial field).
+            string usbSerial = string.Empty;
+            if (!string.IsNullOrWhiteSpace(ipPort))
             {
                 usbSerial = await GetDeviceSerialAsync(ipPort);
+            }
+            if (string.IsNullOrWhiteSpace(usbSerial))
+            {
+                var adbSerial = await GetConnectedUsbDeviceAsync();
+                if (!string.IsNullOrWhiteSpace(adbSerial))
+                    usbSerial = await GetDeviceSerialAsync(adbSerial);
             }
             if (!string.IsNullOrWhiteSpace(usbSerial))
             {
