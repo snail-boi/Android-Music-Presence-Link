@@ -369,9 +369,9 @@ namespace musicpresense
                         if (metadataChanged)
                         {
                             var musicProperties = smtcDisplayUpdater.MusicProperties;
-                            musicProperties.Title = title;
-                            musicProperties.Artist = artist;
-                            musicProperties.AlbumTitle = album;
+                            musicProperties.Title = title ?? string.Empty;
+                            musicProperties.Artist = artist ?? string.Empty;
+                            musicProperties.AlbumTitle = album ?? string.Empty;
 
                             smtcDisplayUpdater.Update();
                         }
