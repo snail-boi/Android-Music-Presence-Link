@@ -471,46 +471,62 @@ namespace musicpresense
                 .Replace('\uFF1C', '<')   // <  FULLWIDTH LESS-THAN SIGN
                 .Replace('\uFF1E', '>');  // >  FULLWIDTH GREATER-THAN SIGN
 
-            // Replace every char Android/Windows filesystems can't store, plus stray whitespace,
-            // with a single space. We then collapse runs and trim, so "A: B" and "A  B" both
-            // normalize to "A B" and a Contains() check survives the substitution either side did.
-            // Tilde variants (wave dash, fullwidth tilde, tilde operator, ASCII tilde) are also
-            // treated as whitespace here. Japanese titles commonly use these as separators and
-            // different players/tools save them differently (and the Shift-JIS U+301C/U+FF5E
-            // conflation means the same file can exist under either code point). Folding them
-            // all to space + collapsing yields a stable comparison regardless of which variant
-            // (or no variant at all, if the player stripped it) ended up on disk.
-            var sb = new System.Text.StringBuilder(folded.Length);
-            foreach (var ch in folded)
-            {
-                bool unsafeChar = ch == '/' || ch == '\\' || ch == ':' || ch == '*' ||
-                                  ch == '?' || ch == '"' || ch == '<' || ch == '>' || ch == '|';
-                bool tildeVariant = ch == '~' ||        // U+007E ASCII TILDE
-                                    ch == '\u301C' ||   // 〜 WAVE DASH
-                                    ch == '\uFF5E' ||   // ～ FULLWIDTH TILDE
-                                    ch == '\u223C' ||   // ∼ TILDE OPERATOR
-                                    ch == '\u2053';     // ⁓ SWUNG DASH
-                if (unsafeChar || tildeVariant || char.IsWhiteSpace(ch) || char.IsControl(ch))
-                    sb.Append(' ');
-                else
-                    sb.Append(ch);
-            }
+            // If the title contains slashes, treat them as separators and keep the longest
+            // slash-delimited segment instead of replacing '/' with whitespace. This makes
+            // metadata like "A/B/C" resolve to the most informative fragment rather than a
+            // flattened string that can match too broadly.
+            var segments = folded.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0)
+                return string.Empty;
 
-            // Collapse multiple spaces into one.
-            var collapsed = new System.Text.StringBuilder(sb.Length);
-            bool prevSpace = false;
-            foreach (var ch in sb.ToString())
+            string? best = null;
+            foreach (var segment in segments)
             {
-                if (ch == ' ')
+                // Replace every char Android/Windows filesystems can't store, plus stray whitespace,
+                // with a single space. We then collapse runs and trim, so "A: B" and "A  B" both
+                // normalize to "A B" and a Contains() check survives the substitution either side did.
+                // Tilde variants (wave dash, fullwidth tilde, tilde operator, ASCII tilde) are also
+                // treated as whitespace here. Japanese titles commonly use these as separators and
+                // different players/tools save them differently (and the Shift-JIS U+301C/U+FF5E
+                // conflation means the same file can exist under either code point). Folding them
+                // all to space + collapsing yields a stable comparison regardless of which variant
+                // (or no variant at all, if the player stripped it) ended up on disk.
+                var sb = new System.Text.StringBuilder(segment.Length);
+                foreach (var ch in segment)
                 {
-                    if (!prevSpace) collapsed.Append(' ');
-                    prevSpace = true;
+                    bool unsafeChar = ch == '\\' || ch == ':' || ch == '*' ||
+                                      ch == '?' || ch == '"' || ch == '<' || ch == '>' || ch == '|';
+                    bool tildeVariant = ch == '~' ||        // U+007E ASCII TILDE
+                                        ch == '\u301C' ||   // 〜 WAVE DASH
+                                        ch == '\uFF5E' ||   // ～ FULLWIDTH TILDE
+                                        ch == '\u223C' ||   // ∼ TILDE OPERATOR
+                                        ch == '\u2053';     // ⁓ SWUNG DASH
+                    if (unsafeChar || tildeVariant || char.IsWhiteSpace(ch) || char.IsControl(ch))
+                        sb.Append(' ');
+                    else
+                        sb.Append(ch);
                 }
-                else
+
+                // Collapse multiple spaces into one.
+                var collapsed = new System.Text.StringBuilder(sb.Length);
+                bool prevSpace = false;
+                foreach (var ch in sb.ToString())
                 {
-                    collapsed.Append(ch);
-                    prevSpace = false;
+                    if (ch == ' ')
+                    {
+                        if (!prevSpace) collapsed.Append(' ');
+                        prevSpace = true;
+                    }
+                    else
+                    {
+                        collapsed.Append(ch);
+                        prevSpace = false;
+                    }
                 }
+
+                var normalized = collapsed.ToString().Trim().TrimEnd('.');
+                if (best == null || normalized.Length > best.Length)
+                    best = normalized;
             }
 
             // Also trim trailing periods. Windows filesystems silently drop them, and
@@ -519,7 +535,7 @@ namespace musicpresense
             // "Realm of a Born Sea, Colorful..mp3" (or similar) and after extension-strip
             // becomes "Realm of a Born Sea, Colorful" (no trailing dot). Stripping trailing
             // periods in normalization keeps the match symmetric so "<title>." == "<file-no-ext>".
-            return collapsed.ToString().Trim().TrimEnd('.');
+            return best ?? string.Empty;
         }
 
         /// <summary>
