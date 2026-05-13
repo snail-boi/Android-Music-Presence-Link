@@ -308,9 +308,9 @@ namespace musicpresense
         }
         private void CopyCoverInfoMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string title = TxtTitle.Text == "-" ? "" : TxtTitle.Text;
-            string artist = TxtArtist.Text == "-" ? "" : TxtArtist.Text;
-            string album = TxtAlbum.Text == "-" ? "" : TxtAlbum.Text;
+            string title = string.IsNullOrWhiteSpace(TxtTitle.Text) || TxtTitle.Text == "-" ? "" : TxtTitle.Text;
+            string artist = string.IsNullOrWhiteSpace(TxtArtist.Text) || TxtArtist.Text == "-" ? "" : TxtArtist.Text;
+            string album = string.IsNullOrWhiteSpace(TxtAlbum.Text) || TxtAlbum.Text == "-" ? "" : TxtAlbum.Text;
 
             // Template: "Artist - Title [Album]"
             string text = $"{artist} - {title} [{album}]".Trim(' ', '-', '[', ']').Trim();

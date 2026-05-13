@@ -430,14 +430,18 @@ namespace musicpresense
                 return;
             }
 
-            bool hasSong = !string.IsNullOrWhiteSpace(title) && title.Trim() != "-";
+            string normalizedTitle = NormalizeTrackText(title);
+            string normalizedArtist = NormalizeTrackText(artist);
+            string normalizedAlbum = NormalizeTrackText(album);
+
+            bool hasSong = !string.IsNullOrWhiteSpace(normalizedTitle) && normalizedTitle != "-";
             bool hasSongChanged = hasSong != _hasSong;
             _hasSong = hasSong;
             _isPlaying = isPlaying;
 
-            TxtTitle.Text = string.IsNullOrWhiteSpace(title) ? "-" : title.Trim();
-            TxtArtist.Text = string.IsNullOrWhiteSpace(artist) ? "-" : artist.Trim();
-            TxtAlbum.Text = string.IsNullOrWhiteSpace(album) ? "-" : album.Trim();
+            TxtTitle.Text = normalizedTitle;
+            TxtArtist.Text = normalizedArtist;
+            TxtAlbum.Text = normalizedAlbum;
             RenderTransportIcons(isPlaying);
 
             // Auxiliary icons (seek, volume, lyrics, audio link) resolve their brush
@@ -553,6 +557,15 @@ namespace musicpresense
             catch
             {
             }
+        }
+
+        private static string NormalizeTrackText(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var trimmed = value.Trim();
+            return trimmed.Equals("null", StringComparison.OrdinalIgnoreCase) ? string.Empty : trimmed;
         }
 
         /// <summary>
