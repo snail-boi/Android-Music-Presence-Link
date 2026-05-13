@@ -555,6 +555,38 @@ namespace musicpresense
             return idx < 0 ? 0 : idx;
         }
 
+        /// <summary>
+        /// Returns how many milliseconds remain until the line after the current one starts.
+        /// Returns 30000 if there is no next line (end of lyrics) or lyrics are not timed.
+        /// </summary>
+        public double GetMsUntilNextLine()
+        {
+            if (_lines.Count == 0 || !_linesAreTimed)
+                return 30_000;
+
+            var posMs = _basePositionMs;
+            if (_isPlaying)
+            {
+                var elapsed = DateTime.UtcNow - _positionAnchorUtc;
+                posMs += Math.Max(0, (long)elapsed.TotalMilliseconds);
+            }
+            posMs += LyricsLeadMs;
+
+            var position = TimeSpan.FromMilliseconds(Math.Max(0, posMs));
+
+            // Find the next line whose timestamp is strictly after the current position.
+            for (int i = 0; i < _lines.Count; i++)
+            {
+                if (_lines[i].Time > position)
+                {
+                    double remainingMs = (_lines[i].Time - position).TotalMilliseconds;
+                    return Math.Max(0, remainingMs);
+                }
+            }
+
+            return 30_000; // past the last line
+        }
+
         private void RaiseLinesChanged()
         {
             try { LinesChanged?.Invoke(GetCurrentTrackData()); } catch { }

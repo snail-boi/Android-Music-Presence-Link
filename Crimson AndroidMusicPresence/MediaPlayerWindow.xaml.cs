@@ -403,6 +403,7 @@ namespace musicpresense
             }
 
             bool hasSong = !string.IsNullOrWhiteSpace(title) && title.Trim() != "-";
+            bool hasSongChanged = hasSong != _hasSong;
             _hasSong = hasSong;
             _isPlaying = isPlaying;
 
@@ -430,13 +431,10 @@ namespace musicpresense
             ApplyCoverGradientBackground(hasSong ? _currentCoverPath : null);
             ApplyPlayerTextColor(hasSong);
 
-            // The inline lyrics color set depends on _hasSong; refresh if open.
-            if (_lyricsViewActive && _lyricsLines.Count > 0)
-            {
-                RebuildLyricsPanel();
-                _lyricsHighlightedIndex = -1;
-                Dispatcher.BeginInvoke(new Action(() => UpdateLyricsHighlightAndScroll(animate: false)), DispatcherPriority.Loaded);
-            }
+            // Lyrics brush colors depend on _hasSong. Only rebuild when that flips,
+            // not on every poll tick.
+            if (_lyricsViewActive && _lyricsLines.Count > 0 && hasSongChanged)
+                AdoptLyricsData(new LyricsOverlayManager.LyricsTrackData(_lyricsLines, _lyricsAreTimed));
         }
 
         /// <summary>
@@ -511,11 +509,7 @@ namespace musicpresense
 
             // Lyrics panel uses theme-aware brushes; rebuild colors.
             if (_lyricsViewActive && _lyricsLines.Count > 0)
-            {
-                RebuildLyricsPanel();
-                _lyricsHighlightedIndex = -1;
-                Dispatcher.BeginInvoke(new Action(() => UpdateLyricsHighlightAndScroll(animate: false)), DispatcherPriority.Loaded);
-            }
+                AdoptLyricsData(new LyricsOverlayManager.LyricsTrackData(_lyricsLines, _lyricsAreTimed));
         }
 
         /// <summary>
