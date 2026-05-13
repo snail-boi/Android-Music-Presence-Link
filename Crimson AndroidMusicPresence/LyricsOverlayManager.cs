@@ -119,6 +119,8 @@ namespace musicpresense
                 _lastReportedPositionMs = reported;
                 _positionAnchorUtc = now;
 
+                try { PositionChanged?.Invoke(); } catch { }
+
                 var trackKey = BuildTrackKey(_currentArtist, _currentTitle, _currentAlbum);
 
                 if (string.IsNullOrWhiteSpace(_currentTitle) || string.IsNullOrWhiteSpace(_currentArtist))
@@ -412,26 +414,48 @@ namespace musicpresense
 
             var lines = new List<LyricsLine>();
             var regex = new Regex(@"\[(\d{1,2}):(\d{2})(?:[\.:](\d{1,3}))?\]");
-            // Tag-only lines like [ar:...], [ti:...], [length:...] - skip from plain-text fallback.
+            // Metadata tags like [ar:...], [ti:...], [length:...] - never shown.
             var tagOnlyRegex = new Regex(@"^\s*\[[a-zA-Z]{2,}:[^\]]*\]\s*$");
 
             bool anyTimestamp = false;
             var rawLines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
 
+            // Untimed display lines (section headers, blank separators) found before the
+            // next timestamped line. We flush them with a sentinel timestamp so they sort
+            // immediately before their following timed line.
+            var pendingUntimed = new List<string>();
+
             foreach (var rawLine in rawLines)
             {
                 if (string.IsNullOrWhiteSpace(rawLine))
+                {
+                    // Blank line: keep as a visual spacer in the pending buffer.
+                    pendingUntimed.Add(string.Empty);
+                    continue;
+                }
+
+                // Skip pure metadata tags entirely.
+                if (tagOnlyRegex.IsMatch(rawLine))
                     continue;
 
                 var matches = regex.Matches(rawLine);
                 if (matches.Count == 0)
+                {
+                    // No timestamp: display line (e.g. "[Verse 1]", "[Chorus]").
+                    // Strip surrounding brackets if the whole line is just a label.
+                    var display = rawLine.Trim();
+                    if (display.StartsWith("[") && display.EndsWith("]"))
+                        display = display[1..^1].Trim();
+                    pendingUntimed.Add(display);
                     continue;
+                }
 
                 anyTimestamp = true;
 
-                var lyricText = regex.Replace(rawLine, string.Empty).Trim();
-                if (string.IsNullOrWhiteSpace(lyricText))
-                    lyricText = "♪";
+                // Parse the timestamp(s) on this line.
+                var timedText = regex.Replace(rawLine, string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(timedText))
+                    timedText = "♪";
 
                 foreach (Match match in matches)
                 {
@@ -448,8 +472,29 @@ namespace musicpresense
                         int.TryParse(frac, out ms);
                     }
 
-                    lines.Add(new LyricsLine(new TimeSpan(0, 0, mm, ss, ms), lyricText));
+                    var ts = new TimeSpan(0, 0, mm, ss, ms);
+
+                    // Flush any pending untimed lines just before this timed entry.
+                    // We use (ts - 1 tick) so they sort immediately before it.
+                    if (pendingUntimed.Count > 0)
+                    {
+                        var before = ts == TimeSpan.Zero ? TimeSpan.Zero : ts - TimeSpan.FromTicks(1);
+                        foreach (var u in pendingUntimed)
+                            lines.Add(new LyricsLine(before, u, IsUntimed: true));
+                        pendingUntimed.Clear();
+                    }
+
+                    lines.Add(new LyricsLine(ts, timedText, IsUntimed: false));
                 }
+            }
+
+            // Any trailing untimed lines (after the last timed line): attach to end.
+            if (pendingUntimed.Count > 0 && lines.Count > 0)
+            {
+                var last = lines[^1].Time;
+                foreach (var u in pendingUntimed)
+                    lines.Add(new LyricsLine(last, u, IsUntimed: true));
+                pendingUntimed.Clear();
             }
 
             if (anyTimestamp)
@@ -511,10 +556,15 @@ namespace musicpresense
         // ── Public surface for the inline media-player lyrics view ────────────
 
         /// <summary>
-        /// Fired on the dispatcher whenever the loaded lyrics for the current track change
-        /// (track switched, lyrics newly loaded, or cleared because no track is playing).
+        /// Fired on the dispatcher whenever the loaded lyrics for the current track change.
         /// </summary>
         public event Action<LyricsTrackData>? LinesChanged;
+
+        /// <summary>
+        /// Fired on the dispatcher every time playback position is updated (every poll,
+        /// including after seeks). The inline view uses this to resync its scheduled timer.
+        /// </summary>
+        public event Action? PositionChanged;
 
         /// <summary>
         /// Returns the lines currently loaded for the playing track, plus whether they
@@ -522,7 +572,7 @@ namespace musicpresense
         /// </summary>
         public LyricsTrackData GetCurrentTrackData()
         {
-            return new LyricsTrackData(_lines.Select(l => new LyricsLineDto(l.Time, l.Text)).ToList(), _linesAreTimed);
+            return new LyricsTrackData(_lines.Select(l => new LyricsLineDto(l.Time, l.Text, l.IsUntimed)).ToList(), _linesAreTimed);
         }
 
         /// <summary>
@@ -556,8 +606,8 @@ namespace musicpresense
         }
 
         /// <summary>
-        /// Returns how many milliseconds remain until the line after the current one starts.
-        /// Returns 30000 if there is no next line (end of lyrics) or lyrics are not timed.
+        /// Returns how many milliseconds remain until the next timed line starts.
+        /// Returns 30000 if there is no next timed line or lyrics are not timed.
         /// </summary>
         public double GetMsUntilNextLine()
         {
@@ -574,17 +624,14 @@ namespace musicpresense
 
             var position = TimeSpan.FromMilliseconds(Math.Max(0, posMs));
 
-            // Find the next line whose timestamp is strictly after the current position.
+            // Find the next timed line whose timestamp is strictly after the current position.
             for (int i = 0; i < _lines.Count; i++)
             {
-                if (_lines[i].Time > position)
-                {
-                    double remainingMs = (_lines[i].Time - position).TotalMilliseconds;
-                    return Math.Max(0, remainingMs);
-                }
+                if (!_lines[i].IsUntimed && _lines[i].Time > position)
+                    return Math.Max(0, (_lines[i].Time - position).TotalMilliseconds);
             }
 
-            return 30_000; // past the last line
+            return 30_000;
         }
 
         private void RaiseLinesChanged()
@@ -592,13 +639,13 @@ namespace musicpresense
             try { LinesChanged?.Invoke(GetCurrentTrackData()); } catch { }
         }
 
-        public sealed record LyricsLineDto(TimeSpan Time, string Text);
+        public sealed record LyricsLineDto(TimeSpan Time, string Text, bool IsUntimed = false);
 
         public sealed record LyricsTrackData(IReadOnlyList<LyricsLineDto> Lines, bool IsTimed);
 
         private sealed record LyricsCacheEntry(string? RemotePath, string? LocalPath);
 
-        private sealed record LyricsLine(TimeSpan Time, string Text);
+        private sealed record LyricsLine(TimeSpan Time, string Text, bool IsUntimed = false);
     }
 
     internal sealed class LyricsOverlayWindow : Window

@@ -249,6 +249,7 @@ namespace musicpresense
                 if (_lyricsManager != null)
                 {
                     _lyricsManager.LinesChanged -= OnLyricsLinesChanged;
+                    _lyricsManager.PositionChanged -= OnLyricsPositionChanged;
                 }
                 StopLyricsTimer();
                 StopLyricsScrollLoop();

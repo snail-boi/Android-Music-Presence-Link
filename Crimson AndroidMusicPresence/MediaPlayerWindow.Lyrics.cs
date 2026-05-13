@@ -25,12 +25,20 @@ namespace musicpresense
             if (_lyricsViewActive)
             {
                 if (_lyricsManager != null)
+                {
+                    _lyricsManager.PositionChanged += OnLyricsPositionChanged;
                     AdoptLyricsData(_lyricsManager.GetCurrentTrackData());
+                }
                 else
-                    AdoptLyricsData(new LyricsOverlayManager.LyricsTrackData(Array.Empty<LyricsOverlayManager.LyricsLineDto>(), false));
+                {
+                    AdoptLyricsData(new LyricsOverlayManager.LyricsTrackData(
+                        Array.Empty<LyricsOverlayManager.LyricsLineDto>(), false));
+                }
             }
             else
             {
+                if (_lyricsManager != null)
+                    _lyricsManager.PositionChanged -= OnLyricsPositionChanged;
                 StopLyricsTimer();
                 StopLyricsScrollLoop();
             }
@@ -68,9 +76,18 @@ namespace musicpresense
             }
         }
 
+        // Called every poll (including after seeks). Re-applies highlight and reschedules
+        // the timer without rebuilding the panel.
+        private void OnLyricsPositionChanged()
+        {
+            if (!_lyricsViewActive || _lyricsLines.Count == 0) return;
+            StopLyricsTimer();
+            ApplyHighlight(animate: true);
+            ScheduleNextLineTick();
+        }
+
         private void AdoptLyricsData(LyricsOverlayManager.LyricsTrackData data)
         {
-            // Stop everything before touching panel state.
             StopLyricsTimer();
             StopLyricsScrollLoop();
 
@@ -80,8 +97,6 @@ namespace musicpresense
 
             RebuildLyricsPanel();
 
-            // Defer first highlight + scroll until after the layout pass so
-            // TransformToAncestor measurements are valid.
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 ApplyHighlight(animate: false);
@@ -121,17 +136,21 @@ namespace musicpresense
                     continue;
                 }
 
+                // Untimed lines (section headers) are always visible at reduced size/opacity.
+                // Timed lyric lines start dim and brighten when active.
+                double initialOpacity = (!_lyricsAreTimed || line.IsUntimed) ? 0.85 : 0.45;
+
                 var tb = new TextBlock
                 {
                     Text = line.Text,
-                    FontSize = 18,
+                    FontSize = line.IsUntimed ? 14 : 18,
                     FontWeight = FontWeights.SemiBold,
                     TextWrapping = TextWrapping.Wrap,
                     TextAlignment = TextAlignment.Center,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
-                    Margin = new Thickness(16, 8, 16, 8),
+                    Margin = new Thickness(16, line.IsUntimed ? 4 : 8, 16, line.IsUntimed ? 4 : 8),
                     Foreground = _lyricsInactiveBrush,
-                    Opacity = _lyricsAreTimed ? 0.45 : 0.85
+                    Opacity = initialOpacity
                 };
 
                 var host = new Border
@@ -186,10 +205,6 @@ namespace musicpresense
         }
 
         // ── Event-driven line scheduling ──────────────────────────────────────
-        //
-        // Instead of a fixed-interval poll, we ask the manager how many ms remain
-        // until the next line and set the timer to fire exactly then. This means
-        // zero UI writes happen between line transitions.
 
         private void StopLyricsTimer()
         {
@@ -207,26 +222,20 @@ namespace musicpresense
             double delayMs = _lyricsManager.GetMsUntilNextLine();
             delayMs = Math.Max(50, Math.Min(delayMs, 30_000));
 
-            _lyricsTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(delayMs)
-            };
+            _lyricsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(delayMs) };
             _lyricsTimer.Tick += LyricsTimer_Tick;
             _lyricsTimer.Start();
         }
 
         private void LyricsTimer_Tick(object? sender, EventArgs e)
         {
-            // Single-shot: stop before doing anything so re-entrancy is impossible.
             StopLyricsTimer();
             if (!_lyricsViewActive) return;
-
             ApplyHighlight(animate: true);
             ScheduleNextLineTick();
         }
 
-        // Applies highlight for the current line index. Only writes to the UI when
-        // the index has actually changed since the last call.
+        // Applies highlight for the current line. Only writes to the UI when the index changed.
         private void ApplyHighlight(bool animate)
         {
             if (_lyricsLines.Count == 0) return;
@@ -244,7 +253,8 @@ namespace musicpresense
                 var prev = _lyricsLineBlocks[_lyricsHighlightedIndex];
                 if (prev != null)
                 {
-                    prev.Opacity = 0.45;
+                    // Restore to the correct resting opacity for this line type.
+                    prev.Opacity = (_lyricsLines[_lyricsHighlightedIndex].IsUntimed) ? 0.85 : 0.45;
                     prev.Foreground = _lyricsInactiveBrush;
                 }
                 if (_lyricsHighlightedIndex < _lyricsLineHosts.Count)
@@ -303,6 +313,7 @@ namespace musicpresense
                     return;
                 }
 
+                // Lerp loop handles any distance smoothly, including large jumps from seeks.
                 _lyricsTargetScrollOffset = targetOffset;
                 StartLyricsScrollLoop();
             }
