@@ -18,7 +18,7 @@ namespace musicpresense
     {
         private const string RepoOwner = "snail-boi";
         private const string RepoName = "Android-Music-Presence-Link";
-        private const string InstallerPrefix = "Android.Music.Presence.Link";
+        private const string InstallerPrefix = "AndroidMusicPresenceLink_Setup";
         private const string ReleasesPageUrl = "https://github.com/snail-boi/Android-Music-Presence-Link/releases";
         private static readonly SemaphoreSlim PromptSemaphore = new(1, 1);
 
@@ -145,7 +145,7 @@ namespace musicpresense
                             continue;
 
                         if (name.StartsWith(InstallerPrefix, StringComparison.OrdinalIgnoreCase) &&
-                            name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
+                            name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                         {
                             installerAsset = asset;
                             break;
