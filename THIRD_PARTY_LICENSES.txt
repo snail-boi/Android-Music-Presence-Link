@@ -23,7 +23,7 @@ TABLE OF CONTENTS
    ffmpeg.exe)
 3. Android Debug Bridge (adb,      Apache License 2.0
    AdbWinApi.dll, AdbWinUsbApi.dll)
-4. SDL2                            zlib License
+4. SDL3                            zlib License
 5. libusb                          GNU Lesser General Public License v2.1
 
 
@@ -54,8 +54,8 @@ Project:    FFmpeg
 Website:    https://ffmpeg.org/
 License:    GNU Lesser General Public License v2.1 or later
 
-Files in this distribution: ffmpeg.exe, avcodec-61.dll, avformat-61.dll,
-                            avutil-59.dll, swresample-5.dll
+Files in this distribution: ffmpeg.exe, avcodec-62.dll, avformat-62.dll,
+                            avutil-60.dll, swresample-6.dll
 
 The FFmpeg binaries shipped here are LGPL-licensed builds. FFmpeg is a
 trademark of Fabrice Bellard, originator of the FFmpeg project.
@@ -86,15 +86,15 @@ in section A below.
 
 
 ================================================================================
-4. SDL2
+4. SDL3
 ================================================================================
 
-Project:    Simple DirectMedia Layer (SDL2)
+Project:    Simple DirectMedia Layer (SDL3)
 Author:     Sam Lantinga and the SDL contributors
 Website:    https://www.libsdl.org/
 License:    zlib License
 
-Files in this distribution: SDL2.dll
+Files in this distribution: SDL3.dll
 
 Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
