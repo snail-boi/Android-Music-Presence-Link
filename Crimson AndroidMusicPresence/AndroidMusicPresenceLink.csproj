@@ -111,11 +111,25 @@
 		</None>
 	</ItemGroup>
 
-	<Target Name="CreatePortablePackage" AfterTargets="Build">
+	<Target Name="CreateInstaller" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+		<PropertyGroup>
+			<InnoSetupCompiler>C:\Program Files (x86)\Inno Setup 6\ISCC.exe</InnoSetupCompiler>
+			<InnoSetupScript>$(MSBuildProjectDirectory)\..\AndroidMusicPresenceLinkInstaller\setup.iss</InnoSetupScript>
+		</PropertyGroup>
+		<Exec Command="&quot;$(InnoSetupCompiler)&quot; &quot;$(InnoSetupScript)&quot;"
+			  Condition="Exists('$(InnoSetupCompiler)')" />
+		<Warning Text="Inno Setup not found at '$(InnoSetupCompiler)' - installer was not built."
+				 Condition="!Exists('$(InnoSetupCompiler)')" />
+	</Target>
+
+	<Target Name="CreatePortablePackage" AfterTargets="CreateInstaller" Condition="'$(Configuration)' == 'Release'">
 		<PropertyGroup>
 			<PortableStageDir>$(TargetDir)portable-package\</PortableStageDir>
-			<PortableZipPath>$(MSBuildProjectDirectory)\..\AndroidMusicPresenceLinkInstaller\Output\Android.Music.Presence.Link.Portable.zip</PortableZipPath>
+			<PortableOutputDir>$(MSBuildProjectDirectory)\..\AndroidMusicPresenceLinkInstaller\Output\</PortableOutputDir>
+			<PortableZipPath>$(PortableOutputDir)Android.Music.Presence.Link.Portable.zip</PortableZipPath>
 		</PropertyGroup>
+
+		<MakeDir Directories="$(PortableOutputDir)" />
 
 		<ItemGroup>
 			<PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll" />
@@ -131,17 +145,6 @@
 		<WriteLinesToFile File="$(PortableStageDir)portable.mode" Lines="portable" Overwrite="true" />
 		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;if (Test-Path '$(PortableZipPath)') { Remove-Item '$(PortableZipPath)' -Force }; Compress-Archive -Path '$(PortableStageDir)*' -DestinationPath '$(PortableZipPath)' -Force&quot;" />
 		<RemoveDir Directories="$(PortableStageDir)" />
-	</Target>
-
-	<Target Name="CreateInstaller" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
-		<PropertyGroup>
-			<InnoSetupCompiler>C:\Program Files (x86)\Inno Setup 6\ISCC.exe</InnoSetupCompiler>
-			<InnoSetupScript>$(MSBuildProjectDirectory)\..\AndroidMusicPresenceLinkInstaller\setup.iss</InnoSetupScript>
-		</PropertyGroup>
-		<Exec Command="&quot;$(InnoSetupCompiler)&quot; &quot;$(InnoSetupScript)&quot;"
-			  Condition="Exists('$(InnoSetupCompiler)')" />
-		<Warning Text="Inno Setup not found at '$(InnoSetupCompiler)' - installer was not built."
-				 Condition="!Exists('$(InnoSetupCompiler)')" />
 	</Target>
 
 </Project>
