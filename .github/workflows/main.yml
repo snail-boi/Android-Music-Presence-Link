@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes
+
+      - name: Build (Release)
+        run: dotnet build "Crimson AndroidMusicPresence/AndroidMusicPresenceLink.csproj" -c Release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: |
+            AndroidMusicPresenceLinkInstaller/Output/AndroidMusicPresenceLink_Setup.exe
+            AndroidMusicPresenceLinkInstaller/Output/Android.Music.Presence.Link.Portable.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
