@@ -38,10 +38,10 @@ namespace musicpresense
 
         public sealed class MdnsService
         {
-            public string Name { get; set; } = string.Empty;       // adb-XXXXXXXX-XXXXXX
+            public string Name { get; set; } = string.Empty;        // adb-XXXXXXXX-XXXXXX
             public string ServiceType { get; set; } = string.Empty; // _adb-tls-connect._tcp etc.
-            public string Address { get; set; } = string.Empty;    // 192.168.x.y
-            public int Port { get; set; }                          // current connect port
+            public string Address { get; set; } = string.Empty;     // 192.168.x.y
+            public int Port { get; set; }                           // current connect port
             public string IpPort => $"{Address}:{Port}";
         }
 
@@ -55,6 +55,7 @@ namespace musicpresense
         /// <summary>
         /// Pair this workstation with a phone using a 6-digit code shown on
         /// the phone's "Pair device with pairing code" screen.
+        /// The code is sent via stdin because adb prompts for it interactively.
         /// </summary>
         /// <param name="ipPair">"ip:pair_port" from the phone screen.</param>
         /// <param name="code">6-digit pairing code.</param>
@@ -101,8 +102,50 @@ namespace musicpresense
         }
 
         /// <summary>
-        /// Run "adb mdns services" and parse the result, looking for
-        /// _adb-tls-connect._tcp services (the ones we can connect to).
+        /// Pair using a password supplied as a command-line argument rather than via stdin.
+        /// This is the correct method for QR code pairing: after the phone scans the QR code,
+        /// adb accepts the password directly as "adb pair ip:port password" without prompting.
+        /// Using stdin (PairAsync) in this flow causes the process to hang.
+        /// </summary>
+        /// <param name="ipPort">"ip:pair_port" discovered from mDNS after the phone scans the QR.</param>
+        /// <param name="password">Password embedded in the QR code.</param>
+        public static async Task<PairResult> PairWithPasswordAsync(string ipPort, string password)
+        {
+            var result = new PairResult();
+
+            if (string.IsNullOrWhiteSpace(ipPort) || !IpPortRegex.IsMatch(ipPort))
+            {
+                result.Output = "Invalid pairing address. Expected format ip:port.";
+                return result;
+            }
+
+            try
+            {
+                var output = await RunAdbProcessWithStdinAsync(
+                    $"pair {ipPort} {password}",
+                    string.Empty).ConfigureAwait(false);
+
+                result.Output = output;
+
+                var nameMatch = Regex.Match(output, @"adb-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*");
+                if (output.IndexOf("Successfully paired", StringComparison.OrdinalIgnoreCase) >= 0
+                    || nameMatch.Success)
+                {
+                    result.Success = true;
+                    result.ServiceName = nameMatch.Success ? nameMatch.Value : string.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("WirelessDebuggingHelper.PairWithPasswordAsync failed: " + ex.Message);
+                result.Output = ex.Message;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Run "adb mdns services" and parse the result.
         /// </summary>
         public static async Task<List<MdnsService>> ListServicesAsync()
         {
@@ -176,7 +219,7 @@ namespace musicpresense
                 var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
                 var lines = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 return lines.Any(l => l.StartsWith(ipPort, StringComparison.OrdinalIgnoreCase)
-                                      && l.EndsWith("device", StringComparison.OrdinalIgnoreCase));
+                                       && l.EndsWith("device", StringComparison.OrdinalIgnoreCase));
             }
             catch (Exception ex)
             {
@@ -268,9 +311,7 @@ namespace musicpresense
                 var error = await errorTask.ConfigureAwait(false);
 
                 if (!string.IsNullOrWhiteSpace(error))
-                {
                     Debugger.show("ADB (wireless) stderr: " + error.Trim());
-                }
 
                 return string.IsNullOrEmpty(output) ? error : output + Environment.NewLine + error;
             }
