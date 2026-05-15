@@ -33,6 +33,7 @@ Source: "{#BinDir}\AndroidMusicPresenceLink.deps.json";          DestDir: "{app}
 Source: "{#BinDir}\AndroidMusicPresenceLink.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\WinRT.Runtime.dll";                           DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\Microsoft.Windows.SDK.NET.dll";               DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\QRCoder.dll";                                 DestDir: "{app}"; Flags: ignoreversion
 
 ; Tray icons
 Source: "{#BinDir}\Tray_Icons\Tray_USB.ico";          DestDir: "{app}\Tray_Icons"; Flags: ignoreversion

@@ -67,10 +67,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="QRCoder" Version="1.8.0" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<None Update="Resources\AdbWinApi.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
@@ -134,7 +130,7 @@
 		<MakeDir Directories="$(PortableOutputDir)" />
 
 		<ItemGroup>
-			<PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll" />
+			<PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll;$(TargetDir)QRCoder.dll" />
 			<PortableResourceFiles Include="$(TargetDir)Resources\**\*" />
 			<PortableTrayFiles Include="$(TargetDir)Tray_Icons\**\*" />
 		</ItemGroup>
