@@ -1,8 +1,8 @@
-#define MyAppName "AndroidMusicPresenceLink"
-#define MyAppVersion "1.3.1.0"
-#define MyAppPublisher "Snail"
 #define MyAppExeName "AndroidMusicPresenceLink.exe"
 #define BinDir "..\Crimson AndroidMusicPresence\bin\Release\net8.0-windows10.0.19041.0"
+#define MyAppVersion GetVersionNumbersString(SourcePath + "\" + BinDir + "\" + MyAppExeName)
+#define MyAppName "AndroidMusicPresenceLink"
+#define MyAppPublisher "Snail"
 
 [Setup]
 AppId={{e5fefbf4-6207-4d9c-9e5e-6db2c2eaa8a1}
@@ -62,7 +62,7 @@ Source: "{#BinDir}\Resources\SDL3.dll";                 DestDir: "{userappdata}\
 Source: "{#BinDir}\Resources\swresample-6.dll";         DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}";        Filename: "{app}\{#MyAppExeName}"; Tasks: startmenuicon
+Name: "{group}\{#MyAppName}";         Filename: "{app}\{#MyAppExeName}"; Tasks: startmenuicon
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [InstallDelete]
@@ -75,14 +75,15 @@ Type: files; Name: "{userappdata}\Snail\Resources\SDL2.dll"
 Type: files; Name: "{userappdata}\Snail\Resources\scrcpy-console.bat"
 Type: files; Name: "{userappdata}\Snail\Resources\icon.png"
 
+[UninstallDelete]
+Type: filesandordirs; Name: "{userappdata}\Snail\AndroidMusicPresenceLink"
+Type: filesandordirs; Name: "{userappdata}\Snail\Resources"
+Type: dirifempty;     Name: "{userappdata}\Snail"
+
 [Registry]
 Root: HKCU; Subkey: "Software\AndroidMusicPresenceLink"; ValueType: dword; ValueName: "Installed"; ValueData: "1"; Flags: uninsdeletekey
 
 [Code]
-var
-  RemoveDataCheckbox: TNewCheckBox;
-  UninstallDataPage: TWizardPage;
-
 procedure CleanLegacyWixKeys();
 begin
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\AndroidMusicPresenceLink\Resources');
@@ -92,40 +93,4 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
     CleanLegacyWixKeys();
-end;
-
-procedure InitializeUninstallProgressForm();
-begin
-  UninstallDataPage := CreateCustomPage(
-    wpWelcome,
-    'Remove user data',
-    'Choose what to do with your settings and cached data.'
-  );
-
-  RemoveDataCheckbox := TNewCheckBox.Create(UninstallDataPage);
-  RemoveDataCheckbox.Parent := UninstallDataPage.Surface;
-  RemoveDataCheckbox.Caption := 'Remove all settings, logs, cached cover art, and shared resources (ADB, scrcpy, ffmpeg)';
-  RemoveDataCheckbox.Left := 0;
-  RemoveDataCheckbox.Top := 0;
-  RemoveDataCheckbox.Width := UninstallDataPage.SurfaceWidth;
-  RemoveDataCheckbox.Checked := True;
-end;
-
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  DataPath, ResourcesPath, SnailPath: String;
-begin
-  if CurUninstallStep = usPostUninstall then
-  begin
-    if RemoveDataCheckbox.Checked then
-    begin
-      DataPath      := ExpandConstant('{userappdata}\Snail\AndroidMusicPresenceLink');
-      ResourcesPath := ExpandConstant('{userappdata}\Snail\Resources');
-      SnailPath     := ExpandConstant('{userappdata}\Snail');
-
-      if DirExists(DataPath)      then DelTree(DataPath,      True, True, True);
-      if DirExists(ResourcesPath) then DelTree(ResourcesPath, True, True, True);
-      if DirExists(SnailPath)     then DelTree(SnailPath,     True, True, True);
-    end;
-  end;
 end;
