@@ -123,6 +123,7 @@ namespace musicpresense
         public int HotkeyToggleScrcpyKey { get; set; } = 0x53;
         public int HotkeyToggleLyricsOverlayKey { get; set; } = 0x4C;
         public int HotkeyCopyTrackInfoKey { get; set; } = 0x43;
+        public int HotkeyAudioQualityKey { get; set; } = 0x51;   // Q
         public int HotkeyModifier { get; set; } = 0x0001;
     }
 
@@ -309,6 +310,8 @@ namespace musicpresense
                 config.HotkeyToggleLyricsOverlayKey = 0x4C;
             if (config.HotkeyCopyTrackInfoKey < 0 || config.HotkeyCopyTrackInfoKey > 0xFF)
                 config.HotkeyCopyTrackInfoKey = 0x43;
+            if (config.HotkeyAudioQualityKey < 0 || config.HotkeyAudioQualityKey > 0xFF)
+                config.HotkeyAudioQualityKey = 0x51;
 
             var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };
             if (!allowedMods.Contains(config.HotkeyModifier)) config.HotkeyModifier = 0x0001;

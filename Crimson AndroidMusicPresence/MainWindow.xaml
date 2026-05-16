@@ -557,6 +557,7 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="150" />
@@ -810,6 +811,7 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="150" />
@@ -889,14 +891,28 @@
                                        Grid.Row="5" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
                                 <TextBox x:Name="TxtHotkeyCopyTrackInfo"
-                                     Grid.Row="5" Grid.Column="1" />
+                                     Grid.Row="5" Grid.Column="1"
+                                     Margin="0,0,0,6" />
                                 <Button x:Name="BtnRecordHotkeyCopyTrackInfo"
                                     Grid.Row="5" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
-                                    Margin="8,0,0,0"
+                                    Margin="8,0,0,6"
                                     Click="BtnRecordHotkeyCopyTrackInfo_Click" />
+
+                                <TextBlock Text="Audio quality"
+                                       Grid.Row="6" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox x:Name="TxtHotkeyAudioQuality"
+                                     Grid.Row="6" Grid.Column="1" />
+                                <Button x:Name="BtnRecordHotkeyAudioQuality"
+                                    Grid.Row="6" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,0"
+                                    Click="BtnRecordHotkeyAudioQuality_Click" />
                             </Grid>
                         </StackPanel>
                     </Expander>

@@ -36,6 +36,7 @@ namespace musicpresense
         private const int HotkeyIdToggleScrcpy = 3;
         private const int HotkeyIdToggleLyricsOverlay = 4;
         private const int HotkeyIdCopyTrackInfo = 5;
+        private const int HotkeyIdAudioQuality = 6;
         private const int ModShift = 0x0004;
         private const int VkVolumeUp = 0xAF;
         private const int VkVolumeDown = 0xAE;
@@ -380,6 +381,41 @@ namespace musicpresense
             }
         }
 
+        /// <summary>
+        /// Called by the global hotkey. Always opens the quality window with the full
+        /// preset picker, regardless of whether the media player is open.
+        /// </summary>
+        private void OpenAudioQualityFromHotkey()
+        {
+            OpenAudioQualityWindow(showPresets: true, calledFromMediaPlayer: false);
+        }
+
+        private void OpenAudioQualityWindow(bool showPresets, bool calledFromMediaPlayer)
+        {
+            Window? owner = calledFromMediaPlayer ? (Window?)_mediaPlayerWindow : _settingsWindow;
+            // Only assign Owner if the window has a live HWND; a window that was
+            // created but never shown (e.g. hidden on startup) throws otherwise.
+            if (owner != null && !owner.IsLoaded)
+                owner = null;
+
+            var window = new AudioCustomQualityWindow(Config, showPresets);
+            if (owner != null)
+                window.Owner = owner;
+
+            if (window.ShowDialog() == true && window.ResultConfig.HasValue)
+            {
+                var (codec, bitrate, bufferMs, flacLevel) = window.ResultConfig.Value;
+                AudioQualityPresets.ApplyCustomToConfig(Config, codec, bitrate, bufferMs, flacLevel);
+                MusicConfigManager.Save(Config);
+
+                bool wasRunning = _scrcpyProcess != null && !_scrcpyProcess.HasExited;
+                UpdateConfig(Config);
+
+                if (wasRunning)
+                    _ = RestartScrcpyForPresetAsync();
+            }
+        }
+
         private async Task RestartScrcpyForPresetAsync()
         {
             try
@@ -538,7 +574,8 @@ namespace musicpresense
                     seconds => _presenceService?.SeekRelativeCurrentAsync(seconds) ?? Task.CompletedTask,
                     _lyricsOverlayManager,
                     () => Config,
-                    ApplyAudioQualityPresetFromMediaPlayer);
+                    ApplyAudioQualityPresetFromMediaPlayer,
+                    () => OpenAudioQualityWindow(showPresets: false, calledFromMediaPlayer: true));
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
 
                 // Push current connection + scrcpy state into the freshly created window.
@@ -751,6 +788,20 @@ namespace musicpresense
 
             // Push the theme change into the media player window so the idle
             // background, icon brush, and text colors all flip immediately.
+            _mediaPlayerWindow?.NotifyThemeChanged();
+
+            // If the dev marker file is present, always re-apply dev accent colors
+            // so UpdateConfig can't clobber them.
+            if (File.Exists(Path.Combine(AppPaths.BaseDirectory, "devmode_snail.txt")))
+                ApplyDevTheme();
+        }
+
+        internal void ApplyDevTheme()
+        {
+            Resources["ThemeAccentBrush"] = CreateBrush("#CC0000");
+            Resources["ThemeAccentHoverBrush"] = CreateBrush("#FF2222");
+            Resources["ThemeAccentPressedBrush"] = CreateBrush("#990000");
+            _trayIconManager?.SetDarkMode(false);
             _mediaPlayerWindow?.NotifyThemeChanged();
         }
 
@@ -1236,6 +1287,7 @@ namespace musicpresense
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.HotkeyModifier, Config.HotkeyToggleScrcpyKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay, Config.HotkeyModifier, Config.HotkeyToggleLyricsOverlayKey); } catch { }
             try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo, Config.HotkeyModifier, Config.HotkeyCopyTrackInfoKey); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdAudioQuality, Config.HotkeyModifier, Config.HotkeyAudioQualityKey); } catch { }
             Debugger.show($"[HOTKEY] Hotkeys initialized with modifier 0x{Config.HotkeyModifier:X}.");
         }
 
@@ -1257,6 +1309,7 @@ namespace musicpresense
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy);
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay);
                 UnregisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo);
+                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdAudioQuality);
                 _hotkeySource.RemoveHook(HotkeyHook);
                 _hotkeySource.Dispose();
                 _hotkeySource = null;
@@ -1293,6 +1346,11 @@ namespace musicpresense
                     case HotkeyIdCopyTrackInfo:
                         Debugger.show("[HOTKEY] Global hotkey used: copy track info.");
                         handled = TryCopyCurrentTrackInfoToClipboard();
+                        break;
+                    case HotkeyIdAudioQuality:
+                        Debugger.show("[HOTKEY] Global hotkey used: audio quality.");
+                        OpenAudioQualityFromHotkey();
+                        handled = true;
                         break;
                 }
             }

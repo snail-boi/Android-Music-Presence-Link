@@ -149,6 +149,51 @@ namespace musicpresense
                 customRow.Child = stack;
                 AudioQualityMenuItems.Children.Add(customRow);
             }
+
+            // Separator before "Custom settings..." entry.
+            AudioQualityMenuItems.Children.Add(new Border
+            {
+                Height = 1,
+                Background = (Brush)FindResource("ThemeControlBorderBrush"),
+                Opacity = 0.4,
+                Margin = new Thickness(8, 4, 8, 4)
+            });
+
+            // "Custom settings..." — always at the bottom, opens the custom quality window.
+            var customSettingsBtn = new Button
+            {
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(10, 8, 10, 8),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 1, 0, 1),
+                Foreground = fg
+            };
+            var customSettingsStack = new StackPanel { Orientation = Orientation.Vertical };
+            customSettingsStack.Children.Add(new TextBlock
+            {
+                Text = "Custom settings...",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = fg
+            });
+            customSettingsStack.Children.Add(new TextBlock
+            {
+                Text = "Manually set codec, bitrate and buffer.",
+                FontSize = 11,
+                Opacity = 0.7,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 0, 0),
+                Foreground = fg
+            });
+            customSettingsBtn.Content = customSettingsStack;
+            customSettingsBtn.Click += (s, e) =>
+            {
+                AudioQualityPopup.IsOpen = false;
+                _openCustomQualityWindow?.Invoke();
+            };
+            AudioQualityMenuItems.Children.Add(customSettingsBtn);
         }
         private UIElement BuildPresetMenuRow(AudioQualityPresets.Preset preset, bool isSelected, Brush foreground)
         {
@@ -241,6 +286,29 @@ namespace musicpresense
 
             AudioQualityPopup.IsOpen = false;
             RefreshAudioQualityButton();
+        }
+
+        // ── Audio Quality: hotkey entry point ────────────────────────────────
+
+        /// <summary>
+        /// Opens the audio quality popup as if the user had clicked the pill button.
+        /// Called by the global hotkey path in App when the media player is visible.
+        /// Shows all presets plus the "Custom settings..." entry.
+        /// </summary>
+        public void OpenAudioQualityPopupFromHotkey()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(OpenAudioQualityPopupFromHotkey);
+                return;
+            }
+
+            if (AudioQualityPopup == null || AudioQualityMenuItems == null)
+                return;
+
+            Debugger.show("[HOTKEY] Opening audio quality popup from hotkey.");
+            BuildAudioQualityMenu();
+            AudioQualityPopup.IsOpen = true;
         }
 
         // ── Audio Link ────────────────────────────────────────────────────────

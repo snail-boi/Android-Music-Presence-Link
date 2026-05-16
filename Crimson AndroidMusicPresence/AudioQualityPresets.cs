@@ -162,6 +162,22 @@ namespace musicpresense
             config.AudioQualityPresetName = preset.Name;
         }
 
+
+        /// <summary>
+        /// Writes a fully custom codec/bitrate/buffer/FLAC-level combo into config
+        /// and marks the preset name as "Custom".
+        /// </summary>
+        public static void ApplyCustomToConfig(MusicConfig config,
+            string codec, string bitrate, int bufferMs, int flacLevel)
+        {
+            if (config == null) return;
+            config.ScrcpyAudioCodec = codec;
+            config.ScrcpyAudioBitrate = bitrate;
+            config.ScrcpyAudioBuffer = bufferMs;
+            config.ScrcpyFlacCompressionLevel = flacLevel;
+            config.AudioQualityPresetName = CustomLabel;
+        }
+
         /// <summary>
         /// Returns the short display label for the current config: either the preset's
         /// ShortName, or "Custom" if no preset matches.

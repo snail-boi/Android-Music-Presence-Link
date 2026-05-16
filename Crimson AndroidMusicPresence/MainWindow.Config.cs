@@ -52,6 +52,7 @@ namespace musicpresense
             try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
             try { TxtHotkeyToggleLyricsOverlay.Text = VirtualKeyToDisplayName(_config.HotkeyToggleLyricsOverlayKey); } catch { TxtHotkeyToggleLyricsOverlay.Text = string.Empty; }
             try { TxtHotkeyCopyTrackInfo.Text = VirtualKeyToDisplayName(_config.HotkeyCopyTrackInfoKey); } catch { TxtHotkeyCopyTrackInfo.Text = string.Empty; }
+            try { TxtHotkeyAudioQuality.Text = VirtualKeyToDisplayName(_config.HotkeyAudioQualityKey); } catch { TxtHotkeyAudioQuality.Text = string.Empty; }
             TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
             TxtCoverPatterns.Text = _config.CoverArtFileNamePatterns ?? string.Empty;
             TxtCopyTrackTemplate.Text = _config.CopyTrackInfoTemplate ?? string.Empty;
@@ -291,6 +292,7 @@ namespace musicpresense
             _config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
             _config.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
             _config.HotkeyCopyTrackInfoKey = ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _config.HotkeyCopyTrackInfoKey);
+            _config.HotkeyAudioQualityKey = ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _config.HotkeyAudioQualityKey);
             _config.LyricsSearchFolderOverride = TxtLyricsFolderOverride.Text.Trim();
             _config.CoverArtFileNamePatterns = TxtCoverPatterns.Text.Trim();
             _config.CopyTrackInfoTemplate = TxtCopyTrackTemplate.Text.Trim();
@@ -488,6 +490,7 @@ namespace musicpresense
             config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
             config.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
             config.HotkeyCopyTrackInfoKey = ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _config.HotkeyCopyTrackInfoKey);
+            config.HotkeyAudioQualityKey = ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _config.HotkeyAudioQualityKey);
             config.LyricsSearchFolderOverride = TxtLyricsFolderOverride.Text.Trim();
             config.CoverArtFileNamePatterns = TxtCoverPatterns.Text.Trim();
             config.CopyTrackInfoTemplate = TxtCopyTrackTemplate.Text.Trim();
@@ -568,6 +571,7 @@ namespace musicpresense
             if (left.HotkeyToggleScrcpyKey != right.HotkeyToggleScrcpyKey) return false;
             if (left.HotkeyToggleLyricsOverlayKey != right.HotkeyToggleLyricsOverlayKey) return false;
             if (left.HotkeyCopyTrackInfoKey != right.HotkeyCopyTrackInfoKey) return false;
+            if (left.HotkeyAudioQualityKey != right.HotkeyAudioQualityKey) return false;
             if (left.HotkeyModifier != right.HotkeyModifier) return false;
             if (!string.Equals(left.LyricsSearchFolderOverride ?? string.Empty, right.LyricsSearchFolderOverride ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(left.CoverArtFileNamePatterns ?? string.Empty, right.CoverArtFileNamePatterns ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
@@ -668,6 +672,7 @@ namespace musicpresense
                 HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,
                 HotkeyToggleLyricsOverlayKey = source.HotkeyToggleLyricsOverlayKey,
                 HotkeyCopyTrackInfoKey = source.HotkeyCopyTrackInfoKey,
+                HotkeyAudioQualityKey = source.HotkeyAudioQualityKey,
                 LyricsSearchFolderOverride = source.LyricsSearchFolderOverride ?? string.Empty,
                 CoverArtFileNamePatterns = source.CoverArtFileNamePatterns ?? string.Empty,
                 CopyTrackInfoTemplate = source.CopyTrackInfoTemplate ?? string.Empty,

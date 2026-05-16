@@ -80,6 +80,7 @@ namespace musicpresense
         // preset to the live config, persists it, and restarts scrcpy if needed.
         private readonly Func<MusicConfig>? _getConfig;
         private readonly Action<AudioQualityPresets.Preset>? _applyAudioQualityPreset;
+        private readonly Action? _openCustomQualityWindow;
 
         // Hide-decorations toggle state. We snapshot the chrome before hiding
         // so the toggle restores the user's exact pre-toggle layout. Despite the
@@ -138,7 +139,8 @@ namespace musicpresense
             Func<int, Task>? seekRelativeSeconds = null,
             LyricsOverlayManager? lyricsManager = null,
             Func<MusicConfig>? getConfig = null,
-            Action<AudioQualityPresets.Preset>? applyAudioQualityPreset = null)
+            Action<AudioQualityPresets.Preset>? applyAudioQualityPreset = null,
+            Action? openCustomQualityWindow = null)
         {
             InitializeComponent();
             _pauseAction = pauseAction;
@@ -154,6 +156,7 @@ namespace musicpresense
             _lyricsManager = lyricsManager;
             _getConfig = getConfig;
             _applyAudioQualityPreset = applyAudioQualityPreset;
+            _openCustomQualityWindow = openCustomQualityWindow;
 
             if (_lyricsManager != null)
             {
@@ -394,9 +397,11 @@ namespace musicpresense
 
             ClampSettingsColumnWidth();
             double targetWidth = Math.Min(DefaultSettingsWidth, SettingsColumn.MaxWidth > 0 ? SettingsColumn.MaxWidth : DefaultSettingsWidth);
-            double fromWidth = SettingsColumn.Width.IsAbsolute && SettingsColumn.Width.Value > 0
-                ? SettingsColumn.Width.Value
-                : 0;
+            // Reset to 0 so the animation always slides in from nothing.
+            // ClampSettingsColumnWidth sets Width to the target which would
+            // cause the animation to start at the end and appear instant.
+            SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
+            double fromWidth = 0;
 
             var anim = new GridLengthAnimation
             {
