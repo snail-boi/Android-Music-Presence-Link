@@ -67,6 +67,11 @@ namespace musicpresense
         private long _lastPositionMs;
         private long _lastDurationMs;
 
+        // Smooth progress interpolation — updated every poll, ticked every 100 ms.
+        private long _positionAnchorMs;
+        private DateTime _positionAnchorTime;
+        private DispatcherTimer? _smoothTimer;
+
         // Settings pane open/closed state — used by SizeChanged to decide whether to clamp or auto-collapse.
         private bool _settingsPaneOpen = false;
 
@@ -187,6 +192,10 @@ namespace musicpresense
                 RefreshAlwaysOnTopButton();
                 ApplySavedRuntimeState();
             };
+
+            _smoothTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _smoothTimer.Tick += SmoothTimer_Tick;
+            _smoothTimer.Start();
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -576,10 +585,8 @@ namespace musicpresense
         }
 
         /// <summary>
-        /// Updates the read-only progress bar and the position/duration labels.
-        /// Position is the manually-counted-forward value from MediaController
-        /// (Android only reports the last scrub location, so the controller
-        /// ticks it forward each poll cycle while playing).
+        /// Called every poll cycle. Sets the wall-clock anchor so the smooth timer
+        /// can interpolate position between polls regardless of update cycle length.
         /// </summary>
         public void UpdateProgress(long positionMs, long durationMs)
         {
@@ -591,6 +598,8 @@ namespace musicpresense
 
             _lastPositionMs = positionMs;
             _lastDurationMs = durationMs;
+            _positionAnchorMs = positionMs;
+            _positionAnchorTime = DateTime.UtcNow;
 
             if (durationMs <= 0)
             {
@@ -603,18 +612,27 @@ namespace musicpresense
                 return;
             }
 
-            long clamped = Math.Max(0, Math.Min(positionMs, durationMs));
-
             ProgressSlider.Maximum = durationMs;
-            ProgressSlider.Value = clamped;
 
             // Show skip buttons inline in transport row for songs > 10 minutes
             var seekVisibility = durationMs > 10 * 60 * 1000L ? Visibility.Visible : Visibility.Collapsed;
             BtnSeekBack.Visibility = seekVisibility;
             BtnSeekFwd.Visibility = seekVisibility;
 
-            RefreshPositionLabel();
             TxtDurationLabel.Text = FormatMs(durationMs);
+        }
+
+        private void SmoothTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_lastDurationMs <= 0 || !_isPlaying)
+                return;
+
+            long elapsed = (long)(DateTime.UtcNow - _positionAnchorTime).TotalMilliseconds;
+            long interpolated = Math.Max(0, Math.Min(_positionAnchorMs + elapsed, _lastDurationMs));
+
+            _lastPositionMs = interpolated;
+            ProgressSlider.Value = interpolated;
+            RefreshPositionLabel();
         }
 
         // ── Connection Info ───────────────────────────────────────────────────
