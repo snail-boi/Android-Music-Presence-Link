@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.VisualBasic.Devices;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -82,8 +83,16 @@ namespace musicpresense
         {
             if (TxtUpdateIntervalWarning == null) return;
             // Indices 0=1sec, 1=3sec, 2=5sec, 3=10sec. Warn for index >= 2 (5 sec and above).
-            bool slow = CmbUpdateInterval.SelectedIndex >= 2;
+            bool slow = CmbUpdateInterval.SelectedIndex >= 1;
             TxtUpdateIntervalWarning.Visibility = slow ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            if (CmbUpdateInterval.SelectedIndex == 1)
+            {
+                TxtUpdateIntervalWarning.Text = "Intervals above 1 sec may cause timing issue's in the mediaplayer";
+            }
+            else
+            {
+                TxtUpdateIntervalWarning.Text = "Intervals above 3 sec disable audio link hotswap recovery and may cause timing issue's in the mediaplayer.";
+            }
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)

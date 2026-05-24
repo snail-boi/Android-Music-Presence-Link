@@ -1021,7 +1021,7 @@
 
                             <TextBlock x:Name="TxtUpdateIntervalWarning"
                                    Visibility="Collapsed"
-                                   Text="Intervals above 3 sec disable audio link hotswap recovery and may cause the mediaplayer to update slowly."
+                                   Text="Intervals above 3 sec disable audio link hotswap recovery and intervals above 1 sec may cause timing issue's in the mediaplayer."
                                    Style="{StaticResource HintTextStyle}"
                                    Foreground="#E6A020"
                                    Margin="0,0,0,8" />
