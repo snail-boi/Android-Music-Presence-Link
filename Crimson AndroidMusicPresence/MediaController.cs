@@ -129,7 +129,8 @@ namespace musicpresense
 
             var musicProperties = smtcDisplayUpdater.MusicProperties;
             musicProperties.Title = SmtcAppLabel;
-            musicProperties.Artist = SmtcAppLabel;
+            musicProperties.Artist = " ";
+            musicProperties.AlbumTitle = " ";
             smtcDisplayUpdater.Update();
         }
 
@@ -370,8 +371,8 @@ namespace musicpresense
                         {
                             var musicProperties = smtcDisplayUpdater.MusicProperties;
                             musicProperties.Title = title ?? string.Empty;
-                            musicProperties.Artist = artist ?? string.Empty;
-                            musicProperties.AlbumTitle = album ?? string.Empty;
+                            musicProperties.Artist = NormalizeSmtcMetadata(artist);
+                            musicProperties.AlbumTitle = NormalizeSmtcMetadata(album);
 
                             smtcDisplayUpdater.Update();
                         }
@@ -401,6 +402,15 @@ namespace musicpresense
             {
                 Debugger.show($"UpdateMediaControlsAsync failed: {ex.Message}");
             }
+        }
+
+        private static string NormalizeSmtcMetadata(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return " ";
+
+            var trimmed = value.Trim();
+            return trimmed.Equals("null", StringComparison.OrdinalIgnoreCase) ? " " : trimmed;
         }
 
         public void Clear()

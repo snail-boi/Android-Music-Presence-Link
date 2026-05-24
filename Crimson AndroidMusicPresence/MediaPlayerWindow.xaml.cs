@@ -436,8 +436,8 @@ namespace musicpresense
             }
 
             string normalizedTitle = NormalizeTrackText(title);
-            string normalizedArtist = NormalizeTrackText(artist);
-            string normalizedAlbum = NormalizeTrackText(album);
+            string normalizedArtist = NormalizeTrackText(artist, replaceNullWithPlaceholder: true);
+            string normalizedAlbum = NormalizeTrackText(album, replaceNullWithPlaceholder: true);
 
             bool hasSong = !string.IsNullOrWhiteSpace(normalizedTitle) && normalizedTitle != "-";
             bool hasSongChanged = hasSong != _hasSong;
@@ -564,13 +564,15 @@ namespace musicpresense
             }
         }
 
-        private static string NormalizeTrackText(string? value)
+        private static string NormalizeTrackText(string? value, bool replaceNullWithPlaceholder = false)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return string.Empty;
+                return replaceNullWithPlaceholder ? " " : string.Empty;
 
             var trimmed = value.Trim();
-            return trimmed.Equals("null", StringComparison.OrdinalIgnoreCase) ? string.Empty : trimmed;
+            return trimmed.Equals("null", StringComparison.OrdinalIgnoreCase)
+                ? (replaceNullWithPlaceholder ? " " : string.Empty)
+                : trimmed;
         }
 
         /// <summary>
