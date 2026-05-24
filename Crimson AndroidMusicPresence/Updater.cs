@@ -9,6 +9,13 @@ using System.Windows;
 
 namespace musicpresense
 {
+    public enum UpdateStatus
+    {
+        UpdateAvailable,
+        UpToDate,
+        DebugBuild
+    }
+
     /// <summary>
     /// very important reminder as to how the updater works
     /// it first checks numerically eg 1.2.0 or 1.3.0 (this takes priority)
@@ -22,9 +29,10 @@ namespace musicpresense
         private const string ReleasesPageUrl = "https://github.com/snail-boi/Android-Music-Presence-Link/releases";
         private static readonly SemaphoreSlim PromptSemaphore = new(1, 1);
 
-        public static event Action<bool, string?, string?>? UpdateStatusChanged;
+        public static event Action<UpdateStatus, string?, string?>? UpdateStatusChanged;
 
-        public static bool IsUpdateAvailable { get; private set; }
+        public static UpdateStatus Status { get; private set; } = UpdateStatus.UpToDate;
+        public static bool IsUpdateAvailable => Status == UpdateStatus.UpdateAvailable;
         public static string? LatestVersion { get; private set; }
         public static string? LatestPatchNotes { get; private set; }
 
@@ -36,7 +44,7 @@ namespace musicpresense
         {
             try
             {
-                using HttpClient client = new();
+                using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(10) };
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("AndroidMusicPresenceUpdater/1.0");
 
                 string apiUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases";
@@ -83,19 +91,21 @@ namespace musicpresense
 
                 if (!IsNewerVersion(latestVersion, currentVersion))
                 {
-                    IsUpdateAvailable = false;
-                    UpdateStatusChanged?.Invoke(false, latestVersion, LatestPatchNotes);
+                    Status = IsNewerVersion(currentVersion, latestVersion)
+                        ? UpdateStatus.DebugBuild
+                        : UpdateStatus.UpToDate;
+                    UpdateStatusChanged?.Invoke(Status, latestVersion, LatestPatchNotes);
                     return;
                 }
 
-                IsUpdateAvailable = true;
-                UpdateStatusChanged?.Invoke(true, latestVersion, LatestPatchNotes);
+                Status = UpdateStatus.UpdateAvailable;
+                UpdateStatusChanged?.Invoke(Status, latestVersion, LatestPatchNotes);
 
                 var patchNotes = LatestPatchNotes ?? GetReleaseNotes(latestRelease.Value);
 
                 if (!showPrompt)
                 {
-                    UpdateStatusChanged?.Invoke(true, latestVersion, LatestPatchNotes);
+                    UpdateStatusChanged?.Invoke(Status, latestVersion, LatestPatchNotes);
                     return;
                 }
 
@@ -170,11 +180,16 @@ namespace musicpresense
                     PromptSemaphore.Release();
                 }
             }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+            {
+                // Network unavailable or timeout — not worth bothering the user.
+                Debugger.show($"[UPDATER] Update check failed (network): {ex.Message}");
+            }
             catch (Exception ex)
             {
                 MessageBox.Show($"Update check failed:\n{ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                IsUpdateAvailable = false;
-                UpdateStatusChanged?.Invoke(false, LatestVersion, LatestPatchNotes);
+                Status = UpdateStatus.UpToDate;
+                UpdateStatusChanged?.Invoke(Status, LatestVersion, LatestPatchNotes);
             }
         }
 

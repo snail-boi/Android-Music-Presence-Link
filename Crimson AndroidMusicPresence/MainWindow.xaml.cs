@@ -143,7 +143,7 @@ namespace musicpresense
             Updater.UpdateStatusChanged += Updater_UpdateStatusChanged;
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
-            UpdateUpdateBanner(Updater.IsUpdateAvailable, Updater.LatestVersion, Updater.LatestPatchNotes);
+            UpdateUpdateBanner(Updater.Status, Updater.LatestVersion, Updater.LatestPatchNotes);
             UpdateMediaPlayerModeButton((Application.Current as App)?.IsMediaPlayerModeActive() == true);
             _isInitializing = false;
         }
@@ -262,27 +262,32 @@ namespace musicpresense
             BtnToggleTheme.Content = useDarkMode ? "Switch to Light" : "Switch to Dark";
         }
 
-        private void Updater_UpdateStatusChanged(bool isUpdateAvailable, string? latestVersion, string? patchNotes)
+        private void Updater_UpdateStatusChanged(UpdateStatus status, string? latestVersion, string? patchNotes)
         {
             if (!Dispatcher.CheckAccess())
             {
-                Dispatcher.BeginInvoke(new Action(() => UpdateUpdateBanner(isUpdateAvailable, latestVersion, patchNotes)));
+                Dispatcher.BeginInvoke(new Action(() => UpdateUpdateBanner(status, latestVersion, patchNotes)));
                 return;
             }
 
-            UpdateUpdateBanner(isUpdateAvailable, latestVersion, patchNotes);
+            UpdateUpdateBanner(status, latestVersion, patchNotes);
         }
 
-        private void UpdateUpdateBanner(bool isUpdateAvailable, string? latestVersion, string? patchNotes)
+        private void UpdateUpdateBanner(UpdateStatus status, string? latestVersion, string? patchNotes)
         {
             if (TxtVersionInfo != null)
                 TxtVersionInfo.Text = $"v{App.CurrentVersion}";
 
             if (TxtUpdateStatus != null)
-                TxtUpdateStatus.Text = isUpdateAvailable ? "· Update available" : "· Up to date";
+                TxtUpdateStatus.Text = status switch
+                {
+                    UpdateStatus.UpdateAvailable => "· Update available",
+                    UpdateStatus.DebugBuild => "· Debug build",
+                    _ => "· Up to date"
+                };
 
             if (BtnUpdate != null)
-                BtnUpdate.Visibility = isUpdateAvailable ? Visibility.Visible : Visibility.Collapsed;
+                BtnUpdate.Visibility = status == UpdateStatus.UpdateAvailable ? Visibility.Visible : Visibility.Collapsed;
         }
         #endregion
 
