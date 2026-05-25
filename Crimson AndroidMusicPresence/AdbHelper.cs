@@ -51,7 +51,6 @@ namespace musicpresense
         {
             if (!IsAdbConfigured(showError: false))
                 return;
-
             try
             {
                 DisposeAllShellSessions();

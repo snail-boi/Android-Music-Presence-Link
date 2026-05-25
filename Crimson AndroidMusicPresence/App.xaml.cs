@@ -852,7 +852,6 @@ namespace musicpresense
             _settingsWindow?.AllowClose();
             Shutdown();
         }
-
         private void ToggleScrcpyNoAudio()
         {
             if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
