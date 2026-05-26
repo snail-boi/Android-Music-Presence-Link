@@ -41,6 +41,10 @@ namespace musicpresense
         private readonly Func<float?>? _getVolume;
         private readonly Action<float>? _setVolume;
         private readonly Action<bool>? _stepVolume;
+        private readonly Func<Task<(int current, int max)>>? _getPhoneVolume;
+        private readonly Func<int, int, int, Task>? _setPhoneVolume;
+        private int _lastSentPhoneVolumeIndex = -1;
+        private int _lastPhoneVolumeMax = 15;
         // Set true while we initialize the slider value from the actual scrcpy
         // volume on popup open, so the resulting ValueChanged event doesn't
         // bounce back as a SetVolume call.
@@ -145,7 +149,9 @@ namespace musicpresense
             LyricsOverlayManager? lyricsManager = null,
             Func<MusicConfig>? getConfig = null,
             Action<AudioQualityPresets.Preset>? applyAudioQualityPreset = null,
-            Action? openCustomQualityWindow = null)
+            Action? openCustomQualityWindow = null,
+            Func<Task<(int current, int max)>>? getPhoneVolume = null,
+            Func<int, int, int, Task>? setPhoneVolume = null)
         {
             InitializeComponent();
             _pauseAction = pauseAction;
@@ -162,6 +168,8 @@ namespace musicpresense
             _getConfig = getConfig;
             _applyAudioQualityPreset = applyAudioQualityPreset;
             _openCustomQualityWindow = openCustomQualityWindow;
+            _getPhoneVolume = getPhoneVolume;
+            _setPhoneVolume = setPhoneVolume;
 
             if (_lyricsManager != null)
             {

@@ -83,10 +83,38 @@ namespace musicpresense
             }
             else
             {
-                VolumeSliderHost.Visibility = Visibility.Collapsed;
-                VolumeStepHost.Visibility = Visibility.Visible;
+                _ = OpenPhoneVolumeSliderAsync();
+                return;
             }
 
+            VolumePopup.IsOpen = true;
+            RefreshVolumeIcon();
+        }
+
+        private async Task OpenPhoneVolumeSliderAsync()
+        {
+            var (current, max) = _getPhoneVolume != null
+                ? await _getPhoneVolume().ConfigureAwait(true)
+                : (-1, 15);
+
+            _lastPhoneVolumeMax = max > 0 ? max : 15;
+            _lastSentPhoneVolumeIndex = current;
+
+            _suppressVolumeSliderEcho = true;
+            try
+            {
+                VolumeSlider.Value = current >= 0
+                    ? Math.Clamp(current / (double)_lastPhoneVolumeMax * 100.0, 0, 100)
+                    : 50;
+            }
+            finally
+            {
+                _suppressVolumeSliderEcho = false;
+            }
+
+            TxtVolumePercent.Text = $"{(int)Math.Round(current / (double)_lastPhoneVolumeMax * 100.0)}%";
+            VolumeSliderHost.Visibility = Visibility.Visible;
+            VolumeStepHost.Visibility = Visibility.Collapsed;
             VolumePopup.IsOpen = true;
             RefreshVolumeIcon();
         }
@@ -94,10 +122,27 @@ namespace musicpresense
         {
             if (_suppressVolumeSliderEcho) return;
 
-            // Slider is 0..100, scrcpy volume is 0..1.
-            float volume = (float)Math.Clamp(e.NewValue / 100.0, 0.0, 1.0);
-            _setVolume?.Invoke(volume);
-            TxtVolumePercent.Text = $"{(int)Math.Round(e.NewValue)}%";
+            if (_isScrcpyAudioAvailable?.Invoke() == true)
+            {
+                // Scrcpy audio: continuous 0..1 float.
+                float volume = (float)Math.Clamp(e.NewValue / 100.0, 0.0, 1.0);
+                _setVolume?.Invoke(volume);
+                TxtVolumePercent.Text = $"{(int)Math.Round(e.NewValue)}%";
+            }
+            else
+            {
+                // Phone volume: only send ADB command when the mapped integer index changes.
+                int newIndex = (int)Math.Round(e.NewValue / 100.0 * _lastPhoneVolumeMax);
+                newIndex = Math.Clamp(newIndex, 0, _lastPhoneVolumeMax);
+                if (newIndex != _lastSentPhoneVolumeIndex)
+                {
+                    int previousIndex = _lastSentPhoneVolumeIndex;
+                    _lastSentPhoneVolumeIndex = newIndex;
+                    _ = _setPhoneVolume?.Invoke(previousIndex, newIndex, _lastPhoneVolumeMax);
+                }
+                TxtVolumePercent.Text = $"{(int)Math.Round(_lastSentPhoneVolumeIndex / (double)_lastPhoneVolumeMax * 100.0)}%";
+            }
+
             RefreshVolumeIcon();
         }
         private void BtnVolumeDown_Click(object sender, RoutedEventArgs e)

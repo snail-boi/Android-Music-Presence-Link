@@ -5,6 +5,7 @@ using System.Configuration;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -575,7 +576,9 @@ namespace musicpresense
                     _lyricsOverlayManager,
                     () => Config,
                     ApplyAudioQualityPresetFromMediaPlayer,
-                    () => OpenAudioQualityWindow(showPresets: false, calledFromMediaPlayer: true));
+                    () => OpenAudioQualityWindow(showPresets: false, calledFromMediaPlayer: true),
+                    GetPhoneVolumeAsync,
+                    (prev, target, max) => SetPhoneVolumeAsync(prev, target, max));
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
 
                 // Push current connection + scrcpy state into the freshly created window.
@@ -1438,6 +1441,91 @@ namespace musicpresense
             catch (Exception ex)
             {
                 Debugger.show($"ADB volume key failed: {ex.Message}");
+            }
+        }
+
+        private async Task<(int current, int max)> GetPhoneVolumeAsync()
+        {
+            try
+            {
+                var device = _presenceService?.CurrentDevice;
+                if (string.IsNullOrWhiteSpace(device))
+                    return (-1, 15);
+
+                var output = await AdbHelper.RunAdbCaptureAsync(
+                    $"-s {device} shell sh -c \"dumpsys audio | grep -A 6 'VOLUME GROUP AUDIO_STREAM_MUSIC'\"")
+                    .ConfigureAwait(false);
+
+                Debugger.show($"[VOLUME] dumpsys output: {output.Replace("\n", "|").Replace("\r", "")}");
+                if (string.IsNullOrWhiteSpace(output))
+                    return (-1, 15);
+
+                int max = 15;
+                string? currentLine = null;
+                string? activeDevice = null;
+
+                foreach (var rawLine in output.Split('\n'))
+                {
+                    var line = rawLine.Trim();
+
+                    if (line.StartsWith("Max:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (int.TryParse(line.Substring(4).Trim(), out var m))
+                            max = m;
+                    }
+                    else if (line.StartsWith("Current:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        currentLine = line;
+                    }
+                    else if (line.StartsWith("Devices:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        activeDevice = line.Substring(8).Trim();
+                    }
+                }
+
+                if (activeDevice != null && currentLine != null)
+                {
+                    var needle = $"({activeDevice}):";
+                    var idx = currentLine.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0)
+                    {
+                        var after = currentLine.Substring(idx + needle.Length).TrimStart();
+                        var comma = after.IndexOf(',');
+                        var numStr = comma >= 0 ? after.Substring(0, comma) : after;
+                        if (int.TryParse(numStr.Trim(), out var v))
+                            return (v, max);
+                    }
+                }
+
+                return (-1, max);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"GetPhoneVolumeAsync failed: {ex.Message}");
+                return (-1, 15);
+            }
+        }
+
+        private async Task SetPhoneVolumeAsync(int previousIndex, int targetIndex, int max)
+        {
+            try
+            {
+                var device = _presenceService?.CurrentDevice;
+                if (string.IsNullOrWhiteSpace(device))
+                    return;
+
+                int delta = Math.Clamp(targetIndex, 0, max) - Math.Clamp(previousIndex, 0, max);
+                if (delta == 0)
+                    return;
+
+                int keycode = delta > 0 ? 24 : 25;
+                var keys = string.Join(" ", Enumerable.Repeat(keycode, Math.Abs(delta)));
+                Debugger.show($"[VOLUME] Sending {Math.Abs(delta)}x keyevent {keycode} (prev={previousIndex} target={targetIndex})");
+                await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent {keys}").ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"SetPhoneVolumeAsync failed: {ex.Message}");
             }
         }
 
