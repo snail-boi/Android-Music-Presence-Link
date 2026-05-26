@@ -22,7 +22,7 @@ namespace musicpresense
         private string? lastSMTCTitle;
         private string? lastTimelineTrackKey;
         private string? lastSmtcPushedKey;
-        private bool _smtcClearedForHalf;
+        private bool _smtcClearedForHalf = true;
         private long? lastAdbPositionMs;
         private long realPositionMs;
         private TimeSpan? lastTrackDuration;
@@ -289,12 +289,18 @@ namespace musicpresense
                 if (enableSmtc && smtcControls != null)
                 {
                     smtcControls.PlaybackStatus = isPlaying ? MediaPlaybackStatus.Playing : MediaPlaybackStatus.Paused;
-                    _smtcClearedForHalf = false;
+                    if (_smtcClearedForHalf)
+                    {
+                        Debugger.show($"[SMTC] First Full tick after Half/Off — forcing re-push. lastSmtcPushedKey={lastSmtcPushedKey ?? "null"}");
+                        _smtcClearedForHalf = false;
+                        lastSmtcPushedKey = null;
+                    }
                 }
                 else if (!enableSmtc && !_smtcClearedForHalf)
                 {
+                    Debugger.show("[SMTC] Clearing for Half/Off mode.");
                     _smtcClearedForHalf = true;
-                    lastSmtcPushedKey = null; // Force re-push when switching back to Full.
+                    lastSmtcPushedKey = null;
                     if (smtcDisplayUpdater != null)
                     {
                         smtcDisplayUpdater.ClearAll();
@@ -319,23 +325,35 @@ namespace musicpresense
 
                 // smtcMetadataChanged drives SMTC push — uses lastSmtcPushedKey (nulled by Half clear).
                 bool smtcMetadataChanged = !string.Equals(lastSmtcPushedKey, trackKey, StringComparison.OrdinalIgnoreCase);
+                Debugger.show($"[SMTC] metadataChanged={metadataChanged} smtcMetadataChanged={smtcMetadataChanged} enableSmtc={enableSmtc}");
 
                 TimeSpan? duration = lastTrackDuration;
                 CoverCacheManager.MediaMetadata? meta = null;
 
-                if (metadataChanged)
+                if (metadataChanged || smtcMetadataChanged)
                 {
-                    if (enableCoverSearch)
+                    if (metadataChanged)
                     {
-                        var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
-                        duration = result.Duration ?? duration;
-                        meta = result.Metadata;
-                        CurrentCoverPath = result.ImagePath;
+                        if (enableCoverSearch)
+                        {
+                            var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
+                            duration = result.Duration ?? duration;
+                            meta = result.Metadata;
+                            CurrentCoverPath = result.ImagePath;
+                        }
+                        else
+                        {
+                            Debugger.show("Cover art search disabled for current app.");
+                            await SetDefaultImage().ConfigureAwait(false);
+                        }
                     }
-                    else
+                    else if (smtcMetadataChanged && enableSmtc)
                     {
-                        Debugger.show("Cover art search disabled for current app.");
-                        await SetDefaultImage().ConfigureAwait(false);
+                        // SMTC was cleared (Half/Off -> Full): re-push cached cover without re-searching.
+                        if (!string.IsNullOrWhiteSpace(CurrentCoverPath))
+                            await SetCachedImage(CurrentCoverPath).ConfigureAwait(false);
+                        else
+                            await SetDefaultImage().ConfigureAwait(false);
                     }
                 }
 
@@ -391,6 +409,7 @@ namespace musicpresense
                         if (smtcMetadataChanged)
                         {
                             lastSmtcPushedKey = trackKey;
+                            smtcDisplayUpdater.Type = MediaPlaybackType.Music;
                             var musicProperties = smtcDisplayUpdater.MusicProperties;
                             musicProperties.Title = title ?? string.Empty;
                             musicProperties.Artist = NormalizeSmtcMetadata(artist);
@@ -1012,6 +1031,31 @@ namespace musicpresense
                 Debugger.show($"[COVERART] Critical error in SetSMTCImageAsync: {ex.Message}");
                 await SetDefaultImage().ConfigureAwait(false);
                 return (null, null, _defaultImagePath);
+            }
+        }
+
+        private async Task SetCachedImage(string imagePath)
+        {
+            try
+            {
+                var imageFile = await StorageFile.GetFileFromPathAsync(imagePath).AsTask().ConfigureAwait(false);
+                await dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        smtcDisplayUpdater!.Thumbnail = RandomAccessStreamReference.CreateFromFile(imageFile);
+                        smtcDisplayUpdater.Update();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debugger.show($"[COVERART] Failed to re-set cached thumbnail: {ex.Message}");
+                    }
+                }).Task.ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[COVERART] SetCachedImage failed: {ex.Message}");
+                await SetDefaultImage().ConfigureAwait(false);
             }
         }
 
