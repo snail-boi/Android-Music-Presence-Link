@@ -936,6 +936,7 @@ namespace musicpresense
                     }
                 }
 
+                _mediaController.ClearDisplay();
                 NotifyNowPlaying(null, null, null);
                 NotifyLyricsPlayback(null, null, null, false, 0);
                 NotifyMediaPlayerState(null, null, null, null, false, 0, 0);

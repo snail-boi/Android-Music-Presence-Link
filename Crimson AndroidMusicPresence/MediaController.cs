@@ -116,7 +116,12 @@ namespace musicpresense
 
                 smtcControls.ButtonPressed += SmTc_ButtonPressed;
                 smtcDisplayUpdater.Type = MediaPlaybackType.Music;
-                ApplyDefaultSmtcLabel();
+
+                // Clear immediately so no empty/default session is visible until
+                // a Full-mode app is detected.
+                smtcDisplayUpdater.ClearAll();
+                smtcDisplayUpdater.Update();
+                smtcControls.PlaybackStatus = MediaPlaybackStatus.Stopped;
             }
             catch (Exception ex)
             {
@@ -454,6 +459,32 @@ namespace musicpresense
             return trimmed.Equals("null", StringComparison.OrdinalIgnoreCase) ? " " : trimmed;
         }
 
+        public void ClearDisplay()
+        {
+            try
+            {
+                if (smtcDisplayUpdater != null)
+                {
+                    smtcDisplayUpdater.ClearAll();
+                    smtcDisplayUpdater.Update();
+                }
+                if (smtcControls != null)
+                    smtcControls.PlaybackStatus = MediaPlaybackStatus.Stopped;
+
+                lastSMTCTitle = null;
+                lastSmtcPushedKey = null;
+                _smtcClearedForHalf = true;
+                CurrentTitle = null;
+                CurrentArtist = null;
+                CurrentAlbum = null;
+                CurrentCoverPath = _defaultImagePath;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"Failed to clear SMTC display: {ex.Message}");
+            }
+        }
+
         public void Clear()
         {
             try
@@ -476,7 +507,7 @@ namespace musicpresense
                 lastSMTCTitle = null;
                 lastSmtcPushedKey = null;
                 lastTimelineTrackKey = null;
-                _smtcClearedForHalf = false;
+                _smtcClearedForHalf = true;
                 lastAdbPositionMs = null;
                 realPositionMs = 0;
                 lastTrackDuration = null;
