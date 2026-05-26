@@ -225,6 +225,10 @@ namespace musicpresense
             string cleanLatest = latest.TrimStart('v', 'V').Trim();
             string cleanCurrent = current.TrimStart('v', 'V').Trim();
 
+            // Strip build number (4th part) before comparing — GitHub tags use x.x.x only.
+            cleanCurrent = Regex.Replace(cleanCurrent, @"^(\d+\.\d+\.\d+)\.\d+", "$1");
+            cleanLatest = Regex.Replace(cleanLatest, @"^(\d+\.\d+\.\d+)\.\d+", "$1");
+
             var rx = new Regex(@"\d+");
             var latestNumbers = rx.Matches(cleanLatest);
             var currentNumbers = rx.Matches(cleanCurrent);
