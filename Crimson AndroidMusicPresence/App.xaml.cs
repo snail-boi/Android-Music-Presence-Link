@@ -272,6 +272,12 @@ namespace musicpresense
         {
             try
             {
+                bool wasPlaying = _lastMediaPlayerIsPlaying;
+                var oldDevice = _scrcpyDeviceId;
+
+                if (!string.IsNullOrWhiteSpace(oldDevice))
+                    await AdbHelper.RunAdbAsync($"-s {oldDevice} shell input keyevent 164").ConfigureAwait(true);
+
                 await StopScrcpyAsync().ConfigureAwait(true);
                 if (!_audioLinkDesired || _isExiting) return;
 
@@ -288,6 +294,8 @@ namespace musicpresense
                     _trayIconManager?.SetScrcpyRunning(false);
                     UpdateTrayAudioSettings();
                     ApplyTrayState();
+                    if (!string.IsNullOrWhiteSpace(newDevice))
+                        await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 164").ConfigureAwait(true);
                     return;
                 }
 
@@ -300,6 +308,12 @@ namespace musicpresense
                 _trayIconManager?.SetScrcpyRunning(true);
                 UpdateTrayAudioSettings();
                 ApplyTrayState();
+
+                await Task.Delay(1000).ConfigureAwait(true);
+                await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 164").ConfigureAwait(true);
+
+                if (wasPlaying)
+                    await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 126").ConfigureAwait(true);
             }
             catch (Exception ex)
             {
@@ -421,10 +435,18 @@ namespace musicpresense
         {
             try
             {
+                var device = _presenceService?.CurrentDevice;
+
+                if (!string.IsNullOrWhiteSpace(device))
+                    await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 164").ConfigureAwait(true);
+
                 await StopScrcpyAsync().ConfigureAwait(true);
-                // Tiny pause so the OS releases the audio session before we re-grab it.
                 await Task.Delay(150).ConfigureAwait(true);
                 StartScrcpyNoAudio();
+                await Task.Delay(1000).ConfigureAwait(true);
+
+                if (!string.IsNullOrWhiteSpace(device))
+                    await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 164").ConfigureAwait(true);
             }
             catch (Exception ex)
             {
@@ -1569,4 +1591,4 @@ namespace musicpresense
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     }
 
-}
+}i
