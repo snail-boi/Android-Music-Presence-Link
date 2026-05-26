@@ -728,26 +728,28 @@
                     <!-- ====== ELIGIBLE APPS ====== -->
                     <Expander Header="Eligible apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
                         <StackPanel>
-                            <TextBlock Text="Choose which Android apps can broadcast presence and share album art."
+                            <TextBlock Text="Saved apps and their current settings. Use Manage apps to add or configure."
                                    Style="{StaticResource HintTextStyle}" />
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <Button x:Name="BtnRefreshApps"
-                                    Content="Refresh apps"
+                                <Button x:Name="BtnManageApps"
+                                    Content="Manage apps"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="130" />
-                                <TextBlock x:Name="TxtAppsStatus"
-                                       Margin="12,0,0,0"
-                                       VerticalAlignment="Center" />
+                                <Button x:Name="BtnClearDisabledApps"
+                                    Content="Clear all disabled"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="130"
+                                    Margin="8,0,0,0" />
                             </StackPanel>
 
                             <Grid Margin="6,0,6,4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="190" />
-                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="125" />
+                                    <ColumnDefinition Width="55" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Package" FontWeight="SemiBold" FontSize="12" />
+                                <TextBlock Grid.Column="0" Text="App" FontWeight="SemiBold" FontSize="12" />
                                 <TextBlock Grid.Column="1" Text="Presence" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
                                 <TextBlock Grid.Column="2" Text="Cover" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
                             </Grid>
@@ -756,11 +758,25 @@
                                  Margin="0,0,0,0"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 TextSearch.TextPath="PackageName"
                                  HorizontalContentAlignment="Stretch">
                                 <ListBox.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                        <Setter Property="Focusable" Value="False" />
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="4,2,4,2" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            CornerRadius="4"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
                                     </Style>
                                 </ListBox.ItemContainerStyle>
                                 <ListBox.ItemTemplate>
@@ -768,28 +784,53 @@
                                         <Grid Margin="0,2,0,2">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="190" />
-                                                <ColumnDefinition Width="70" />
+                                                <ColumnDefinition Width="130" />
+                                                <ColumnDefinition Width="50" />
                                             </Grid.ColumnDefinitions>
 
                                             <TextBlock Grid.Column="0"
-                                                   Text="{Binding PackageName}"
+                                                   Text="{Binding DisplayName}"
                                                    VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip="{Binding PackageName}" />
 
-                                            <CheckBox Grid.Column="1"
-                                                  Content=""
-                                                  IsChecked="{Binding IsSelected}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center" />
+                                            <Button Grid.Column="1"
+                                                    Content="{Binding PresenceModeLabel}"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Width="68" Height="27"
+                                                    FontSize="11" FontWeight="SemiBold"
+                                                    Foreground="White"
+                                                    Background="{Binding PresenceModeBrush}"
+                                                    BorderThickness="0"
+                                                    Cursor="Hand"
+                                                    Tag="{Binding}"
+                                                    Click="BtnPresenceMode_Click">
+                                                <Button.Resources>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="CornerRadius" Value="4" />
+                                                    </Style>
+                                                </Button.Resources>
+                                            </Button>
 
-                                            <CheckBox Grid.Column="2"
-                                                  Content=""
-                                                  IsChecked="{Binding IsCoverSearchEnabled}"
-                                                  IsEnabled="{Binding IsSelected}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center" />
+                                            <Button Grid.Column="2"
+                                                    Content="{Binding CoverLabel}"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Width="45" Height="27"
+                                                    FontSize="11" FontWeight="SemiBold"
+                                                    Foreground="White"
+                                                    Background="{Binding CoverBrush}"
+                                                    BorderThickness="0"
+                                                    Cursor="Hand"
+                                                    Tag="{Binding}"
+                                                    Click="BtnCover_Click">
+                                                <Button.Resources>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="CornerRadius" Value="4" />
+                                                    </Style>
+                                                </Button.Resources>
+                                            </Button>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>

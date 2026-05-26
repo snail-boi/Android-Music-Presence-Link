@@ -758,7 +758,12 @@ namespace musicpresense
                         g => new EligibleAppConfig
                         {
                             PackageName = g.Key,
-                            IsEnabled = g.Any(x => x.IsEnabled),
+                            PresenceMode = g.Max(x => (int)x.PresenceMode) switch
+                            {
+                                2 => PresenceMode.Full,
+                                1 => PresenceMode.Half,
+                                _ => PresenceMode.Off
+                            },
                             EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
                         },
                         StringComparer.OrdinalIgnoreCase);
@@ -771,16 +776,18 @@ namespace musicpresense
                         continue;
 
                     bool enableCoverSearchForApp = false;
+                    bool enableSmtcForApp = false;
                     string pkg = string.Empty;
 
                     var pkgMatch = Regex.Match(block, @"package=([^\s]+)");
                     if (pkgMatch.Success)
                     {
                         pkg = pkgMatch.Groups[1].Value.Trim();
-                        if (!eligibleApps.TryGetValue(pkg, out var appSettings) || !appSettings.IsEnabled)
+                        if (!eligibleApps.TryGetValue(pkg, out var appSettings) || appSettings.PresenceMode == PresenceMode.Off)
                             continue;
 
                         enableCoverSearchForApp = appSettings.EnableCoverSearch;
+                        enableSmtcForApp = appSettings.PresenceMode == PresenceMode.Full;
                     }
                     else
                     {
@@ -923,12 +930,13 @@ namespace musicpresense
                             _smtcPausedCleared = false;
                         }
 
-                        await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp, adbPositionMs, _timer.Interval).ConfigureAwait(false);
+                        await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp, enableSmtcForApp, adbPositionMs, _timer.Interval).ConfigureAwait(false);
                         NotifyMediaPlayerState(_mediaController.CurrentTitle, _mediaController.CurrentArtist, _mediaController.CurrentAlbum, _mediaController.CurrentCoverPath, isPlaying, _mediaController.CurrentPositionMs, _mediaController.CurrentDurationMs);
                         return isPlaying;
                     }
                 }
 
+                _mediaController.ClearDisplay();
                 NotifyNowPlaying(null, null, null);
                 NotifyLyricsPlayback(null, null, null, false, 0);
                 NotifyMediaPlayerState(null, null, null, null, false, 0, 0);

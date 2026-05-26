@@ -55,11 +55,21 @@ namespace musicpresense
         WirelessDebugging = 1
     }
 
+    public enum PresenceMode
+    {
+        Off = 0,
+        Half = 1,
+        Full = 2
+    }
+
     public sealed class EligibleAppConfig
     {
         public string PackageName { get; set; } = string.Empty;
-        public bool IsEnabled { get; set; } = true;
-        public bool EnableCoverSearch { get; set; } = true;
+
+        // Legacy field kept for migration only. New code uses PresenceMode.
+        public bool IsEnabled { get; set; } = false;
+        public bool EnableCoverSearch { get; set; } = false;
+        public PresenceMode PresenceMode { get; set; } = PresenceMode.Off;
     }
 
     public class MusicConfig
@@ -205,7 +215,7 @@ namespace musicpresense
                     .Select(a => new EligibleAppConfig
                     {
                         PackageName = a,
-                        IsEnabled = true,
+                        PresenceMode = PresenceMode.Full,
                         EnableCoverSearch = true
                     })
                     .ToList();
@@ -216,7 +226,7 @@ namespace musicpresense
                 config.EligibleApps.Add(new EligibleAppConfig
                 {
                     PackageName = "in.krosbits.musicolet",
-                    IsEnabled = true,
+                    PresenceMode = PresenceMode.Full,
                     EnableCoverSearch = true
                 });
             }
@@ -227,27 +237,22 @@ namespace musicpresense
                 .Select(g =>
                 {
                     var first = g.First();
+                    // Migrate legacy IsEnabled: if PresenceMode is still Off but IsEnabled was true,
+                    // treat as Full (old config had no half mode).
+                    var mode = first.PresenceMode;
+                    if (mode == PresenceMode.Off && first.IsEnabled)
+                        mode = PresenceMode.Full;
                     return new EligibleAppConfig
                     {
                         PackageName = g.Key,
-                        IsEnabled = g.Any(x => x.IsEnabled),
+                        PresenceMode = mode,
                         EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
                     };
                 })
                 .ToList();
 
-            if (!config.EligibleApps.Any(a => a.IsEnabled))
-            {
-                config.EligibleApps.Add(new EligibleAppConfig
-                {
-                    PackageName = "in.krosbits.musicolet",
-                    IsEnabled = true,
-                    EnableCoverSearch = true
-                });
-            }
-
             config.AllowedApps = config.EligibleApps
-                .Where(a => a.IsEnabled)
+                .Where(a => a.PresenceMode != PresenceMode.Off)
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();

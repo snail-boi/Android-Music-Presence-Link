@@ -21,6 +21,8 @@ namespace musicpresense
         private readonly Func<Task> updateCurrentSongCallback;
         private string? lastSMTCTitle;
         private string? lastTimelineTrackKey;
+        private string? lastSmtcPushedKey;
+        private bool _smtcClearedForHalf = true;
         private long? lastAdbPositionMs;
         private long realPositionMs;
         private TimeSpan? lastTrackDuration;
@@ -114,7 +116,12 @@ namespace musicpresense
 
                 smtcControls.ButtonPressed += SmTc_ButtonPressed;
                 smtcDisplayUpdater.Type = MediaPlaybackType.Music;
-                ApplyDefaultSmtcLabel();
+
+                // Clear immediately so no empty/default session is visible until
+                // a Full-mode app is detected.
+                smtcDisplayUpdater.ClearAll();
+                smtcDisplayUpdater.Update();
+                smtcControls.PlaybackStatus = MediaPlaybackStatus.Stopped;
             }
             catch (Exception ex)
             {
@@ -279,13 +286,34 @@ namespace musicpresense
 
         public bool IsPaused { get; private set; }
 
-        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch, long adbPositionMs, TimeSpan updateCycleTime)
+        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch, bool enableSmtc, long adbPositionMs, TimeSpan updateCycleTime)
         {
             try
             {
                 IsPaused = !isPlaying;
-                if (smtcControls != null)
+                if (enableSmtc && smtcControls != null)
+                {
                     smtcControls.PlaybackStatus = isPlaying ? MediaPlaybackStatus.Playing : MediaPlaybackStatus.Paused;
+                    if (_smtcClearedForHalf)
+                    {
+                        Debugger.show($"[SMTC] First Full tick after Half/Off — forcing re-push. lastSmtcPushedKey={lastSmtcPushedKey ?? "null"}");
+                        _smtcClearedForHalf = false;
+                        lastSmtcPushedKey = null;
+                    }
+                }
+                else if (!enableSmtc && !_smtcClearedForHalf)
+                {
+                    Debugger.show("[SMTC] Clearing for Half/Off mode.");
+                    _smtcClearedForHalf = true;
+                    lastSmtcPushedKey = null;
+                    if (smtcDisplayUpdater != null)
+                    {
+                        smtcDisplayUpdater.ClearAll();
+                        smtcDisplayUpdater.Update();
+                    }
+                    if (smtcControls != null)
+                        smtcControls.PlaybackStatus = MediaPlaybackStatus.Stopped;
+                }
 
                 var trackKey = $"{title}\n{artist}\n{album}";
                 if (!string.Equals(lastTimelineTrackKey, trackKey, StringComparison.Ordinal))
@@ -296,25 +324,61 @@ namespace musicpresense
                     lastTrackDuration = null;
                 }
 
+                // metadataChanged drives cover art search — uses lastSMTCTitle (never nulled by Half clear).
                 bool metadataChanged = !string.Equals(lastSMTCTitle, trackKey, StringComparison.OrdinalIgnoreCase);
                 lastSMTCTitle = trackKey;
+
+                // smtcMetadataChanged drives SMTC push — uses lastSmtcPushedKey (nulled by Half clear).
+                bool smtcMetadataChanged = !string.Equals(lastSmtcPushedKey, trackKey, StringComparison.OrdinalIgnoreCase);
 
                 TimeSpan? duration = lastTrackDuration;
                 CoverCacheManager.MediaMetadata? meta = null;
 
-                if (metadataChanged)
+                if (metadataChanged || smtcMetadataChanged)
                 {
-                    if (enableCoverSearch)
+                    if (metadataChanged)
                     {
-                        var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
-                        duration = result.Duration ?? duration;
-                        meta = result.Metadata;
-                        CurrentCoverPath = result.ImagePath;
+                        if (enableCoverSearch && enableSmtc)
+                        {
+                            var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
+                            duration = result.Duration ?? duration;
+                            meta = result.Metadata;
+                            CurrentCoverPath = result.ImagePath;
+                        }
+                        else if (enableCoverSearch && !enableSmtc)
+                        {
+                            // Half mode: search for cover so it's cached and ready when switching to Full,
+                            // but don't push it to SMTC yet.
+                            var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
+                            duration = result.Duration ?? duration;
+                            meta = result.Metadata;
+                            CurrentCoverPath = result.ImagePath;
+                            // Undo the thumbnail that SetSMTCImageAsync pushed.
+                            await dispatcher.InvokeAsync(() =>
+                            {
+                                try
+                                {
+                                    if (smtcDisplayUpdater != null)
+                                    {
+                                        smtcDisplayUpdater.ClearAll();
+                                        smtcDisplayUpdater.Update();
+                                    }
+                                }
+                                catch { }
+                            }).Task.ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            Debugger.show("Cover art search disabled for current app.");
+                        }
                     }
-                    else
+                    else if (smtcMetadataChanged && enableSmtc)
                     {
-                        Debugger.show("Cover art search disabled for current app.");
-                        await SetDefaultImage().ConfigureAwait(false);
+                        // SMTC was cleared (Half/Off -> Full): re-push cached cover without re-searching.
+                        if (!string.IsNullOrWhiteSpace(CurrentCoverPath))
+                            await SetCachedImage(CurrentCoverPath).ConfigureAwait(false);
+                        else
+                            await SetDefaultImage().ConfigureAwait(false);
                     }
                 }
 
@@ -360,15 +424,17 @@ namespace musicpresense
 
                 var currentPosition = TimeSpan.FromMilliseconds(Math.Max(0, realPositionMs));
 
-                if (mediaPlayer == null || smtcDisplayUpdater == null)
+                if (!enableSmtc || mediaPlayer == null || smtcDisplayUpdater == null)
                     return;
 
                 await dispatcher.InvokeAsync(() =>
                 {
                     try
                     {
-                        if (metadataChanged)
+                        if (smtcMetadataChanged)
                         {
+                            lastSmtcPushedKey = trackKey;
+                            smtcDisplayUpdater.Type = MediaPlaybackType.Music;
                             var musicProperties = smtcDisplayUpdater.MusicProperties;
                             musicProperties.Title = title ?? string.Empty;
                             musicProperties.Artist = NormalizeSmtcMetadata(artist);
@@ -413,6 +479,32 @@ namespace musicpresense
             return trimmed.Equals("null", StringComparison.OrdinalIgnoreCase) ? " " : trimmed;
         }
 
+        public void ClearDisplay()
+        {
+            try
+            {
+                if (smtcDisplayUpdater != null)
+                {
+                    smtcDisplayUpdater.ClearAll();
+                    smtcDisplayUpdater.Update();
+                }
+                if (smtcControls != null)
+                    smtcControls.PlaybackStatus = MediaPlaybackStatus.Stopped;
+
+                lastSMTCTitle = null;
+                lastSmtcPushedKey = null;
+                _smtcClearedForHalf = true;
+                CurrentTitle = null;
+                CurrentArtist = null;
+                CurrentAlbum = null;
+                CurrentCoverPath = _defaultImagePath;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"Failed to clear SMTC display: {ex.Message}");
+            }
+        }
+
         public void Clear()
         {
             try
@@ -433,7 +525,9 @@ namespace musicpresense
                 smtcControls = null;
                 smtcDisplayUpdater = null;
                 lastSMTCTitle = null;
+                lastSmtcPushedKey = null;
                 lastTimelineTrackKey = null;
+                _smtcClearedForHalf = true;
                 lastAdbPositionMs = null;
                 realPositionMs = 0;
                 lastTrackDuration = null;
@@ -988,6 +1082,31 @@ namespace musicpresense
                 Debugger.show($"[COVERART] Critical error in SetSMTCImageAsync: {ex.Message}");
                 await SetDefaultImage().ConfigureAwait(false);
                 return (null, null, _defaultImagePath);
+            }
+        }
+
+        private async Task SetCachedImage(string imagePath)
+        {
+            try
+            {
+                var imageFile = await StorageFile.GetFileFromPathAsync(imagePath).AsTask().ConfigureAwait(false);
+                await dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        smtcDisplayUpdater!.Thumbnail = RandomAccessStreamReference.CreateFromFile(imageFile);
+                        smtcDisplayUpdater.Update();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debugger.show($"[COVERART] Failed to re-set cached thumbnail: {ex.Message}");
+                    }
+                }).Task.ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[COVERART] SetCachedImage failed: {ex.Message}");
+                await SetDefaultImage().ConfigureAwait(false);
             }
         }
 
