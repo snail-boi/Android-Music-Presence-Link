@@ -26,7 +26,7 @@ namespace musicpresense
                 _remoteRoots.Add(root);
             }
 
-            ApplyAllowedAppsSelection();
+            RefreshAppsSummary();
 
             int mode = (int)_config.UpdateIntervalMode;
             if (mode < 1 || mode > 4) mode = 1;
@@ -148,39 +148,24 @@ namespace musicpresense
                 .Select(item => new EligibleAppConfig
                 {
                     PackageName = item.PackageName,
-                    IsEnabled = item.IsSelected,
-                    EnableCoverSearch = item.IsSelected && item.IsCoverSearchEnabled
+                    PresenceMode = item.PresenceMode,
+                    EnableCoverSearch = item.EnableCoverSearch
                 })
                 .Where(item => !string.IsNullOrWhiteSpace(item.PackageName))
                 .GroupBy(item => item.PackageName, StringComparer.OrdinalIgnoreCase)
                 .Select(g => new EligibleAppConfig
                 {
                     PackageName = g.Key,
-                    IsEnabled = g.Any(x => x.IsEnabled),
+                    PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
                     EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
                 })
                 .ToList();
 
-            if (!_config.EligibleApps.Any(a => a.IsEnabled))
-            {
-                _config.EligibleApps.Add(new EligibleAppConfig
-                {
-                    PackageName = "in.krosbits.musicolet",
-                    IsEnabled = true,
-                    EnableCoverSearch = true
-                });
-            }
-
             _config.AllowedApps = _config.EligibleApps
-                .Where(a => a.IsEnabled)
+                .Where(a => a.PresenceMode != PresenceMode.Off)
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            if (_config.AllowedApps.Count == 0)
-            {
-                _config.AllowedApps.Add("in.krosbits.musicolet");
-            }
 
             if (!_isInitializing && CmbUpdateInterval.SelectedIndex >= 0)
             {
@@ -373,15 +358,15 @@ namespace musicpresense
                     .Select(item => new EligibleAppConfig
                     {
                         PackageName = item.PackageName,
-                        IsEnabled = item.IsSelected,
-                        EnableCoverSearch = item.IsSelected && item.IsCoverSearchEnabled
+                        PresenceMode = item.PresenceMode,
+                        EnableCoverSearch = item.EnableCoverSearch
                     })
                     .Where(item => !string.IsNullOrWhiteSpace(item.PackageName))
                     .GroupBy(item => item.PackageName, StringComparer.OrdinalIgnoreCase)
                     .Select(g => new EligibleAppConfig
                     {
                         PackageName = g.Key,
-                        IsEnabled = g.Any(x => x.IsEnabled),
+                        PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
                         EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
                     })
                     .ToList();
@@ -391,31 +376,16 @@ namespace musicpresense
                 config.EligibleApps = _config.EligibleApps?.Select(a => new EligibleAppConfig
                 {
                     PackageName = a.PackageName,
-                    IsEnabled = a.IsEnabled,
+                    PresenceMode = a.PresenceMode,
                     EnableCoverSearch = a.EnableCoverSearch
                 }).ToList() ?? new List<EligibleAppConfig>();
             }
 
-            if (!config.EligibleApps.Any(a => a.IsEnabled))
-            {
-                config.EligibleApps.Add(new EligibleAppConfig
-                {
-                    PackageName = "in.krosbits.musicolet",
-                    IsEnabled = true,
-                    EnableCoverSearch = true
-                });
-            }
-
             config.AllowedApps = config.EligibleApps
-                .Where(a => a.IsEnabled)
+                .Where(a => a.PresenceMode != PresenceMode.Off)
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            if (config.AllowedApps.Count == 0)
-            {
-                config.AllowedApps.Add("in.krosbits.musicolet");
-            }
 
             config.DebugMode = ChkDebugMode.IsChecked == true;
             config.UseDarkMode = ChkDarkMode.IsChecked == true;
@@ -594,7 +564,7 @@ namespace musicpresense
                     g => new EligibleAppConfig
                     {
                         PackageName = g.Key,
-                        IsEnabled = g.Any(x => x.IsEnabled),
+                        PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
                         EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
                     },
                     StringComparer.OrdinalIgnoreCase);
@@ -607,7 +577,7 @@ namespace musicpresense
                     g => new EligibleAppConfig
                     {
                         PackageName = g.Key,
-                        IsEnabled = g.Any(x => x.IsEnabled),
+                        PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
                         EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
                     },
                     StringComparer.OrdinalIgnoreCase);
@@ -620,7 +590,7 @@ namespace musicpresense
                 if (!eligibleRight.TryGetValue(pair.Key, out var rightItem))
                     return false;
 
-                if (pair.Value.IsEnabled != rightItem.IsEnabled)
+                if (pair.Value.PresenceMode != rightItem.PresenceMode)
                     return false;
 
                 if (pair.Value.EnableCoverSearch != rightItem.EnableCoverSearch)
@@ -657,7 +627,7 @@ namespace musicpresense
                 EligibleApps = source.EligibleApps?.Select(a => new EligibleAppConfig
                 {
                     PackageName = a.PackageName,
-                    IsEnabled = a.IsEnabled,
+                    PresenceMode = a.PresenceMode,
                     EnableCoverSearch = a.EnableCoverSearch
                 }).ToList() ?? new List<EligibleAppConfig>(),
                 UpdateIntervalMode = source.UpdateIntervalMode,

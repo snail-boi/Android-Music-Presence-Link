@@ -1,0 +1,284 @@
+<Window x:Class="musicpresense.AppsManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Manage Apps"
+        Width="600" Height="640"
+        MinWidth="480" MinHeight="400"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ThemeBackgroundBrush}"
+        Foreground="{DynamicResource ThemeForegroundBrush}"
+        FontFamily="Segoe UI"
+        FontSize="13">
+    <Window.Resources>
+
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="20,8" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CycleButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="6,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid Margin="20,16,20,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Manage Apps"
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+            <TextBlock Text="Configure which apps are detected and how."
+                       Opacity="0.7" Margin="0,4,0,0"
+                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+        </StackPanel>
+
+        <!-- Help cards -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource ThemeControlBackgroundBrush}"
+                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                BorderThickness="1" CornerRadius="6"
+                Padding="14,10" Margin="0,0,0,8">
+            <StackPanel>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#34C954" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                        <TextBlock Text="Full" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                    </Border>
+                    <TextBlock Grid.Column="2" TextWrapping="Wrap" Opacity="0.85"
+                               Foreground="{DynamicResource ThemeForegroundBrush}"
+                               Text="Makes the current playing media available to Windows and any other app that needs it. Required for Discord music presence." />
+                </Grid>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#3E7BFF" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                        <TextBlock Text="Half" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                    </Border>
+                    <TextBlock Grid.Column="2" TextWrapping="Wrap" Opacity="0.85"
+                               Foreground="{DynamicResource ThemeForegroundBrush}"
+                               Text="Only this app knows what is playing. Other apps cannot read the current song. As a side effect, play, pause, and skip buttons may not work." />
+                </Grid>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#FF3B30" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                        <TextBlock Text="Off" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                    </Border>
+                    <TextBlock Grid.Column="2" TextWrapping="Wrap" Opacity="0.85"
+                               Foreground="{DynamicResource ThemeForegroundBrush}"
+                               Text="App is ignored." />
+                </Grid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#34C954" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                        <TextBlock Text="Cover" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                    </Border>
+                    <TextBlock Grid.Column="2" TextWrapping="Wrap" Opacity="0.85"
+                               Foreground="{DynamicResource ThemeForegroundBrush}"
+                               Text="Searches your device for the cover art of the current song. Requires a configured search path. May fail if metadata has small variations." />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Status row -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock x:Name="TxtLoadStatus"
+                       VerticalAlignment="Center"
+                       Opacity="0.7"
+                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+        </StackPanel>
+
+        <!-- Column headers + list -->
+        <Grid Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="6,0,6,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="70" />
+                    <ColumnDefinition Width="50" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="App" FontWeight="SemiBold" FontSize="12"
+                           Foreground="{DynamicResource ThemeForegroundBrush}" />
+                <TextBlock Grid.Column="1" Text="Presence" FontWeight="SemiBold" FontSize="12"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeForegroundBrush}" />
+                <TextBlock Grid.Column="2" Text="Cover" FontWeight="SemiBold" FontSize="12"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeForegroundBrush}" />
+            </Grid>
+
+            <ListBox Grid.Row="1"
+                     x:Name="LstApps"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     HorizontalContentAlignment="Stretch"
+                     Background="{DynamicResource ThemeControlBackgroundBrush}"
+                     BorderBrush="{DynamicResource ThemeControlBorderBrush}">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="4,2,4,2" />
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,2,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding DisplayName}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="{DynamicResource ThemeForegroundBrush}"
+                                       ToolTip="{Binding PackageName}" />
+
+                            <Button Grid.Column="1"
+                                    Content="{Binding PresenceModeLabel}"
+                                    Background="{Binding PresenceModeBrush}"
+                                    Style="{StaticResource CycleButton}"
+                                    Width="58"
+                                    HorizontalAlignment="Center"
+                                    Tag="{Binding}"
+                                    Click="BtnPresenceMode_Click" />
+
+                            <Button Grid.Column="2"
+                                    Content="{Binding CoverLabel}"
+                                    Background="{Binding CoverBrush}"
+                                    Style="{StaticResource CycleButton}"
+                                    Width="40"
+                                    HorizontalAlignment="Center"
+                                    Tag="{Binding}"
+                                    Click="BtnCover_Click" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+
+        <!-- Footer -->
+        <Grid Grid.Row="4" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1"
+                    Content="Save"
+                    Style="{StaticResource PrimaryButton}"
+                    Click="BtnSave_Click" />
+            <Button Grid.Column="3"
+                    Content="Cancel"
+                    Style="{StaticResource SecondaryButton}"
+                    IsCancel="True"
+                    Click="BtnCancel_Click" />
+        </Grid>
+    </Grid>
+</Window>

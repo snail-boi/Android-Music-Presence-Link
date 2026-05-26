@@ -21,6 +21,8 @@ namespace musicpresense
         private readonly Func<Task> updateCurrentSongCallback;
         private string? lastSMTCTitle;
         private string? lastTimelineTrackKey;
+        private string? lastSmtcPushedKey;
+        private bool _smtcClearedForHalf;
         private long? lastAdbPositionMs;
         private long realPositionMs;
         private TimeSpan? lastTrackDuration;
@@ -279,13 +281,28 @@ namespace musicpresense
 
         public bool IsPaused { get; private set; }
 
-        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch, long adbPositionMs, TimeSpan updateCycleTime)
+        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch, bool enableSmtc, long adbPositionMs, TimeSpan updateCycleTime)
         {
             try
             {
                 IsPaused = !isPlaying;
-                if (smtcControls != null)
+                if (enableSmtc && smtcControls != null)
+                {
                     smtcControls.PlaybackStatus = isPlaying ? MediaPlaybackStatus.Playing : MediaPlaybackStatus.Paused;
+                    _smtcClearedForHalf = false;
+                }
+                else if (!enableSmtc && !_smtcClearedForHalf)
+                {
+                    _smtcClearedForHalf = true;
+                    lastSmtcPushedKey = null; // Force re-push when switching back to Full.
+                    if (smtcDisplayUpdater != null)
+                    {
+                        smtcDisplayUpdater.ClearAll();
+                        smtcDisplayUpdater.Update();
+                    }
+                    if (smtcControls != null)
+                        smtcControls.PlaybackStatus = MediaPlaybackStatus.Stopped;
+                }
 
                 var trackKey = $"{title}\n{artist}\n{album}";
                 if (!string.Equals(lastTimelineTrackKey, trackKey, StringComparison.Ordinal))
@@ -296,8 +313,12 @@ namespace musicpresense
                     lastTrackDuration = null;
                 }
 
+                // metadataChanged drives cover art search — uses lastSMTCTitle (never nulled by Half clear).
                 bool metadataChanged = !string.Equals(lastSMTCTitle, trackKey, StringComparison.OrdinalIgnoreCase);
                 lastSMTCTitle = trackKey;
+
+                // smtcMetadataChanged drives SMTC push — uses lastSmtcPushedKey (nulled by Half clear).
+                bool smtcMetadataChanged = !string.Equals(lastSmtcPushedKey, trackKey, StringComparison.OrdinalIgnoreCase);
 
                 TimeSpan? duration = lastTrackDuration;
                 CoverCacheManager.MediaMetadata? meta = null;
@@ -360,15 +381,16 @@ namespace musicpresense
 
                 var currentPosition = TimeSpan.FromMilliseconds(Math.Max(0, realPositionMs));
 
-                if (mediaPlayer == null || smtcDisplayUpdater == null)
+                if (!enableSmtc || mediaPlayer == null || smtcDisplayUpdater == null)
                     return;
 
                 await dispatcher.InvokeAsync(() =>
                 {
                     try
                     {
-                        if (metadataChanged)
+                        if (smtcMetadataChanged)
                         {
+                            lastSmtcPushedKey = trackKey;
                             var musicProperties = smtcDisplayUpdater.MusicProperties;
                             musicProperties.Title = title ?? string.Empty;
                             musicProperties.Artist = NormalizeSmtcMetadata(artist);
@@ -433,7 +455,9 @@ namespace musicpresense
                 smtcControls = null;
                 smtcDisplayUpdater = null;
                 lastSMTCTitle = null;
+                lastSmtcPushedKey = null;
                 lastTimelineTrackKey = null;
+                _smtcClearedForHalf = false;
                 lastAdbPositionMs = null;
                 realPositionMs = 0;
                 lastTrackDuration = null;

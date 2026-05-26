@@ -1403,6 +1403,8 @@ namespace musicpresense
 
         // ---- Volume helpers exposed to MediaPlayerWindow ----
 
+        internal string GetCurrentDevice() => _presenceService?.CurrentDevice ?? string.Empty;
+
         /// <summary>
         /// True when scrcpy is running AND its audio session is reachable, i.e.
         /// we can read/write its absolute volume right now.
@@ -1591,4 +1593,4 @@ namespace musicpresense
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     }
 
-}i
+}

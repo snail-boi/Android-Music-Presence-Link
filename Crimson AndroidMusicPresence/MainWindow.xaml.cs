@@ -33,7 +33,6 @@ namespace musicpresense
         private bool _allowClose;
         private readonly ObservableCollection<AppPackageItem> _appPackages = new();
         private readonly ObservableCollection<string> _remoteRoots = new();
-        private bool _isLoadingApps;
         private readonly ObservableCollection<string> _audioCodecs = new();
         private bool _isLoadingCodecs;
         private bool _isAutoGathering;
@@ -121,7 +120,8 @@ namespace musicpresense
             LstRemoteRoots.ItemsSource = _remoteRoots;
 
             BtnSave.Click += BtnSave_Click;
-            BtnRefreshApps.Click += BtnRefreshApps_Click;
+            BtnManageApps.Click += BtnManageApps_Click;
+            BtnClearDisabledApps.Click += BtnClearDisabledApps_Click;
             BtnListCodecs.Click += BtnListCodecs_Click;
             BtnAutoGather.Click += BtnAutoGather_Click;
             BtnPickRemoteRoot.Click += BtnPickRemoteRoot_Click;
@@ -160,7 +160,7 @@ namespace musicpresense
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            _ = LoadInstalledAppsAsync();
+            RefreshAppsSummary();
             UpdateScrollIndicator();
         }
 
