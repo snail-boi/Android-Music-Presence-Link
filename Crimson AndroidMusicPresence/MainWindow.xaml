@@ -746,8 +746,8 @@
                             <Grid Margin="6,0,6,4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="80" />
-                                    <ColumnDefinition Width="50" />
+                                    <ColumnDefinition Width="125" />
+                                    <ColumnDefinition Width="55" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="App" FontWeight="SemiBold" FontSize="12" />
                                 <TextBlock Grid.Column="1" Text="Presence" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
@@ -770,7 +770,7 @@
                                         <Grid Margin="0,2,0,2">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="130" />
                                                 <ColumnDefinition Width="50" />
                                             </Grid.ColumnDefinitions>
 
@@ -784,7 +784,7 @@
                                                     Content="{Binding PresenceModeLabel}"
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center"
-                                                    Width="68" Height="22"
+                                                    Width="68" Height="27"
                                                     FontSize="11" FontWeight="SemiBold"
                                                     Foreground="White"
                                                     Background="{Binding PresenceModeBrush}"
@@ -803,7 +803,7 @@
                                                     Content="{Binding CoverLabel}"
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center"
-                                                    Width="40" Height="22"
+                                                    Width="45" Height="27"
                                                     FontSize="11" FontWeight="SemiBold"
                                                     Foreground="White"
                                                     Background="{Binding CoverBrush}"

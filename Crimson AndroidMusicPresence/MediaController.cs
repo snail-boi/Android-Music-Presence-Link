@@ -330,7 +330,6 @@ namespace musicpresense
 
                 // smtcMetadataChanged drives SMTC push — uses lastSmtcPushedKey (nulled by Half clear).
                 bool smtcMetadataChanged = !string.Equals(lastSmtcPushedKey, trackKey, StringComparison.OrdinalIgnoreCase);
-                Debugger.show($"[SMTC] metadataChanged={metadataChanged} smtcMetadataChanged={smtcMetadataChanged} enableSmtc={enableSmtc}");
 
                 TimeSpan? duration = lastTrackDuration;
                 CoverCacheManager.MediaMetadata? meta = null;
@@ -339,17 +338,38 @@ namespace musicpresense
                 {
                     if (metadataChanged)
                     {
-                        if (enableCoverSearch)
+                        if (enableCoverSearch && enableSmtc)
                         {
                             var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
                             duration = result.Duration ?? duration;
                             meta = result.Metadata;
                             CurrentCoverPath = result.ImagePath;
                         }
+                        else if (enableCoverSearch && !enableSmtc)
+                        {
+                            // Half mode: search for cover so it's cached and ready when switching to Full,
+                            // but don't push it to SMTC yet.
+                            var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
+                            duration = result.Duration ?? duration;
+                            meta = result.Metadata;
+                            CurrentCoverPath = result.ImagePath;
+                            // Undo the thumbnail that SetSMTCImageAsync pushed.
+                            await dispatcher.InvokeAsync(() =>
+                            {
+                                try
+                                {
+                                    if (smtcDisplayUpdater != null)
+                                    {
+                                        smtcDisplayUpdater.ClearAll();
+                                        smtcDisplayUpdater.Update();
+                                    }
+                                }
+                                catch { }
+                            }).Task.ConfigureAwait(false);
+                        }
                         else
                         {
                             Debugger.show("Cover art search disabled for current app.");
-                            await SetDefaultImage().ConfigureAwait(false);
                         }
                     }
                     else if (smtcMetadataChanged && enableSmtc)
