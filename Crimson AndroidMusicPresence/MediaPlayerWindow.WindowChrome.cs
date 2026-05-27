@@ -194,6 +194,7 @@ namespace musicpresense
             RenderAudioLinkButton();
             RenderHelpButtonIcon();
             RenderFullscreenButtonIcon();
+            RenderBatteryButtonIcon();
             RefreshAudioQualityButton();
             RefreshAlwaysOnTopButton();
         }

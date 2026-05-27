@@ -198,6 +198,8 @@ namespace musicpresense
                 RefreshAudioQualityButton();
                 RenderFullscreenButtonIcon();
                 RefreshAlwaysOnTopButton();
+                RenderBatteryButtonIcon();
+                StartBatteryPolling();
                 ApplySavedRuntimeState();
             };
 
@@ -278,6 +280,7 @@ namespace musicpresense
                 StopLyricsTimer();
                 StopLyricsScrollLoop();
                 _lyricsTimer = null;
+                StopBatteryPolling();
             }
             catch { }
             base.OnClosed(e);
