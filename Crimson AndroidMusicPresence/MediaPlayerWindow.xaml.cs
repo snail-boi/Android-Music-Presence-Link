@@ -896,28 +896,18 @@ namespace musicpresense
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ApplyPaneLayout); return; }
 
-            bool swap = App.Config.SettingsPaneOnRight || App.Config.PlayerSettingsPaneOnLeft;
+            bool swap = App.Config.SwapSettingsLocation;
             if (swap == _panesSwapped) return;
             _panesSwapped = swap;
 
-            if (swap)
-            {
-                // Main settings moves to the right column; player settings to the left.
-                var mainContent = SettingsHost.Content;
-                SettingsHost.Content = _playerSettingsPane;
-                PlayerSettingsHost.Content = mainContent;
-                Grid.SetColumn(SettingsPaneBorder, 4);
-                Grid.SetColumn(PlayerSettingsPaneBorder, 0);
-            }
-            else
-            {
-                // Restore defaults.
-                var mainContent = PlayerSettingsHost.Content;
-                PlayerSettingsHost.Content = _playerSettingsPane;
-                SettingsHost.Content = mainContent;
-                Grid.SetColumn(SettingsPaneBorder, 0);
-                Grid.SetColumn(PlayerSettingsPaneBorder, 4);
-            }
+            // Swapping content between hosts is self-inverse, so the same operation
+            // both applies and reverses the swap.
+            var leftContent = SettingsHost.Content;
+            SettingsHost.Content = PlayerSettingsHost.Content;
+            PlayerSettingsHost.Content = leftContent;
+
+            // Re-render arrows so they point inward toward the player pane.
+            RenderSettingsPaneArrowIcons();
         }
     }
 }

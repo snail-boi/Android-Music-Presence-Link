@@ -167,14 +167,18 @@ namespace musicpresense
         private void RenderSettingsPaneArrowIcons()
         {
             var iconBrush = TryFindResource("ThemeControlForegroundBrush") as Brush ?? Brushes.White;
-            BtnShowSettingsPane.Content = BuildRevealSettingsArrowIcon(iconBrush);
+            bool swap = App.Config?.SwapSettingsLocation ?? false;
+
+            // Left pane: open arrow points right normally, left when swapped (player settings live here).
+            BtnShowSettingsPane.Content = swap ? BuildCollapseSettingsArrowIcon(iconBrush) : BuildRevealSettingsArrowIcon(iconBrush);
             if (BtnCollapseSettingsPane != null)
-                BtnCollapseSettingsPane.Content = BuildCollapseSettingsArrowIcon(iconBrush);
-            // Right pane: left-pointing arrow to open (faces inward), right-pointing to collapse.
+                BtnCollapseSettingsPane.Content = swap ? BuildRevealSettingsArrowIcon(iconBrush) : BuildCollapseSettingsArrowIcon(iconBrush);
+
+            // Right pane: open arrow points left normally, right when swapped (main settings live here).
             if (BtnShowPlayerSettingsPane != null)
-                BtnShowPlayerSettingsPane.Content = BuildCollapseSettingsArrowIcon(iconBrush);
+                BtnShowPlayerSettingsPane.Content = swap ? BuildRevealSettingsArrowIcon(iconBrush) : BuildCollapseSettingsArrowIcon(iconBrush);
             if (BtnCollapsePlayerSettingsPane != null)
-                BtnCollapsePlayerSettingsPane.Content = BuildRevealSettingsArrowIcon(iconBrush);
+                BtnCollapsePlayerSettingsPane.Content = swap ? BuildCollapseSettingsArrowIcon(iconBrush) : BuildRevealSettingsArrowIcon(iconBrush);
         }
         private void RenderTransportIcons(bool isPlaying)
         {

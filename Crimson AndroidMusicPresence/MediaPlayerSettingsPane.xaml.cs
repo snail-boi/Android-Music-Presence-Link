@@ -53,8 +53,7 @@ namespace musicpresense
                 ChkShowFullscreen.IsChecked = c.PlayerShowFullscreenButton;
 
                 // Layout
-                ChkSettingsPaneOnRight.IsChecked = c.SettingsPaneOnRight;
-                ChkPlayerSettingsPaneOnLeft.IsChecked = c.PlayerSettingsPaneOnLeft;
+                ChkSwapSettingsLocation.IsChecked = c.SwapSettingsLocation;
             }
             finally
             {
@@ -156,17 +155,10 @@ namespace musicpresense
         private void ChkShowHelp_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowHelpButton = ChkShowHelp.IsChecked == true; SaveAndNotify(); } }
         private void ChkShowFullscreen_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowFullscreenButton = ChkShowFullscreen.IsChecked == true; SaveAndNotify(); } }
 
-        private void ChkSettingsPaneOnRight_Changed(object sender, RoutedEventArgs e)
+        private void ChkSwapSettingsLocation_Changed(object sender, RoutedEventArgs e)
         {
             if (_loading) return;
-            App.Config.SettingsPaneOnRight = ChkSettingsPaneOnRight.IsChecked == true;
-            SaveAndNotify();
-        }
-
-        private void ChkPlayerSettingsPaneOnLeft_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_loading) return;
-            App.Config.PlayerSettingsPaneOnLeft = ChkPlayerSettingsPaneOnLeft.IsChecked == true;
+            App.Config.SwapSettingsLocation = ChkSwapSettingsLocation.IsChecked == true;
             SaveAndNotify();
         }
 

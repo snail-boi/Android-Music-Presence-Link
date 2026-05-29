@@ -375,25 +375,12 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Settings pane on right" Style="{StaticResource RowLabel}" />
-                <CheckBox x:Name="ChkSettingsPaneOnRight"
+                <TextBlock Grid.Column="0" Text="Switch settings location" Style="{StaticResource RowLabel}" />
+                <CheckBox x:Name="ChkSwapSettingsLocation"
                           Grid.Column="1"
                           Style="{StaticResource ToggleRowStyle}"
-                          Checked="ChkSettingsPaneOnRight_Changed"
-                          Unchecked="ChkSettingsPaneOnRight_Changed" />
-            </Grid>
-
-            <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Player settings pane on left" Style="{StaticResource RowLabel}" />
-                <CheckBox x:Name="ChkPlayerSettingsPaneOnLeft"
-                          Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
-                          Checked="ChkPlayerSettingsPaneOnLeft_Changed"
-                          Unchecked="ChkPlayerSettingsPaneOnLeft_Changed" />
+                          Checked="ChkSwapSettingsLocation_Changed"
+                          Unchecked="ChkSwapSettingsLocation_Changed" />
             </Grid>
 
         </StackPanel>

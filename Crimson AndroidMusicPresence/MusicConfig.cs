@@ -131,9 +131,8 @@ namespace musicpresense
         // Gradient sample points: 2, 4, 6, or 8
         public int PlayerGradientSamplePoints { get; set; } = 8;
 
-        // Pane sides
-        public bool SettingsPaneOnRight { get; set; } = false;
-        public bool PlayerSettingsPaneOnLeft { get; set; } = false;
+        // When true the main settings pane moves to the right and player settings to the left.
+        public bool SwapSettingsLocation { get; set; } = false;
 
         public double MediaPlayerWindowWidth { get; set; } = 1080;
         public double MediaPlayerWindowHeight { get; set; } = 760;
