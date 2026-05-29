@@ -295,7 +295,10 @@
                                 <Border.Background>
                                     <SolidColorBrush Color="#22000000" />
                                 </Border.Background>
-                                <Grid>
+                                <Grid x:Name="CoverImageGrid">
+                                    <Grid.Clip>
+                                        <RectangleGeometry Rect="0,0,420,420" RadiusX="10" RadiusY="10" />
+                                    </Grid.Clip>
                                     <!-- Crossfade layer A (outgoing) -->
                                     <Image x:Name="ImgCoverA"
                                        Stretch="UniformToFill"

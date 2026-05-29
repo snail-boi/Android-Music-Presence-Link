@@ -855,7 +855,11 @@ namespace musicpresense
             // Cover
             if (CoverBorder.Parent is Viewbox coverVb)
                 coverVb.Visibility = c.PlayerShowCover ? Visibility.Visible : Visibility.Collapsed;
-            CoverBorder.CornerRadius = c.PlayerCoverRoundedCorners ? new CornerRadius(10) : new CornerRadius(0);
+            double coverRadius = c.PlayerCoverRoundedCorners ? 10 : 0;
+            CoverBorder.CornerRadius = new CornerRadius(coverRadius);
+            CoverImageGrid.Clip = coverRadius > 0
+                ? new RectangleGeometry(new Rect(0, 0, 420, 420), coverRadius, coverRadius)
+                : null;
 
             // Pills
             ApplyPillMode(BtnConnectionInfo, c.PillModeConnection);
