@@ -338,10 +338,13 @@ namespace musicpresense
         }
         private void RenderAudioLinkButton()
         {
+            if (BtnAudioLink == null || AudioLinkContent == null) return;
+
             var brush = ResolveIconBrush();
-            var sp = new StackPanel { Orientation = Orientation.Horizontal };
-            sp.Children.Add(BuildAudioLinkIcon(brush, _audioLinkActive, 14));
-            sp.Children.Add(new TextBlock
+            AudioLinkContent.Children.Clear();
+
+            AudioLinkContent.Children.Add(BuildAudioLinkIcon(brush, _audioLinkActive, 14));
+            AudioLinkContent.Children.Add(new TextBlock
             {
                 Text = _audioLinkActive ? "Audio on" : "Audio off",
                 FontSize = 11,
@@ -349,10 +352,17 @@ namespace musicpresense
                 Margin = new Thickness(6, 0, 0, 0),
                 Foreground = brush
             });
-            BtnAudioLink.Content = sp;
-            BtnAudioLink.ToolTip = _audioLinkActive ? "Audio link: sync audio from device (on)" : "Audio link: sync audio from device (off)";
 
-            // Re-apply pill mode so Mini hides the label if needed.
+            BtnAudioLink.ToolTip = _audioLinkActive
+                ? "Audio link: sync audio from device (on)"
+                : "Audio link: sync audio from device (off)";
+
+            var borderColor = (brush is SolidColorBrush scb) ? scb.Color : Colors.White;
+            BtnAudioLink.BorderBrush = new SolidColorBrush(borderColor)
+            {
+                Opacity = _audioLinkActive ? 0.85 : 0.45
+            };
+
             ApplyPillMode(BtnAudioLink, App.Config?.PillModeAudioLink ?? 0);
         }
     }

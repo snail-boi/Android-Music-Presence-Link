@@ -419,7 +419,10 @@
                         <!-- Audio link toggle button; icon swaps in code-behind -->
                         <Button x:Name="BtnAudioLink"
                                 Style="{StaticResource PillButtonStyle}"
-                                Click="BtnAudioLink_Click" />
+                                Click="BtnAudioLink_Click">
+                            <StackPanel x:Name="AudioLinkContent"
+                                        Orientation="Horizontal" />
+                        </Button>
 
                         <!-- Quick audio-quality button; shows current preset name (or "Custom") -->
                         <Button x:Name="BtnAudioQuality"
@@ -803,4 +806,3 @@
 
     </Grid>
 </Window>
-

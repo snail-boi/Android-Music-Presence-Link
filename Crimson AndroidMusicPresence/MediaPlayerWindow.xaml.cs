@@ -900,11 +900,18 @@ namespace musicpresense
             if (swap == _panesSwapped) return;
             _panesSwapped = swap;
 
-            // Swapping content between hosts is self-inverse, so the same operation
-            // both applies and reverses the swap.
+            // Swap content between hosts — self-inverse, no branching needed.
             var leftContent = SettingsHost.Content;
             SettingsHost.Content = PlayerSettingsHost.Content;
             PlayerSettingsHost.Content = leftContent;
+
+            // Swap column widths so each pane keeps the correct size.
+            var leftWidth = SettingsColumn.Width;
+            var leftMax = SettingsColumn.MaxWidth;
+            SettingsColumn.Width = PlayerSettingsColumn.Width;
+            SettingsColumn.MaxWidth = PlayerSettingsColumn.MaxWidth;
+            PlayerSettingsColumn.Width = leftWidth;
+            PlayerSettingsColumn.MaxWidth = leftMax;
 
             // Re-render arrows so they point inward toward the player pane.
             RenderSettingsPaneArrowIcons();
