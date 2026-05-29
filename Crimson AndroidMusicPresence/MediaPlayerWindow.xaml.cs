@@ -79,6 +79,13 @@ namespace musicpresense
         // Settings pane open/closed state — used by SizeChanged to decide whether to clamp or auto-collapse.
         private bool _settingsPaneOpen = false;
 
+        // Player settings pane (right side)
+        private bool _playerSettingsPaneOpen = false;
+        private MediaPlayerSettingsPane? _playerSettingsPane;
+
+        // When true the panes are swapped: main settings on right, player settings on left.
+        private bool _panesSwapped = false;
+
         // Audio link toggle state
         private bool _audioLinkActive = false;
         private readonly Action<bool>? _setAudioLink;
@@ -178,7 +185,7 @@ namespace musicpresense
 
             RenderTransportIcons(isPlaying: false);
             RenderAuxiliaryIcons();
-            RenderSettingsPaneArrowIcon();
+            RenderSettingsPaneArrowIcons();
             RenderFastSeekIcons();
             RenderAudioLinkButton();
             RenderHelpButtonIcon();
@@ -186,6 +193,10 @@ namespace musicpresense
             RefreshAlwaysOnTopButton();
             RefreshAudioQualityButton();
             ApplyCoverGradientBackground(null);
+
+            _playerSettingsPane = new MediaPlayerSettingsPane();
+            _playerSettingsPane.SettingChanged += OnPlayerSettingChanged;
+            PlayerSettingsHost.Content = _playerSettingsPane;
 
             SizeChanged += MediaPlayerWindow_SizeChanged;
             PlayerPaneBorder.SizeChanged += (_, _) => UpdateGradientClip();
@@ -201,6 +212,8 @@ namespace musicpresense
                 RenderBatteryButtonIcon();
                 StartBatteryPolling();
                 ApplySavedRuntimeState();
+                ApplyPlayerSettings();
+                ApplyPaneLayout();
             };
 
             _smoothTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
@@ -231,6 +244,14 @@ namespace musicpresense
                     CollapseSettingsPane();
                 else
                     ClampSettingsColumnWidth();
+            }
+
+            if (_playerSettingsPaneOpen)
+            {
+                if (ActualWidth < SettingsAutoCollapseThreshold)
+                    CollapsePlayerSettingsPane();
+                else
+                    ClampPlayerSettingsColumnWidth();
             }
         }
 
@@ -328,6 +349,11 @@ namespace musicpresense
             else
                 CollapseSettingsPane();
 
+            if (config.MediaPlayerPlayerSettingsPaneOpen)
+                ShowPlayerSettingsPane();
+            else
+                CollapsePlayerSettingsPane();
+
             if (_lyricsViewActive != config.MediaPlayerInlineLyricsViewActive)
                 ToggleInlineLyricsView();
 
@@ -368,9 +394,9 @@ namespace musicpresense
                 SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
                 SettingsPaneBorder.Visibility = Visibility.Collapsed;
                 SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
-                Grid.SetColumnSpan(PlayerPaneBorder, 3);
-                PlayerPaneBorder.CornerRadius = new CornerRadius(12);
-                PlayerPaneBorder.BorderThickness = new Thickness(0);
+                if (!_playerSettingsPaneOpen)
+                    Grid.SetColumnSpan(PlayerPaneBorder, 5);
+                UpdatePlayerCornerRadius();
                 UpdateGradientClip();
 
                 BtnCollapseSettingsPane.Visibility = Visibility.Collapsed;
@@ -392,9 +418,7 @@ namespace musicpresense
                 SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
                 BtnShowSettingsPane.Visibility = Visibility.Collapsed;
                 BtnCollapseSettingsPane.Visibility = Visibility.Collapsed;
-                Grid.SetColumnSpan(PlayerPaneBorder, 3);
-                PlayerPaneBorder.CornerRadius = new CornerRadius(12);
-                PlayerPaneBorder.BorderThickness = new Thickness(0);
+                UpdatePlayerCornerRadius();
                 UpdateGradientClip();
                 return;
             }
@@ -407,13 +431,13 @@ namespace musicpresense
             _settingsPaneOpen = true;
             PersistRuntimeState();
             Grid.SetColumnSpan(PlayerPaneBorder, 1);
-            PlayerPaneBorder.CornerRadius = new CornerRadius(6);
             PlayerPaneBorder.BorderThickness = new Thickness(1);
             SplitterColumn.Width = new GridLength(8, GridUnitType.Pixel);
             SettingsPaneBorder.Visibility = Visibility.Visible;
             BtnShowSettingsPane.Visibility = Visibility.Collapsed;
             BtnCollapseSettingsPane.Visibility = Visibility.Visible;
             BtnCollapseSettingsPane.IsEnabled = false;
+            UpdatePlayerCornerRadius();
 
             ClampSettingsColumnWidth();
             double targetWidth = Math.Min(DefaultSettingsWidth, SettingsColumn.MaxWidth > 0 ? SettingsColumn.MaxWidth : DefaultSettingsWidth);
@@ -558,7 +582,7 @@ namespace musicpresense
             RenderTransportIcons(isPlaying: _isPlaying);
             RenderAuxiliaryIcons();
             RefreshVolumeIcon();
-            RenderSettingsPaneArrowIcon();
+            RenderSettingsPaneArrowIcons();
             RenderHelpButtonIcon();
             RenderFullscreenButtonIcon();
             RefreshAudioQualityButton();
@@ -574,6 +598,7 @@ namespace musicpresense
             try
             {
                 App.Config.MediaPlayerSettingsPaneOpen = _settingsPaneOpen;
+                App.Config.MediaPlayerPlayerSettingsPaneOpen = _playerSettingsPaneOpen;
                 App.Config.MediaPlayerInlineLyricsViewActive = _lyricsViewActive;
                 App.Config.MediaPlayerFullscreenActive = _isFullscreen;
                 MusicConfigManager.Save(App.Config);
@@ -664,6 +689,232 @@ namespace musicpresense
             _connectionDetailText = detail;
             _connectionColor = statusColor;
             RefreshConnectionButton();
+        }
+
+        // ── Player settings pane (right side) ────────────────────────────────
+
+        private const double DefaultPlayerSettingsWidth = 280;
+
+        private void ClampPlayerSettingsColumnWidth()
+        {
+            if (!_playerSettingsPaneOpen) return;
+            double available = ActualWidth - 28;
+            if (available <= 0) return;
+            double max = Math.Min(DefaultPlayerSettingsWidth, available * SettingsMaxWidthFraction);
+            if (max <= 0) return;
+            PlayerSettingsColumn.MaxWidth = max;
+            PlayerSettingsColumn.Width = new GridLength(max, GridUnitType.Pixel);
+        }
+
+        private void CollapsePlayerSettingsPane()
+        {
+            _playerSettingsPaneOpen = false;
+            PersistRuntimeState();
+            double fromWidth = PlayerSettingsColumn.Width.IsAbsolute
+                ? PlayerSettingsColumn.Width.Value
+                : DefaultPlayerSettingsWidth;
+
+            BtnCollapsePlayerSettingsPane.IsEnabled = false;
+            BtnShowPlayerSettingsPane.Visibility = Visibility.Collapsed;
+
+            var anim = new GridLengthAnimation
+            {
+                From = new GridLength(fromWidth, GridUnitType.Pixel),
+                To = new GridLength(0, GridUnitType.Pixel),
+                Duration = SettingsPaneAnimDuration,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+            };
+
+            anim.Completed += (_, _) =>
+            {
+                PlayerSettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+                PlayerSettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
+                PlayerSettingsPaneBorder.Visibility = Visibility.Collapsed;
+                PlayerSettingsSplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
+                UpdatePlayerCornerRadius();
+                UpdateGradientClip();
+
+                BtnCollapsePlayerSettingsPane.Visibility = Visibility.Collapsed;
+                BtnShowPlayerSettingsPane.Visibility = Visibility.Visible;
+                BtnShowPlayerSettingsPane.IsEnabled = true;
+            };
+
+            PlayerSettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
+        }
+
+        private void ShowPlayerSettingsPane()
+        {
+            if (PlayerSettingsHost.Content == null)
+            {
+                CollapsePlayerSettingsPane();
+                return;
+            }
+
+            if (ActualWidth < SettingsAutoCollapseThreshold)
+                Width = SettingsAutoExpandWidth;
+
+            _playerSettingsPaneOpen = true;
+            PersistRuntimeState();
+            Grid.SetColumnSpan(PlayerPaneBorder, 1);
+            PlayerPaneBorder.BorderThickness = new Thickness(1);
+            PlayerSettingsSplitterColumn.Width = new GridLength(8, GridUnitType.Pixel);
+            PlayerSettingsPaneBorder.Visibility = Visibility.Visible;
+            BtnShowPlayerSettingsPane.Visibility = Visibility.Collapsed;
+            BtnCollapsePlayerSettingsPane.Visibility = Visibility.Visible;
+            BtnCollapsePlayerSettingsPane.IsEnabled = false;
+            UpdatePlayerCornerRadius();
+
+            ClampPlayerSettingsColumnWidth();
+            double targetWidth = Math.Min(
+                DefaultPlayerSettingsWidth,
+                PlayerSettingsColumn.MaxWidth > 0 ? PlayerSettingsColumn.MaxWidth : DefaultPlayerSettingsWidth);
+            PlayerSettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
+
+            var anim = new GridLengthAnimation
+            {
+                From = new GridLength(0, GridUnitType.Pixel),
+                To = new GridLength(targetWidth, GridUnitType.Pixel),
+                Duration = SettingsPaneAnimDuration,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+            };
+
+            anim.Completed += (_, _) =>
+            {
+                PlayerSettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+                PlayerSettingsColumn.Width = new GridLength(targetWidth, GridUnitType.Pixel);
+                BtnCollapsePlayerSettingsPane.IsEnabled = true;
+                UpdateGradientClip();
+            };
+
+            PlayerSettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
+        }
+
+        private void BtnCollapsePlayerSettingsPane_Click(object sender, RoutedEventArgs e)
+            => CollapsePlayerSettingsPane();
+
+        private void BtnShowPlayerSettingsPane_Click(object sender, RoutedEventArgs e)
+            => ShowPlayerSettingsPane();
+
+        /// <summary>
+        /// Sets the player pane's corner radius based on which side panes are open.
+        /// Also updates BorderThickness and column span when no panes are open.
+        /// </summary>
+        private void UpdatePlayerCornerRadius()
+        {
+            bool left = _settingsPaneOpen;
+            bool right = _playerSettingsPaneOpen;
+
+            if (!left && !right)
+            {
+                Grid.SetColumnSpan(PlayerPaneBorder, 5);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(12);
+                PlayerPaneBorder.BorderThickness = new Thickness(0);
+            }
+            else if (left && !right)
+            {
+                Grid.SetColumnSpan(PlayerPaneBorder, 1);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(6, 12, 12, 6);
+                PlayerPaneBorder.BorderThickness = new Thickness(1);
+            }
+            else if (!left && right)
+            {
+                Grid.SetColumnSpan(PlayerPaneBorder, 1);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(12, 6, 6, 12);
+                PlayerPaneBorder.BorderThickness = new Thickness(1);
+            }
+            else
+            {
+                Grid.SetColumnSpan(PlayerPaneBorder, 1);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(6);
+                PlayerPaneBorder.BorderThickness = new Thickness(1);
+            }
+        }
+
+        // ── Player settings: apply to live UI ────────────────────────────────
+
+        private void OnPlayerSettingChanged()
+        {
+            _playerSettingsPane?.LoadFromConfig();
+            ApplyPlayerSettings();
+            ApplyPaneLayout();
+        }
+
+        public void ApplyPlayerSettings()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ApplyPlayerSettings); return; }
+
+            var c = App.Config;
+
+            TxtTitle.Visibility = c.PlayerShowTitle ? Visibility.Visible : Visibility.Collapsed;
+            TxtArtist.Visibility = c.PlayerShowArtist ? Visibility.Visible : Visibility.Collapsed;
+            TxtAlbum.Visibility = c.PlayerShowAlbum ? Visibility.Visible : Visibility.Collapsed;
+
+            // Artist / album row swap
+            Grid.SetRow(TxtArtist, c.PlayerSwapArtistAlbum ? 3 : 2);
+            Grid.SetRow(TxtAlbum, c.PlayerSwapArtistAlbum ? 2 : 3);
+
+            // Cover
+            if (CoverBorder.Parent is Viewbox coverVb)
+                coverVb.Visibility = c.PlayerShowCover ? Visibility.Visible : Visibility.Collapsed;
+            CoverBorder.CornerRadius = c.PlayerCoverRoundedCorners ? new CornerRadius(10) : new CornerRadius(0);
+
+            // Pills
+            ApplyPillMode(BtnConnectionInfo, c.PillModeConnection);
+            ApplyPillMode(BtnAudioLink, c.PillModeAudioLink);
+            ApplyPillMode(BtnAudioQuality, c.PillModeQuality);
+            ApplyPillMode(BtnAlwaysOnTop, c.PillModeAlwaysOnTop);
+
+            // Controls
+            BtnVolume.Visibility = c.PlayerShowVolumeButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnLyrics.Visibility = c.PlayerShowLyricsButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnBattery.Visibility = c.PlayerShowBattery ? Visibility.Visible : Visibility.Collapsed;
+            BtnHelp.Visibility = c.PlayerShowHelpButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnFullscreen.Visibility = c.PlayerShowFullscreenButton ? Visibility.Visible : Visibility.Collapsed;
+
+            // Bust gradient cache so sample-point change takes effect immediately.
+            _lastGradientSourcePath = null;
+            ApplyCoverGradientBackground(_hasSong ? _currentCoverPath : null);
+        }
+
+        private static void ApplyPillMode(Button pill, int mode)
+        {
+            if (mode == 2) { pill.Visibility = Visibility.Collapsed; return; }
+            pill.Visibility = Visibility.Visible;
+            // Hide TextBlock children for Mini mode (icon-only).
+            if (pill.Content is StackPanel sp)
+                foreach (UIElement child in sp.Children)
+                    if (child is TextBlock tb)
+                        tb.Visibility = mode == 1 ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        // ── Pane side swap ────────────────────────────────────────────────────
+
+        private void ApplyPaneLayout()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ApplyPaneLayout); return; }
+
+            bool swap = App.Config.SettingsPaneOnRight || App.Config.PlayerSettingsPaneOnLeft;
+            if (swap == _panesSwapped) return;
+            _panesSwapped = swap;
+
+            if (swap)
+            {
+                // Main settings moves to the right column; player settings to the left.
+                var mainContent = SettingsHost.Content;
+                SettingsHost.Content = _playerSettingsPane;
+                PlayerSettingsHost.Content = mainContent;
+                Grid.SetColumn(SettingsPaneBorder, 4);
+                Grid.SetColumn(PlayerSettingsPaneBorder, 0);
+            }
+            else
+            {
+                // Restore defaults.
+                var mainContent = PlayerSettingsHost.Content;
+                PlayerSettingsHost.Content = _playerSettingsPane;
+                SettingsHost.Content = mainContent;
+                Grid.SetColumn(SettingsPaneBorder, 0);
+                Grid.SetColumn(PlayerSettingsPaneBorder, 4);
+            }
         }
     }
 }

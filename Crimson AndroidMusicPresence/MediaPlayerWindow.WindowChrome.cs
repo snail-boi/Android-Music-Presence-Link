@@ -164,12 +164,17 @@ namespace musicpresense
             BtnSeekBack.Content = BuildSeekIcon(brush, -30, 30);
             BtnSeekFwd.Content = BuildSeekIcon(brush, 30, 30);
         }
-        private void RenderSettingsPaneArrowIcon()
+        private void RenderSettingsPaneArrowIcons()
         {
             var iconBrush = TryFindResource("ThemeControlForegroundBrush") as Brush ?? Brushes.White;
             BtnShowSettingsPane.Content = BuildRevealSettingsArrowIcon(iconBrush);
             if (BtnCollapseSettingsPane != null)
                 BtnCollapseSettingsPane.Content = BuildCollapseSettingsArrowIcon(iconBrush);
+            // Right pane: left-pointing arrow to open (faces inward), right-pointing to collapse.
+            if (BtnShowPlayerSettingsPane != null)
+                BtnShowPlayerSettingsPane.Content = BuildCollapseSettingsArrowIcon(iconBrush);
+            if (BtnCollapsePlayerSettingsPane != null)
+                BtnCollapsePlayerSettingsPane.Content = BuildRevealSettingsArrowIcon(iconBrush);
         }
         private void RenderTransportIcons(bool isPlaying)
         {

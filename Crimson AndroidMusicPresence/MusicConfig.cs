@@ -105,6 +105,36 @@ namespace musicpresense
         public bool MediaPlayerSettingsPaneOpen { get; set; } = false;
         public bool MediaPlayerInlineLyricsViewActive { get; set; } = false;
         public bool MediaPlayerFullscreenActive { get; set; } = false;
+        public bool MediaPlayerPlayerSettingsPaneOpen { get; set; } = false;
+
+        // Pill display modes: 0 = Full (icon + text), 1 = Mini (icon only), 2 = Off
+        public int PillModeConnection { get; set; } = 0;
+        public int PillModeAudioLink { get; set; } = 0;
+        public int PillModeQuality { get; set; } = 0;
+        public int PillModeAlwaysOnTop { get; set; } = 0;
+
+        // Track info visibility
+        public bool PlayerShowTitle { get; set; } = true;
+        public bool PlayerShowArtist { get; set; } = true;
+        public bool PlayerShowAlbum { get; set; } = true;
+        public bool PlayerShowCover { get; set; } = true;
+        public bool PlayerShowVolumeButton { get; set; } = true;
+        public bool PlayerShowLyricsButton { get; set; } = true;
+        public bool PlayerShowBattery { get; set; } = true;
+        public bool PlayerShowHelpButton { get; set; } = true;
+        public bool PlayerShowFullscreenButton { get; set; } = true;
+
+        // Layout
+        public bool PlayerSwapArtistAlbum { get; set; } = false;
+        public bool PlayerCoverRoundedCorners { get; set; } = true;
+
+        // Gradient sample points: 2, 4, 6, or 8
+        public int PlayerGradientSamplePoints { get; set; } = 8;
+
+        // Pane sides
+        public bool SettingsPaneOnRight { get; set; } = false;
+        public bool PlayerSettingsPaneOnLeft { get; set; } = false;
+
         public double MediaPlayerWindowWidth { get; set; } = 1080;
         public double MediaPlayerWindowHeight { get; set; } = 760;
         public double MediaPlayerWindowTop { get; set; } = 100;
@@ -320,6 +350,10 @@ namespace musicpresense
 
             var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };
             if (!allowedMods.Contains(config.HotkeyModifier)) config.HotkeyModifier = 0x0001;
+
+            var allowedGradientPoints = new[] { 2, 4, 6, 8 };
+            if (!allowedGradientPoints.Contains(config.PlayerGradientSamplePoints))
+                config.PlayerGradientSamplePoints = 8;
 
             // Sanity: WirelessDebugging without a service name is functionally broken,
             // but we don't auto-rewrite to TcpIp because the user may be mid-pairing.

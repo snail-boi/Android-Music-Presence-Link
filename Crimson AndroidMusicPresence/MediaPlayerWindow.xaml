@@ -225,10 +225,11 @@
 
     <Grid Margin="14">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="SettingsColumn" Width="500" MinWidth="0" />
-            <!-- MaxWidth set dynamically in code-behind based on window size -->
-            <ColumnDefinition x:Name="SplitterColumn" Width="8" MinWidth="0" />
+            <ColumnDefinition x:Name="SettingsColumn" Width="0" MinWidth="0" />
+            <ColumnDefinition x:Name="SplitterColumn" Width="0" MinWidth="0" />
             <ColumnDefinition Width="1*" />
+            <ColumnDefinition x:Name="PlayerSettingsSplitterColumn" Width="0" MinWidth="0" />
+            <ColumnDefinition x:Name="PlayerSettingsColumn" Width="0" MinWidth="0" />
         </Grid.ColumnDefinitions>
 
         <Border x:Name="SettingsPaneBorder"
@@ -236,8 +237,19 @@
                 BorderBrush="{DynamicResource ThemeControlBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6"
+                Visibility="Collapsed"
                 Background="{DynamicResource ThemeControlBackgroundBrush}">
             <ContentControl x:Name="SettingsHost" />
+        </Border>
+
+        <Border x:Name="PlayerSettingsPaneBorder"
+                Grid.Column="4"
+                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Visibility="Collapsed"
+                Background="{DynamicResource ThemeControlBackgroundBrush}">
+            <ContentControl x:Name="PlayerSettingsHost" />
         </Border>
 
         <Border x:Name="PlayerPaneBorder"
@@ -712,6 +724,34 @@
                             Visibility="Collapsed"
                             ToolTip="Show settings"
                             Click="BtnShowSettingsPane_Click" />
+
+                    <!-- Collapse player-settings arrow: right edge, visible when right pane open -->
+                    <Button x:Name="BtnCollapsePlayerSettingsPane"
+                            Grid.Row="0"
+                            Grid.RowSpan="6"
+                            Style="{StaticResource PaneToggleArrowButtonStyle}"
+                            Width="28"
+                            Height="36"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Panel.ZIndex="10"
+                            Visibility="Collapsed"
+                            ToolTip="Hide player settings"
+                            Click="BtnCollapsePlayerSettingsPane_Click" />
+
+                    <!-- Show player-settings arrow: right edge, visible when right pane closed -->
+                    <Button x:Name="BtnShowPlayerSettingsPane"
+                            Grid.Row="0"
+                            Grid.RowSpan="6"
+                            Style="{StaticResource PaneToggleArrowButtonStyle}"
+                            Width="28"
+                            Height="36"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Panel.ZIndex="10"
+                            Visibility="Visible"
+                            ToolTip="Show player settings"
+                            Click="BtnShowPlayerSettingsPane_Click" />
 
                     <!-- Help / What's this? button, top-LEFT corner of the player pane -->
                     <Button x:Name="BtnHelp"
