@@ -262,7 +262,7 @@ namespace musicpresense
             double available = ActualWidth - 28;
             if (available <= 0) return;
 
-            double max = Math.Min(DefaultSettingsWidth, available * SettingsMaxWidthFraction);
+            double max = Math.Min(EffectiveSettingsColumnDefaultWidth, available * SettingsMaxWidthFraction);
             if (max <= 0) return;
 
             SettingsColumn.MaxWidth = max;
@@ -374,7 +374,7 @@ namespace musicpresense
         {
             _settingsPaneOpen = false;
             PersistRuntimeState();
-            double fromWidth = SettingsColumn.Width.IsAbsolute ? SettingsColumn.Width.Value : DefaultSettingsWidth;
+            double fromWidth = SettingsColumn.Width.IsAbsolute ? SettingsColumn.Width.Value : EffectiveSettingsColumnDefaultWidth;
 
             BtnCollapseSettingsPane.IsEnabled = false;
             BtnShowSettingsPane.Visibility = Visibility.Collapsed;
@@ -440,7 +440,7 @@ namespace musicpresense
             UpdatePlayerCornerRadius();
 
             ClampSettingsColumnWidth();
-            double targetWidth = Math.Min(DefaultSettingsWidth, SettingsColumn.MaxWidth > 0 ? SettingsColumn.MaxWidth : DefaultSettingsWidth);
+            double targetWidth = Math.Min(EffectiveSettingsColumnDefaultWidth, SettingsColumn.MaxWidth > 0 ? SettingsColumn.MaxWidth : EffectiveSettingsColumnDefaultWidth);
             // Reset to 0 so the animation always slides in from nothing.
             // ClampSettingsColumnWidth sets Width to the target which would
             // cause the animation to start at the end and appear instant.
@@ -695,12 +695,21 @@ namespace musicpresense
 
         private const double DefaultPlayerSettingsWidth = 280;
 
+        // When panes are swapped, SettingsColumn holds the player-settings content
+        // (narrow, 280px) and PlayerSettingsColumn holds the main-settings content
+        // (wide, 500px). These helpers return the correct default for whichever
+        // content is currently living in each column.
+        private double EffectiveSettingsColumnDefaultWidth =>
+            _panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth;
+        private double EffectivePlayerSettingsColumnDefaultWidth =>
+            _panesSwapped ? DefaultSettingsWidth : DefaultPlayerSettingsWidth;
+
         private void ClampPlayerSettingsColumnWidth()
         {
             if (!_playerSettingsPaneOpen) return;
             double available = ActualWidth - 28;
             if (available <= 0) return;
-            double max = Math.Min(DefaultPlayerSettingsWidth, available * SettingsMaxWidthFraction);
+            double max = Math.Min(EffectivePlayerSettingsColumnDefaultWidth, available * SettingsMaxWidthFraction);
             if (max <= 0) return;
             PlayerSettingsColumn.MaxWidth = max;
             PlayerSettingsColumn.Width = new GridLength(max, GridUnitType.Pixel);
@@ -712,7 +721,7 @@ namespace musicpresense
             PersistRuntimeState();
             double fromWidth = PlayerSettingsColumn.Width.IsAbsolute
                 ? PlayerSettingsColumn.Width.Value
-                : DefaultPlayerSettingsWidth;
+                : EffectivePlayerSettingsColumnDefaultWidth;
 
             BtnCollapsePlayerSettingsPane.IsEnabled = false;
             BtnShowPlayerSettingsPane.Visibility = Visibility.Collapsed;
@@ -744,7 +753,10 @@ namespace musicpresense
 
         private void ShowPlayerSettingsPane()
         {
-            if (PlayerSettingsHost.Content == null)
+            // Guard: only bail if the player settings pane was never created.
+            // Do NOT check PlayerSettingsHost.Content here because ApplyPaneLayout
+            // may have swapped a null into it (from the collapsed SettingsHost).
+            if (_playerSettingsPane == null)
             {
                 CollapsePlayerSettingsPane();
                 return;
@@ -766,8 +778,8 @@ namespace musicpresense
 
             ClampPlayerSettingsColumnWidth();
             double targetWidth = Math.Min(
-                DefaultPlayerSettingsWidth,
-                PlayerSettingsColumn.MaxWidth > 0 ? PlayerSettingsColumn.MaxWidth : DefaultPlayerSettingsWidth);
+                EffectivePlayerSettingsColumnDefaultWidth,
+                PlayerSettingsColumn.MaxWidth > 0 ? PlayerSettingsColumn.MaxWidth : EffectivePlayerSettingsColumnDefaultWidth);
             PlayerSettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
 
             var anim = new GridLengthAnimation
@@ -900,18 +912,37 @@ namespace musicpresense
             if (swap == _panesSwapped) return;
             _panesSwapped = swap;
 
-            // Swap content between hosts — self-inverse, no branching needed.
+            // Swap content between hosts. Each host keeps the same column definition
+            // so all Show/Collapse animation and column-width logic continues to work
+            // unchanged. The only thing that moves is which piece of content appears
+            // on each side.
             var leftContent = SettingsHost.Content;
             SettingsHost.Content = PlayerSettingsHost.Content;
             PlayerSettingsHost.Content = leftContent;
 
-            // Swap column widths so each pane keeps the correct size.
+            // Preserve each pane's actual open pixel width across the swap.
             var leftWidth = SettingsColumn.Width;
             var leftMax = SettingsColumn.MaxWidth;
             SettingsColumn.Width = PlayerSettingsColumn.Width;
             SettingsColumn.MaxWidth = PlayerSettingsColumn.MaxWidth;
             PlayerSettingsColumn.Width = leftWidth;
             PlayerSettingsColumn.MaxWidth = leftMax;
+
+            // Swap the open-state flags so that UpdatePlayerCornerRadius and the
+            // auto-collapse logic remain consistent with what is actually open.
+            bool tmpOpen = _settingsPaneOpen;
+            _settingsPaneOpen = _playerSettingsPaneOpen;
+            _playerSettingsPaneOpen = tmpOpen;
+
+            // Sync the Visibility of the two pane borders to match the flags.
+            SettingsPaneBorder.Visibility = _settingsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
+            PlayerSettingsPaneBorder.Visibility = _playerSettingsPaneOpen ? Visibility.Visible : Visibility.Collapsed;
+
+            // Sync the splitter gaps.
+            SplitterColumn.Width = _settingsPaneOpen ? new GridLength(8) : new GridLength(0);
+            PlayerSettingsSplitterColumn.Width = _playerSettingsPaneOpen ? new GridLength(8) : new GridLength(0);
+
+            UpdatePlayerCornerRadius();
 
             // Re-render arrows so they point inward toward the player pane.
             RenderSettingsPaneArrowIcons();
