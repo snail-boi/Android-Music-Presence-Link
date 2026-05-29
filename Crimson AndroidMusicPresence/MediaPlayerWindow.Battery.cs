@@ -13,7 +13,7 @@ namespace musicpresense
     {
         // 5 minutes between polls. The user explicitly asked for a long interval
         // to keep ADB chatter minimal; the icon is purely informational.
-        private static readonly TimeSpan BatteryPollInterval = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan BatteryPollInterval = TimeSpan.FromSeconds(5);
 
         private DispatcherTimer? _batteryTimer;
 
@@ -144,10 +144,10 @@ namespace musicpresense
         /// <para/>
         /// Color rules:
         /// <list type="bullet">
-        ///   <item>100% -> green</item>
-        ///   <item>21-99% -> theme icon brush (white on dark / black on light)</item>
-        ///   <item>0-20% -> red</item>
-        ///   <item>-1 (unknown) -> theme icon brush, no fill text</item>
+        ///   <item>Outline + cap: adaptive (white in dark mode, dark in light mode), or green/red overrides</item>
+        ///   <item>Fill (charge bar): white normally, green at 100%, red at 20% or below</item>
+        ///   <item>Empty portion behind the fill: light grey so text/bolt stay legible</item>
+        ///   <item>Text + bolt: always dark grey for contrast against both the white fill and the light grey empty area</item>
         /// </list>
         /// </summary>
         private static Viewbox BuildBatteryIcon(Brush themeBrush, int level, bool charging)
@@ -157,38 +157,89 @@ namespace musicpresense
 
             var canvas = new Canvas { Width = canvasW, Height = canvasH };
 
-            Brush bodyBrush;
+            // Fixed palette. These don't change with theme; only the outline does.
+            Brush whiteFill = Brushes.White;
+            Brush greenFill = new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59));
+            Brush redFill = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
+            Brush lightGrey = new SolidColorBrush(Color.FromRgb(0xD0, 0xD0, 0xD0));
+            Brush darkGrey = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+
+            // Decide outline/cap and fill colors based on level
+            Brush outlineBrush;
+            Brush fillBrush;
             if (level < 0)
             {
-                bodyBrush = themeBrush;
+                // Unknown state, render as a faint outline with no fill content
+                outlineBrush = themeBrush;
+                fillBrush = whiteFill;
             }
             else if (level >= 100)
             {
-                bodyBrush = new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59));
+                // Full: whole icon goes green for clear at-a-glance readout
+                outlineBrush = greenFill;
+                fillBrush = greenFill;
             }
             else if (level <= 20)
             {
-                bodyBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
+                // Critical: whole icon goes red
+                outlineBrush = redFill;
+                fillBrush = redFill;
             }
             else
             {
-                bodyBrush = themeBrush;
+                outlineBrush = themeBrush;
+                fillBrush = whiteFill;
             }
-
-            // Dark gray, close to black but still readable on both light and dark themes
-            Brush grayBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
 
             const double bodyX = 2;
             const double bodyY = 3;
             const double bodyW = 40;
             const double bodyH = 18;
+            const double inset = 2.5;
 
-            // Battery body outline
+            // Light grey "empty" background. Sits inside the outline so the text and
+            // bolt have a legible surface to land on, regardless of how full the
+            // proportional fill bar is. Rendered first so everything else stacks on top.
+            if (level >= 0)
+            {
+                var emptyBg = new Rectangle
+                {
+                    Width = bodyW - inset * 2,
+                    Height = bodyH - inset * 2,
+                    Fill = lightGrey,
+                    RadiusX = 2,
+                    RadiusY = 2
+                };
+                Canvas.SetLeft(emptyBg, bodyX + inset);
+                Canvas.SetTop(emptyBg, bodyY + inset);
+                canvas.Children.Add(emptyBg);
+            }
+
+            // Proportional fill, overlaid on the light-grey bg
+            if (level > 0)
+            {
+                double fillMaxW = bodyW - inset * 2;
+                double fillW = fillMaxW * (Math.Min(level, 100) / 100.0);
+
+                var fill = new Rectangle
+                {
+                    Width = fillW,
+                    Height = bodyH - inset * 2,
+                    Fill = fillBrush,
+                    RadiusX = 2,
+                    RadiusY = 2
+                };
+                Canvas.SetLeft(fill, bodyX + inset);
+                Canvas.SetTop(fill, bodyY + inset);
+                canvas.Children.Add(fill);
+            }
+
+            // Body outline, drawn after the fills so its stroke sits on top cleanly
             var body = new Rectangle
             {
                 Width = bodyW,
                 Height = bodyH,
-                Stroke = bodyBrush,
+                Stroke = outlineBrush,
                 StrokeThickness = 1.8,
                 RadiusX = 3,
                 RadiusY = 3,
@@ -203,7 +254,7 @@ namespace musicpresense
             {
                 Width = 4,
                 Height = 8,
-                Fill = bodyBrush,
+                Fill = outlineBrush,
                 RadiusX = 1,
                 RadiusY = 1
             };
@@ -211,27 +262,7 @@ namespace musicpresense
             Canvas.SetTop(cap, bodyY + (bodyH - 8) / 2.0);
             canvas.Children.Add(cap);
 
-            // Proportional fill
-            if (level > 0)
-            {
-                const double inset = 2.5;
-                double fillMaxW = bodyW - inset * 2;
-                double fillW = fillMaxW * (Math.Min(level, 100) / 100.0);
-
-                var fill = new Rectangle
-                {
-                    Width = fillW,
-                    Height = bodyH - inset * 2,
-                    Fill = bodyBrush,
-                    RadiusX = 2,
-                    RadiusY = 2
-                };
-                Canvas.SetLeft(fill, bodyX + inset);
-                Canvas.SetTop(fill, bodyY + inset);
-                canvas.Children.Add(fill);
-            }
-
-            // Lightning bolt, left portion of the body
+            // Lightning bolt, sits on the left portion of the body
             if (charging)
             {
                 double cx = bodyX + bodyW * 0.22;
@@ -239,23 +270,23 @@ namespace musicpresense
 
                 var bolt = new Polygon
                 {
-                    Fill = grayBrush,
+                    Fill = darkGrey,
                     Stroke = Brushes.Transparent,
                     StrokeThickness = 0,
                     Points = new PointCollection
-            {
-                new Point(cx + 0.5, cy - 7),
-                new Point(cx - 3.5, cy + 0.5),
-                new Point(cx - 0.5, cy + 0.5),
-                new Point(cx - 1.5, cy + 7),
-                new Point(cx + 3.5, cy - 1),
-                new Point(cx + 0.5, cy - 1)
-            }
+                    {
+                        new Point(cx + 0.5, cy - 7),
+                        new Point(cx - 3.5, cy + 0.5),
+                        new Point(cx - 0.5, cy + 0.5),
+                        new Point(cx - 1.5, cy + 7),
+                        new Point(cx + 3.5, cy - 1),
+                        new Point(cx + 0.5, cy - 1)
+                    }
                 };
                 canvas.Children.Add(bolt);
             }
 
-            // Percentage text
+            // Percentage text, nudged right when the bolt is visible so they don't overlap
             if (level >= 0)
             {
                 double textX = bodyX + (charging ? 10 : 0);
@@ -266,14 +297,14 @@ namespace musicpresense
                     Text = level + "%",
                     FontSize = 10,
                     FontWeight = FontWeights.Bold,
-                    Foreground = grayBrush,
+                    Foreground = darkGrey,
                     TextAlignment = TextAlignment.Center,
                     Width = textW,
                     Height = bodyH,
                     Padding = new Thickness(0)
                 };
                 Canvas.SetLeft(text, textX);
-                Canvas.SetTop(text, bodyY + 1);
+                Canvas.SetTop(text, bodyY + 2);
                 canvas.Children.Add(text);
             }
 
