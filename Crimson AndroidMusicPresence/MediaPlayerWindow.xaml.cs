@@ -834,7 +834,6 @@ namespace musicpresense
 
         private void OnPlayerSettingChanged()
         {
-            _playerSettingsPane?.LoadFromConfig();
             ApplyPlayerSettings();
             ApplyPaneLayout();
         }

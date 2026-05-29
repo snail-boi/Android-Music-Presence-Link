@@ -339,8 +339,21 @@ namespace musicpresense
         private void RenderAudioLinkButton()
         {
             var brush = ResolveIconBrush();
-            BtnAudioLink.Content = BuildAudioLinkIcon(brush, _audioLinkActive, 22);
+            var sp = new StackPanel { Orientation = Orientation.Horizontal };
+            sp.Children.Add(BuildAudioLinkIcon(brush, _audioLinkActive, 14));
+            sp.Children.Add(new TextBlock
+            {
+                Text = _audioLinkActive ? "Audio on" : "Audio off",
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Foreground = brush
+            });
+            BtnAudioLink.Content = sp;
             BtnAudioLink.ToolTip = _audioLinkActive ? "Audio link: sync audio from device (on)" : "Audio link: sync audio from device (off)";
+
+            // Re-apply pill mode so Mini hides the label if needed.
+            ApplyPillMode(BtnAudioLink, App.Config?.PillModeAudioLink ?? 0);
         }
     }
 }

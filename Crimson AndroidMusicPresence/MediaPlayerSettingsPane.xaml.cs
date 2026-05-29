@@ -76,39 +76,34 @@ namespace musicpresense
             btn.Opacity = mode == 2 ? 0.45 : 1.0;
         }
 
-        private void CyclePill(Button btn, ref int configValue)
-        {
-            configValue = (configValue + 1) % 3;
-            UpdatePillButton(btn, configValue);
-            SaveAndNotify();
-        }
+        private static int NextPillMode(int current) => (current + 1) % 3;
 
         private void BtnPillConnection_Click(object sender, RoutedEventArgs e)
         {
-            var v = App.Config.PillModeConnection;
-            CyclePill(BtnPillConnection, ref v);
-            App.Config.PillModeConnection = v;
+            App.Config.PillModeConnection = NextPillMode(App.Config.PillModeConnection);
+            UpdatePillButton(BtnPillConnection, App.Config.PillModeConnection);
+            SaveAndNotify();
         }
 
         private void BtnPillAudioLink_Click(object sender, RoutedEventArgs e)
         {
-            var v = App.Config.PillModeAudioLink;
-            CyclePill(BtnPillAudioLink, ref v);
-            App.Config.PillModeAudioLink = v;
+            App.Config.PillModeAudioLink = NextPillMode(App.Config.PillModeAudioLink);
+            UpdatePillButton(BtnPillAudioLink, App.Config.PillModeAudioLink);
+            SaveAndNotify();
         }
 
         private void BtnPillQuality_Click(object sender, RoutedEventArgs e)
         {
-            var v = App.Config.PillModeQuality;
-            CyclePill(BtnPillQuality, ref v);
-            App.Config.PillModeQuality = v;
+            App.Config.PillModeQuality = NextPillMode(App.Config.PillModeQuality);
+            UpdatePillButton(BtnPillQuality, App.Config.PillModeQuality);
+            SaveAndNotify();
         }
 
         private void BtnPillAlwaysOnTop_Click(object sender, RoutedEventArgs e)
         {
-            var v = App.Config.PillModeAlwaysOnTop;
-            CyclePill(BtnPillAlwaysOnTop, ref v);
-            App.Config.PillModeAlwaysOnTop = v;
+            App.Config.PillModeAlwaysOnTop = NextPillMode(App.Config.PillModeAlwaysOnTop);
+            UpdatePillButton(BtnPillAlwaysOnTop, App.Config.PillModeAlwaysOnTop);
+            SaveAndNotify();
         }
 
         // ── Gradient segmented buttons ────────────────────────────────────────
