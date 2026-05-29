@@ -13,7 +13,7 @@ namespace musicpresense
     {
         // 5 minutes between polls. The user explicitly asked for a long interval
         // to keep ADB chatter minimal; the icon is purely informational.
-        private static readonly TimeSpan BatteryPollInterval = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan BatteryPollInterval = TimeSpan.FromMinutes(2.5);
 
         private DispatcherTimer? _batteryTimer;
 
