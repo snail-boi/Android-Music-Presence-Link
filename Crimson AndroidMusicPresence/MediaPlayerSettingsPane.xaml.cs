@@ -29,7 +29,7 @@ namespace musicpresense
                 var c = App.Config;
 
                 // Pills
-                UpdatePillButton(BtnPillConnection, c.PillModeConnection);
+                UpdatePillButton(BtnPillConnection, c.PillModeConnection, isConnection: true);
                 UpdatePillButton(BtnPillAudioLink, c.PillModeAudioLink);
                 UpdatePillButton(BtnPillQuality, c.PillModeQuality);
                 UpdatePillButton(BtnPillAlwaysOnTop, c.PillModeAlwaysOnTop);
@@ -63,24 +63,26 @@ namespace musicpresense
 
         // ── Pill cycle buttons ────────────────────────────────────────────────
 
-        // 0 = Full, 1 = Mini, 2 = Off
+        // Connection has 4 modes: 0=Full, 1=Mini, 2=Off, 3=Top
+        private static readonly string[] ConnectionPillModeLabels = { "Full", "Mini", "Off", "Top" };
+        // Other pills have 3 modes: 0=Full, 1=Mini, 2=Off
         private static readonly string[] PillModeLabels = { "Full", "Mini", "Off" };
 
-        private static void UpdatePillButton(Button btn, int mode)
+        private static void UpdatePillButton(Button btn, int mode, bool isConnection = false)
         {
-            mode = Math.Clamp(mode, 0, 2);
-            btn.Content = PillModeLabels[mode];
-
-            // Dim the button when Off so there is a clear visual cue.
+            var labels = isConnection ? ConnectionPillModeLabels : PillModeLabels;
+            mode = Math.Clamp(mode, 0, labels.Length - 1);
+            btn.Content = labels[mode];
             btn.Opacity = mode == 2 ? 0.45 : 1.0;
         }
 
         private static int NextPillMode(int current) => (current + 1) % 3;
+        private static int NextConnectionPillMode(int current) => (current + 1) % 4;
 
         private void BtnPillConnection_Click(object sender, RoutedEventArgs e)
         {
-            App.Config.PillModeConnection = NextPillMode(App.Config.PillModeConnection);
-            UpdatePillButton(BtnPillConnection, App.Config.PillModeConnection);
+            App.Config.PillModeConnection = NextConnectionPillMode(App.Config.PillModeConnection);
+            UpdatePillButton(BtnPillConnection, App.Config.PillModeConnection, isConnection: true);
             SaveAndNotify();
         }
 

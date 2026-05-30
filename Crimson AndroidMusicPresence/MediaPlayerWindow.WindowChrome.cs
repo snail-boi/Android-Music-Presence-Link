@@ -127,7 +127,6 @@ namespace musicpresense
             {
                 Opacity = _alwaysOnTop ? 0.85 : 0.45
             };
-            ApplyPillMode(BtnAlwaysOnTop, App.Config?.PillModeAlwaysOnTop ?? 0);
         }
 
         // ── Connection Info ─────────────────────────────────────────────────────
@@ -142,6 +141,37 @@ namespace musicpresense
         {
             ConnectionDot.Fill = new SolidColorBrush(_connectionColor);
             BtnConnectionInfo.BorderBrush = new SolidColorBrush(_connectionColor) { Opacity = 0.7 };
+            RenderConnectionTopIcon();
+        }
+
+        private void RenderConnectionTopIcon()
+        {
+            if (BtnConnectionTop == null) return;
+            var brush = new SolidColorBrush(_connectionColor);
+
+            Viewbox icon;
+            string status = _connectionStatusText ?? "";
+            if (status.StartsWith("USB"))
+                icon = BuildUsbIcon(brush, 28);
+            else if (status.StartsWith("TCP"))
+                icon = BuildTcpIcon(brush, 28);
+            else if (status.StartsWith("Wireless"))
+                icon = BuildWdIcon(brush, 28);
+            else if (status.StartsWith("Wi-Fi port"))
+                icon = BuildPortLostIcon(brush, 28);
+            else
+                icon = BuildNoConnectionIcon(brush, 28);
+
+            BtnConnectionTop.Content = icon;
+            BtnConnectionTop.ToolTip = $"Connection: {status}";
+        }
+
+        private void BtnConnectionTop_Click(object sender, RoutedEventArgs e)
+        {
+            TxtConnectionStatus.Text = _connectionStatusText;
+            TxtConnectionDetail.Text = _connectionDetailText;
+            ConnectionInfoPopup.PlacementTarget = BtnConnectionTop;
+            ConnectionInfoPopup.IsOpen = !ConnectionInfoPopup.IsOpen;
         }
 
         // ── Help / What's this? ───────────────────────────────────────────────

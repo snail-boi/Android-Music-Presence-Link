@@ -808,6 +808,7 @@ namespace musicpresense
             ApplyPillMode(BtnAudioLink, c.PillModeAudioLink);
             ApplyPillMode(BtnAudioQuality, c.PillModeQuality);
             ApplyPillMode(BtnAlwaysOnTop, c.PillModeAlwaysOnTop);
+            BtnConnectionTop.Visibility = c.PillModeConnection == 3 ? Visibility.Visible : Visibility.Collapsed;
 
             BtnVolume.Visibility = c.PlayerShowVolumeButton ? Visibility.Visible : Visibility.Collapsed;
             BtnLyrics.Visibility = c.PlayerShowLyricsButton ? Visibility.Visible : Visibility.Collapsed;
@@ -821,7 +822,9 @@ namespace musicpresense
 
         private static void ApplyPillMode(Button pill, int mode)
         {
-            if (mode == 2) { pill.Visibility = Visibility.Collapsed; return; }
+            // Mode 3 = Top (connection only): collapse pill, show top icon instead.
+            // The top icon visibility is handled separately in ApplyPlayerSettings.
+            if (mode == 2 || mode == 3) { pill.Visibility = Visibility.Collapsed; return; }
             pill.Visibility = Visibility.Visible;
             if (pill.Content is StackPanel sp)
                 foreach (UIElement child in sp.Children)
