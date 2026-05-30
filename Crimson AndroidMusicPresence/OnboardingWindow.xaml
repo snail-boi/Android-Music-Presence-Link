@@ -27,6 +27,32 @@
             </Setter>
         </Style>
 
+        <Style x:Key="CycleButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="6,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Pretty primary button -->
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
@@ -313,7 +339,7 @@
                                 <TextBlock Style="{StaticResource InstructionText}"
                                            FontSize="15"
                                            Margin="0,0,0,16">
-									This app shows what music is playing on your Android phone right here on your Windows PC. It can also pull cover art, sync lyrics, control volume with hotkeys, and stream the audio over a USB or Wi-Fi link.
+                  This app shows what music is playing on your Android phone right here on your Windows PC. It can also pull cover art, sync lyrics, control volume with hotkeys, and stream the audio over a wireless debugging or USB link.
                                 </TextBlock>
 
                                 <TextBlock Text="What we will set up together:"
@@ -330,7 +356,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="📱" FontSize="16" VerticalAlignment="Top" />
                                         <TextBlock Grid.Column="1" Style="{StaticResource InstructionText}">
-											<Run FontWeight="SemiBold">Connect your phone</Run> using a USB cable, with optional Wi-Fi for wireless control afterwards.
+                         <Run FontWeight="SemiBold">Pair your phone wirelessly</Run> using Android's Wireless Debugging, with USB only needed for the first pairing step.
                                         </TextBlock>
                                     </Grid>
                                     <Grid Margin="0,4">
@@ -400,8 +426,8 @@
                                 <TextBlock Style="{StaticResource InstructionText}"
                                            FontSize="14"
                                            Margin="0,0,0,18">
-									To talk to your phone, Windows needs permission through something Android calls
-									<Run FontWeight="SemiBold">USB debugging</Run>. It is hidden by default. Don't worry, follow these steps and you'll be ready in a minute.
+                 To talk to your phone wirelessly, Android needs permission through
+                    <Run FontWeight="SemiBold">Wireless Debugging</Run>. It is hidden by default. Don't worry, follow these steps and you'll be ready in a minute.
                                 </TextBlock>
 
                                 <!-- Step 1 -->
@@ -444,8 +470,8 @@
                                                    FontSize="14" />
                                         <TextBlock Style="{StaticResource InstructionText}"
                                                    Margin="0,4,0,0">
-											Go back to the main Settings screen and open <Run FontWeight="SemiBold">System &#8250; Developer options</Run>.
-											Scroll down until you see <Run FontWeight="SemiBold">USB debugging</Run> and switch it on. Confirm any warning that pops up.
+                         Go back to the main Settings screen and open <Run FontWeight="SemiBold">System &#8250; Developer options</Run>.
+                            Scroll down until you see <Run FontWeight="SemiBold">Wireless debugging</Run> and switch it on. Confirm any warning that pops up.
                                         </TextBlock>
                                     </StackPanel>
                                 </Grid>
@@ -486,11 +512,10 @@
                                                    FontSize="14" />
                                         <TextBlock Style="{StaticResource InstructionText}"
                                                    Margin="0,4,0,0">
-											A popup on your phone will ask <Run FontWeight="SemiBold">"Allow USB debugging?"</Run>. Tick
-											<Run FontWeight="SemiBold">"Always allow from this computer"</Run> and tap <Run FontWeight="SemiBold">Allow</Run>.
+                            A popup on your phone will ask <Run FontWeight="SemiBold">"Pair device with pairing code?"</Run> and then confirm the connection. Approve it so the app can reconnect later without needing a cable.
                                         </TextBlock>
                                         <TextBlock Style="{StaticResource HelperText}">
-											If the popup never shows up, try unplugging and replugging the cable, or tap "Revoke USB debugging authorizations" in Developer options and try again.
+                          If the prompt never shows up, try tapping Wireless debugging off and on again, then use Pair device to retry.
                                         </TextBlock>
                                     </StackPanel>
                                 </Grid>
@@ -530,45 +555,28 @@
                         <TextBlock Grid.Row="0" Style="{StaticResource InstructionText}"
                                    Margin="0,0,0,16"
                                    FontSize="14">
-							Click <Run FontWeight="SemiBold">Auto Detect</Run> below and we'll find your phone, optionally set up Wi-Fi, and ask you for a friendly name. You can also fill these fields in by hand if you know what you're doing.
+                  Click the button below and we'll find your phone, or pair wireless debugging if that's the mode you choose. You can also fill these fields in by hand if you know what you're doing.
                         </TextBlock>
 
-                        <Button Grid.Row="1"
-                                x:Name="BtnAutoGather"
-                                Content="🔍  Auto Detect My Phone"
-                                Style="{StaticResource PrimaryButton}"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,20"
-                                Padding="22,10"
-                                FontSize="14"
-                                Click="BtnAutoGather_Click" />
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
+                            <Button x:Name="BtnAutoGather"
+                                    Content="Auto Detect USB"
+                                    Style="{StaticResource PrimaryButton}"
+                                    HorizontalAlignment="Left"
+                                    Padding="22,10"
+                                    FontSize="14"
+                                    Click="BtnAutoGatherOrPair_Click" />
+                            <Button x:Name="BtnWifiModeToggle"
+                                    Content="mode: adb tcpip"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HorizontalAlignment="Left"
+                                    Margin="8,0,0,0"
+                                    Padding="18,10"
+                                    FontSize="13"
+                                    Click="BtnWifiModeToggle_Click" />
+                        </StackPanel>
 
-                        <TextBlock Grid.Row="2" Style="{StaticResource InstructionText}"
-                                   Margin="0,0,0,6"
-                                   FontSize="13">
-							<Run FontWeight="SemiBold">Wi-Fi connection mode</Run> (only used if you enable Wi-Fi):
-                        </TextBlock>
-
-                        <ComboBox Grid.Row="3" x:Name="CmbWifiMode"
-                                  Margin="0,0,0,16"
-                                  HorizontalAlignment="Left"
-                                  MinWidth="380"
-                                  SelectionChanged="CmbWifiMode_SelectionChanged">
-                            <ComboBoxItem Content="Classic (adb tcpip) - simplest, USB needed after every reboot" Tag="TcpIp" />
-                            <ComboBoxItem Content="Wireless Debugging (Android 11+) - one-time pair, survives reboots" Tag="WirelessDebugging" />
-                        </ComboBox>
-
-                        <Button Grid.Row="4"
-                                x:Name="BtnPairWireless"
-                                Content="🔗  Pair phone (Wireless Debugging)..."
-                                HorizontalAlignment="Left"
-                                Padding="18,8"
-                                Margin="0,0,0,16"
-                                FontSize="13"
-                                Visibility="Collapsed"
-                                Click="BtnPairWireless_Click" />
-
-                        <Grid Grid.Row="5" Margin="0,0,0,12">
+                        <Grid Grid.Row="2" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="*" />
@@ -580,7 +588,7 @@
                             <TextBox Grid.Column="1" x:Name="TxtUsbSerial" />
                         </Grid>
 
-                        <Grid Grid.Row="6" Margin="0,0,0,12">
+                        <Grid Grid.Row="3" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="*" />
@@ -592,7 +600,7 @@
                             <TextBox Grid.Column="1" x:Name="TxtWifi" />
                         </Grid>
 
-                        <Grid Grid.Row="7" Margin="0,0,0,12">
+                        <Grid Grid.Row="4" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="*" />
@@ -703,9 +711,9 @@
                         <TextBlock Grid.Row="0" Style="{StaticResource InstructionText}"
                                    Margin="0,0,0,12"
                                    FontSize="14">
-							Pick which Android apps are allowed to share what they're playing. Tick the
-							<Run FontWeight="SemiBold">Allow</Run> column for music apps like Spotify or YouTube Music. Tick
-							<Run FontWeight="SemiBold">Cover Search</Run> if you also want us to look up cover art for that app.
+                 Pick which Android apps are allowed to share what they're playing. Use the
+                    <Run FontWeight="SemiBold">Presence</Run> button to cycle Full / Half / Off, and the
+                    <Run FontWeight="SemiBold">Cover</Run> button to toggle cover art lookup.
                         </TextBlock>
 
                         <Grid Grid.Row="1" Margin="0,0,0,8">
@@ -725,15 +733,15 @@
                                        Opacity="0.7" />
                         </Grid>
 
-                        <Grid Grid.Row="2" Margin="2,0,18,4">
+                        <Grid Grid.Row="2" Margin="6,0,6,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="50" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="App package" FontWeight="SemiBold" Opacity="0.8" />
-                            <TextBlock Grid.Column="1" Text="Allow" FontWeight="SemiBold" Opacity="0.8" HorizontalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="Cover Search" FontWeight="SemiBold" Opacity="0.8" HorizontalAlignment="Center" />
+                            <TextBlock Grid.Column="0" Text="App" FontWeight="SemiBold" Opacity="0.8" />
+                            <TextBlock Grid.Column="1" Text="Presence" FontWeight="SemiBold" Opacity="0.8" HorizontalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="Cover" FontWeight="SemiBold" Opacity="0.8" HorizontalAlignment="Center" />
                         </Grid>
 
                         <ListBox x:Name="LstAllowedApps"
@@ -741,8 +749,7 @@
                                  BorderBrush="{DynamicResource ThemeControlBorderBrush}"
                                  Background="{DynamicResource ThemeBackgroundBrush}"
                                  HorizontalContentAlignment="Stretch"
-                              TextSearch.TextPath="PackageName"
-								 Foreground="White"
+                                 Foreground="White"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
                             <ListBox.ItemContainerStyle>
@@ -753,15 +760,35 @@
                             </ListBox.ItemContainerStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid Margin="0,3">
+                                    <Grid Margin="0,2">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="140" />
-                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="50" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{Binding PackageName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding PackageName}" />
-                                        <CheckBox Grid.Column="1" IsChecked="{Binding IsSelected}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        <CheckBox Grid.Column="2" IsChecked="{Binding IsCoverSearchEnabled}" IsEnabled="{Binding IsSelected}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding DisplayName}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding PackageName}" />
+
+                                        <Button Grid.Column="1"
+                                                Content="{Binding PresenceModeLabel}"
+                                                Background="{Binding PresenceModeBrush}"
+                                                Style="{StaticResource CycleButton}"
+                                                Width="58"
+                                                HorizontalAlignment="Center"
+                                                Tag="{Binding}"
+                                                Click="BtnPresenceMode_Click" />
+
+                                        <Button Grid.Column="2"
+                                                Content="{Binding CoverLabel}"
+                                                Background="{Binding CoverBrush}"
+                                                Style="{StaticResource CycleButton}"
+                                                Width="40"
+                                                HorizontalAlignment="Center"
+                                                Tag="{Binding}"
+                                                Click="BtnCover_Click" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -822,6 +849,10 @@
                         <TextBlock Grid.Row="6" Grid.Column="0" Text="Copy Track Info" Style="{StaticResource FieldLabel}" />
                         <TextBox x:Name="TxtHotkeyCopyTrackInfo" Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" />
                         <Button Grid.Row="6" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Click="BtnRecordHotkeyCopyTrackInfo_Click" />
+
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Audio Quality" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="TxtHotkeyAudioQuality" Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" />
+                        <Button Grid.Row="7" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Click="BtnRecordHotkeyAudioQuality_Click" />
                     </Grid>
 
                     <!-- =================================================== -->
@@ -844,7 +875,8 @@
                                     <StackPanel>
                                         <CheckBox x:Name="ChkOpenInTaskbar"
                                                   Content="Show in taskbar"
-                                                  FontWeight="SemiBold" />
+                                                  FontWeight="SemiBold" 
+                                                  Style="{StaticResource ToggleSwitchStyle}"/>
                                         <TextBlock Style="{StaticResource HelperText}"
                                                    Margin="22,4,0,0">
 											When checked, the app runs quietly in the system tray near the clock.
@@ -857,7 +889,7 @@
                                         CornerRadius="6"
                                         Padding="16,12">
                                     <StackPanel>
-                                        <CheckBox x:Name="ChkStartWithWindows"
+                                        <CheckBox x:Name="ChkStartWithWindows" Style="{StaticResource ToggleSwitchStyle}"
                                                   Content="Start automatically when Windows starts"
                                                   FontWeight="SemiBold" />
                                         <TextBlock Style="{StaticResource HelperText}"

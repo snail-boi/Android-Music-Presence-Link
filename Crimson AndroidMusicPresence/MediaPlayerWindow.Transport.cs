@@ -200,7 +200,11 @@ namespace musicpresense
         private void BtnPositionLabel_Click(object sender, RoutedEventArgs e)
         {
             _showTimeLeft = !_showTimeLeft;
+            App.Config.PlayerShowTimeLeft = _showTimeLeft;
+            MusicConfigManager.Save(App.Config);
+            (Application.Current as App)?.UpdateConfig(App.Config);
             RefreshPositionLabel();
+            _playerSettingsPane?.SyncTimeFormatButton(_showTimeLeft);
         }
         private void RefreshPositionLabel()
         {
@@ -220,6 +224,38 @@ namespace musicpresense
             return t.TotalHours >= 1
                 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
                 : $"{t.Minutes}:{t.Seconds:00}";
+        }
+
+
+        // Called by the settings pane's time-format button so the live display updates immediately.
+        public void SyncTimeFormatFromConfig()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(SyncTimeFormatFromConfig); return; }
+            _showTimeLeft = App.Config.PlayerShowTimeLeft;
+            RefreshPositionLabel();
+        }
+
+        // Recalculates seek button visibility from the current config and last known duration.
+        // Call whenever duration changes, the seek-buttons setting changes, or settings are applied.
+        internal void RefreshSeekButtonVisibility()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(RefreshSeekButtonVisibility); return; }
+
+            var c = App.Config;
+            Visibility vis;
+            if (!c.PlayerShowSeekButtons)
+            {
+                vis = Visibility.Collapsed;
+            }
+            else
+            {
+                long thresholdMs = (long)c.PlayerSeekButtonThresholdSeconds * 1000L;
+                vis = (_lastDurationMs > 0 && _lastDurationMs >= thresholdMs)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+            BtnSeekBack.Visibility = vis;
+            BtnSeekFwd.Visibility = vis;
         }
 
 

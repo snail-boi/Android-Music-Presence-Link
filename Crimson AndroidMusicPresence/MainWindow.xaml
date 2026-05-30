@@ -524,32 +524,35 @@
                         Padding="16"
                         Margin="0,0,0,12">
                         <StackPanel>
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Device" Style="{StaticResource SectionLabelStyle}" />
-                                    <TextBlock Text="Connect your Android phone via USB or Wi-Fi."
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Device" Style="{StaticResource SectionLabelStyle}" />
+                                <TextBlock Text="Connect your Android phone via USB or Wi-Fi."
                                            Style="{StaticResource HintTextStyle}"
-                                           Margin="0,2,0,0" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button x:Name="BtnAutoGather"
-                                        Content="Auto-detect"
+                                           Margin="12,0,0,0"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                <Button x:Name="BtnAutoGather"
+                                        Content="Auto-detect USB"
                                         Width="130"
-                                        VerticalAlignment="Center" />
-                                    <Button x:Name="BtnResetDevice"
+                                        Click="BtnDeviceAction_Click" />
+                                <Button x:Name="BtnWifiModeToggle"
+                                        Content="mode: adb tcpip"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="189"
+                                        Margin="8,0,0,0"
+                                        Click="BtnWifiModeToggle_Click" />
+                                <Button x:Name="BtnResetDevice"
                                         Content="Reset"
                                         Style="{StaticResource SecondaryButtonStyle}"
                                         Width="90"
                                         Margin="8,0,0,0"
-                                        VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Grid>
+                                        Click="BtnResetDevice_Click"
+                                        />
+                            </StackPanel>
 
-                            <Grid Margin="0,8,0,0">
+                            <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -571,51 +574,30 @@
                                      Grid.Row="0" Grid.Column="1"
                                      Margin="0,0,0,8" />
 
-                                <TextBlock Text="Wi-Fi mode"
-                                       Grid.Row="1" Grid.Column="0"
-                                       Style="{StaticResource FieldLabelStyle}" />
-                                <ComboBox x:Name="CmbWifiMode"
-                                      Grid.Row="1" Grid.Column="1"
-                                      Margin="0,0,0,8"
-                                      SelectionChanged="CmbWifiMode_SelectionChanged">
-                                    <ComboBoxItem Content="Classic (adb tcpip)" Tag="TcpIp" />
-                                    <ComboBoxItem Content="Wireless Debugging (Android 11+)" Tag="WirelessDebugging" />
-                                </ComboBox>
-
                                 <!-- TcpIp row: label + ip:port textbox. Hidden in WD mode. -->
                                 <TextBlock x:Name="LblWifiAddress"
                                        Text="Wi-Fi (ip:port)"
-                                       Grid.Row="2" Grid.Column="0"
+                                       Grid.Row="1" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
                                 <TextBox x:Name="TxtWifi"
-                                     Grid.Row="2" Grid.Column="1"
+                                     Grid.Row="1" Grid.Column="1"
                                      Margin="0,0,0,8" />
 
                                 <!-- mDNS row: read-only display, only shown when paired in WD mode. -->
                                 <TextBlock x:Name="LblMdnsService"
                                        Text="mDNS service"
-                                       Grid.Row="3" Grid.Column="0"
+                                       Grid.Row="2" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
                                 <TextBox x:Name="TxtMdnsService"
-                                     Grid.Row="3" Grid.Column="1"
+                                     Grid.Row="2" Grid.Column="1"
                                      IsReadOnly="True"
                                      Margin="0,0,0,8" />
 
-                                <!-- Pair button row: only shown in WD mode. Takes the full width. -->
-                                <Button x:Name="BtnPairWireless"
-                                    Grid.Row="4" Grid.Column="1"
-                                    Content="Pair phone..."
-                                    HorizontalAlignment="Left"
-                                    Padding="14,6"
-                                    Margin="0,0,0,8"
-                                    Visibility="Collapsed"
-                                    Click="BtnPairWireless_Click" />
-
                                 <TextBlock Text="Device name"
-                                       Grid.Row="5" Grid.Column="0"
+                                       Grid.Row="3" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
                                 <TextBox x:Name="TxtDeviceName"
-                                     Grid.Row="5" Grid.Column="1" />
+                                     Grid.Row="3" Grid.Column="1" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -1109,15 +1091,15 @@
                                      ToolTip="Use {artist}, {title}, {album}" />
                             </Grid>
 
-                            <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,8" />
+                            <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
                             <Button x:Name="BtnOpenLogFolder"
                                 Content="Open log folder"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Width="160"
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,12" />
-                            <CheckBox x:Name="ChkOpenInTaskbar" Content="Start minimized to tray" Margin="0,0,0,8" />
-                            <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,0,0,12" />
+                            <CheckBox x:Name="ChkOpenInTaskbar" Content="Start minimized to tray" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
+                            <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
 
                             <Button x:Name="BtnToggleMediaPlayerView"
                                 Content="Switch to media player view"

@@ -225,10 +225,11 @@
 
     <Grid Margin="14">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="SettingsColumn" Width="500" MinWidth="0" />
-            <!-- MaxWidth set dynamically in code-behind based on window size -->
-            <ColumnDefinition x:Name="SplitterColumn" Width="8" MinWidth="0" />
+            <ColumnDefinition x:Name="SettingsColumn" Width="0" MinWidth="0" />
+            <ColumnDefinition x:Name="SplitterColumn" Width="0" MinWidth="0" />
             <ColumnDefinition Width="1*" />
+            <ColumnDefinition x:Name="PlayerSettingsSplitterColumn" Width="0" MinWidth="0" />
+            <ColumnDefinition x:Name="PlayerSettingsColumn" Width="0" MinWidth="0" />
         </Grid.ColumnDefinitions>
 
         <Border x:Name="SettingsPaneBorder"
@@ -236,8 +237,19 @@
                 BorderBrush="{DynamicResource ThemeControlBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6"
+                Visibility="Collapsed"
                 Background="{DynamicResource ThemeControlBackgroundBrush}">
             <ContentControl x:Name="SettingsHost" />
+        </Border>
+
+        <Border x:Name="PlayerSettingsPaneBorder"
+                Grid.Column="4"
+                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Visibility="Collapsed"
+                Background="{DynamicResource ThemeControlBackgroundBrush}">
+            <ContentControl x:Name="PlayerSettingsHost" />
         </Border>
 
         <Border x:Name="PlayerPaneBorder"
@@ -283,7 +295,10 @@
                                 <Border.Background>
                                     <SolidColorBrush Color="#22000000" />
                                 </Border.Background>
-                                <Grid>
+                                <Grid x:Name="CoverImageGrid">
+                                    <Grid.Clip>
+                                        <RectangleGeometry Rect="0,0,420,420" RadiusX="10" RadiusY="10" />
+                                    </Grid.Clip>
                                     <!-- Crossfade layer A (outgoing) -->
                                     <Image x:Name="ImgCoverA"
                                        Stretch="UniformToFill"
@@ -404,7 +419,10 @@
                         <!-- Audio link toggle button; icon swaps in code-behind -->
                         <Button x:Name="BtnAudioLink"
                                 Style="{StaticResource PillButtonStyle}"
-                                Click="BtnAudioLink_Click" />
+                                Click="BtnAudioLink_Click">
+                            <StackPanel x:Name="AudioLinkContent"
+                                        Orientation="Horizontal" />
+                        </Button>
 
                         <!-- Quick audio-quality button; shows current preset name (or "Custom") -->
                         <Button x:Name="BtnAudioQuality"
@@ -713,6 +731,34 @@
                             ToolTip="Show settings"
                             Click="BtnShowSettingsPane_Click" />
 
+                    <!-- Collapse player-settings arrow: right edge, visible when right pane open -->
+                    <Button x:Name="BtnCollapsePlayerSettingsPane"
+                            Grid.Row="0"
+                            Grid.RowSpan="6"
+                            Style="{StaticResource PaneToggleArrowButtonStyle}"
+                            Width="28"
+                            Height="36"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Panel.ZIndex="10"
+                            Visibility="Collapsed"
+                            ToolTip="Hide player settings"
+                            Click="BtnCollapsePlayerSettingsPane_Click" />
+
+                    <!-- Show player-settings arrow: right edge, visible when right pane closed -->
+                    <Button x:Name="BtnShowPlayerSettingsPane"
+                            Grid.Row="0"
+                            Grid.RowSpan="6"
+                            Style="{StaticResource PaneToggleArrowButtonStyle}"
+                            Width="28"
+                            Height="36"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Panel.ZIndex="10"
+                            Visibility="Visible"
+                            ToolTip="Show player settings"
+                            Click="BtnShowPlayerSettingsPane_Click" />
+
                     <!-- Help / What's this? button, top-LEFT corner of the player pane -->
                     <Button x:Name="BtnHelp"
                             Grid.Row="0"
@@ -725,6 +771,21 @@
                             Panel.ZIndex="10"
                             ToolTip="What's this? (help)"
                             Click="BtnHelp_Click" />
+
+                    <!-- Connection top-mode icon: shown instead of the pill when PillModeConnection=3.
+                         Sits left of the battery indicator. Clickable — opens the connection popup. -->
+                    <Button x:Name="BtnConnectionTop"
+                            Grid.Row="0"
+                            Style="{StaticResource TransportIconButtonStyle}"
+                            Width="32"
+                            Height="32"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,0,92,0"
+                            Panel.ZIndex="10"
+                            Visibility="Collapsed"
+                            ToolTip="Connection"
+                            Click="BtnConnectionTop_Click" />
 
                     <!-- Battery indicator, top-RIGHT corner just left of the fullscreen toggle.
                          Polled every 5 minutes; not clickable, purely informational. -->
@@ -760,4 +821,3 @@
 
     </Grid>
 </Window>
-

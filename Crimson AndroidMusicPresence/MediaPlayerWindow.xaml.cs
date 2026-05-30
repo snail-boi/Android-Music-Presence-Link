@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
@@ -27,10 +28,14 @@ namespace musicpresense
         private const double DefaultSettingsWidth = 500;
         // Maximum fraction of the window width the settings pane may occupy.
         private const double SettingsMaxWidthFraction = 0.75;
-        // Window width below which the settings pane auto-collapses.
-        private const double SettingsAutoCollapseThreshold = 950;
-        // Window width the window expands to when opening the pane on a narrow window.
-        private const double SettingsAutoExpandWidth = 950;
+        // Window width below which the settings pane (500px) auto-collapses.
+        private const double SettingsAutoCollapseThreshold = 1030;
+        // Window width the window expands to when opening the settings pane.
+        private const double SettingsAutoExpandWidth = 1030;
+        // Window width below which the player settings pane (280px) auto-collapses.
+        private const double PlayerSettingsAutoCollapseThreshold = 810;
+        // Window width the window expands to when opening the player settings pane.
+        private const double PlayerSettingsAutoExpandWidth = 810;
         // ─────────────────────────────────────────────────────────────────────
 
         private readonly Func<Task> _pauseAction;
@@ -45,16 +50,9 @@ namespace musicpresense
         private readonly Func<int, int, int, Task>? _setPhoneVolume;
         private int _lastSentPhoneVolumeIndex = -1;
         private int _lastPhoneVolumeMax = 15;
-        // Set true while we initialize the slider value from the actual scrcpy
-        // volume on popup open, so the resulting ValueChanged event doesn't
-        // bounce back as a SetVolume call.
         private bool _suppressVolumeSliderEcho;
         private string? _currentCoverPath;
         private string? _lastGradientSourcePath;
-        // Tracks the theme used for the last idle (no-image) gradient paint, so we can
-        // skip the crossfade when the next idle paint would produce an identical brush
-        // (otherwise the transition pulses from a color back to the same color).
-        // Nullable so the very first idle paint always renders.
         private bool? _lastIdleIsDark;
         private bool _useLayerA = true;
         private static readonly Color DefaultTopLeft = Color.FromRgb(52, 52, 52);
@@ -62,55 +60,43 @@ namespace musicpresense
         private static readonly Color DefaultBottomLeft = Color.FromRgb(36, 36, 36);
         private static readonly Color DefaultBottomRight = Color.FromRgb(28, 28, 28);
 
-        // Cover art crossfade
         private static readonly Duration CoverFadeDuration = new Duration(TimeSpan.FromMilliseconds(350));
         private bool _coverUseLayerA = true;
 
-        // Whether TxtPositionLabel shows elapsed (false) or time-left (true)
         private bool _showTimeLeft = false;
         private long _lastPositionMs;
         private long _lastDurationMs;
 
-        // Smooth progress interpolation — updated every poll, ticked every 100 ms.
         private long _positionAnchorMs;
         private DateTime _positionAnchorTime;
         private DispatcherTimer? _smoothTimer;
 
-        // Settings pane open/closed state — used by SizeChanged to decide whether to clamp or auto-collapse.
         private bool _settingsPaneOpen = false;
 
-        // Audio link toggle state
+        private bool _playerSettingsPaneOpen = false;
+        private MediaPlayerSettingsPane? _playerSettingsPane;
+
+        private bool _panesSwapped = false;
+
         private bool _audioLinkActive = false;
         private readonly Action<bool>? _setAudioLink;
 
-        // Audio quality preset wiring. _getConfig returns the latest MusicConfig
-        // (so the button label reflects current saved values without needing to be
-        // re-pushed on every config change). _applyAudioQualityPreset writes the
-        // preset to the live config, persists it, and restarts scrcpy if needed.
         private readonly Func<MusicConfig>? _getConfig;
         private readonly Action<AudioQualityPresets.Preset>? _applyAudioQualityPreset;
         private readonly Action? _openCustomQualityWindow;
 
-        // Hide-decorations toggle state. We snapshot the chrome before hiding
-        // so the toggle restores the user's exact pre-toggle layout. Despite the
-        // "fullscreen" naming in code, this only hides title bar / borders;
-        // the window stays the same size and remains movable & resizable.
         private bool _isFullscreen = false;
         private WindowStyle _prevWindowStyle = WindowStyle.SingleBorderWindow;
         private ResizeMode _prevResizeMode = ResizeMode.CanResizeWithGrip;
 
-        // Always-on-top state.
         private bool _alwaysOnTop = false;
 
-        // Connection status info (set from outside)
         private string _connectionStatusText = "Not connected";
         private string _connectionDetailText = "";
         private Color _connectionColor = Color.FromRgb(0xFF, 0x3B, 0x30);
 
-        // Fast-seek ADB action
         private readonly Func<int, Task>? _seekRelativeSeconds;
 
-        // Inline lyrics view state
         private readonly LyricsOverlayManager? _lyricsManager;
         private bool _lyricsViewActive;
         private IReadOnlyList<LyricsOverlayManager.LyricsLineDto> _lyricsLines = Array.Empty<LyricsOverlayManager.LyricsLineDto>();
@@ -118,20 +104,11 @@ namespace musicpresense
         private int _lyricsHighlightedIndex = -1;
         private DispatcherTimer? _lyricsTimer;
         private readonly List<TextBlock> _lyricsLineBlocks = new();
-        // Wrapper Border for each line, parallel to _lyricsLineBlocks, used to render
-        // the darkened background pill behind the active line. null entries match the
-        // empty separator slots in _lyricsLineBlocks.
         private readonly List<Border> _lyricsLineHosts = new();
-        // Brushes for lyrics lines. Recomputed once per track/theme change in
-        // RebuildLyricsPanel; reused per highlight update to avoid allocating new
-        // brushes (which would cause a render-pass flash on each line transition).
         private Brush _lyricsInactiveBrush = Brushes.White;
         private Brush _lyricsActiveBrush = Brushes.White;
         private Brush _lyricsActiveLineBgBrush = Brushes.Transparent;
 
-        // Continuous-lerp scroll: instead of starting a new tween on each line change
-        // (which produces a stuttery restart when lines come fast), we keep a target
-        // offset and ease toward it once per frame via CompositionTarget.Rendering.
         private double _lyricsTargetScrollOffset;
         private bool _lyricsScrollLoopActive;
 
@@ -178,7 +155,7 @@ namespace musicpresense
 
             RenderTransportIcons(isPlaying: false);
             RenderAuxiliaryIcons();
-            RenderSettingsPaneArrowIcon();
+            RenderSettingsPaneArrowIcons();
             RenderFastSeekIcons();
             RenderAudioLinkButton();
             RenderHelpButtonIcon();
@@ -186,6 +163,10 @@ namespace musicpresense
             RefreshAlwaysOnTopButton();
             RefreshAudioQualityButton();
             ApplyCoverGradientBackground(null);
+
+            _playerSettingsPane = new MediaPlayerSettingsPane();
+            _playerSettingsPane.SettingChanged += OnPlayerSettingChanged;
+            PlayerSettingsHost.Content = _playerSettingsPane;
 
             SizeChanged += MediaPlayerWindow_SizeChanged;
             PlayerPaneBorder.SizeChanged += (_, _) => UpdateGradientClip();
@@ -200,7 +181,9 @@ namespace musicpresense
                 RefreshAlwaysOnTopButton();
                 RenderBatteryButtonIcon();
                 StartBatteryPolling();
+                ApplyPaneLayout();
                 ApplySavedRuntimeState();
+                ApplyPlayerSettings();
             };
 
             _smoothTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
@@ -224,26 +207,36 @@ namespace musicpresense
         {
             if (!e.WidthChanged) return;
 
+            double mainThreshold = _panesSwapped ? PlayerSettingsAutoCollapseThreshold : SettingsAutoCollapseThreshold;
+            double playerThreshold = _panesSwapped ? SettingsAutoCollapseThreshold : PlayerSettingsAutoCollapseThreshold;
+
             if (_settingsPaneOpen)
             {
-                // Auto-collapse if the window becomes too narrow to show both panes.
-                if (ActualWidth < SettingsAutoCollapseThreshold)
+                double threshold = mainThreshold + (_playerSettingsPaneOpen ? (_panesSwapped ? DefaultSettingsWidth : DefaultPlayerSettingsWidth) : 0);
+                if (ActualWidth < threshold)
                     CollapseSettingsPane();
                 else
                     ClampSettingsColumnWidth();
+            }
+
+            if (_playerSettingsPaneOpen)
+            {
+                double threshold = playerThreshold + (_settingsPaneOpen ? (_panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth) : 0);
+                if (ActualWidth < threshold)
+                    CollapsePlayerSettingsPane();
+                else
+                    ClampPlayerSettingsColumnWidth();
             }
         }
 
         private void ClampSettingsColumnWidth()
         {
             if (!_settingsPaneOpen) return;
-
             double available = ActualWidth - 28;
             if (available <= 0) return;
-
-            double max = Math.Min(DefaultSettingsWidth, available * SettingsMaxWidthFraction);
+            double defaultWidth = _panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth;
+            double max = Math.Min(defaultWidth, available * SettingsMaxWidthFraction);
             if (max <= 0) return;
-
             SettingsColumn.MaxWidth = max;
             SettingsColumn.Width = new GridLength(max, GridUnitType.Pixel);
         }
@@ -256,7 +249,7 @@ namespace musicpresense
                 WindowState = WindowState.Normal;
 
             var config = App.Config;
-            config.MediaPlayerSettingsPaneOpen = _settingsPaneOpen;
+            config.MediaPlayerSettingsPaneOpen = _panesSwapped ? _playerSettingsPaneOpen : _settingsPaneOpen;
             config.MediaPlayerInlineLyricsViewActive = _lyricsViewActive;
             config.MediaPlayerFullscreenActive = _isFullscreen;
             config.MediaPlayerWindowState = WindowState;
@@ -296,21 +289,25 @@ namespace musicpresense
             GradientGrid.Clip = new RectangleGeometry(new Rect(0, 0, w, h), radius, radius);
         }
 
+        // The host that currently holds the main settings content depends on swap state.
+        private ContentControl MainSettingsHost => _panesSwapped ? PlayerSettingsHost : SettingsHost;
+
         public void SetSettingsContent(object? content)
         {
-            SettingsHost.Content = content;
+            MainSettingsHost.Content = content;
         }
 
         public object? TakeSettingsContent()
         {
-            var content = SettingsHost.Content;
-            SettingsHost.Content = null;
+            var host = MainSettingsHost;
+            var content = host.Content;
+            host.Content = null;
             return content;
         }
 
         public void ClearSettingsContent()
         {
-            SettingsHost.Content = null;
+            MainSettingsHost.Content = null;
         }
 
         public void ApplySavedRuntimeState()
@@ -323,13 +320,25 @@ namespace musicpresense
 
             var config = App.Config;
 
-            if (config.MediaPlayerSettingsPaneOpen)
-                ShowSettingsPane();
-            else
+            // Main settings pane: restore saved state, mapped to the correct physical column.
+            // When swapped, main settings is in the right column.
+            bool openMainSettings = config.MediaPlayerSettingsPaneOpen;
+            if (_panesSwapped)
+            {
                 CollapseSettingsPane();
+                if (openMainSettings) ShowPlayerSettingsPane(); else CollapsePlayerSettingsPane();
+            }
+            else
+            {
+                if (openMainSettings) ShowSettingsPane(); else CollapseSettingsPane();
+                CollapsePlayerSettingsPane();
+            }
 
             if (_lyricsViewActive != config.MediaPlayerInlineLyricsViewActive)
                 ToggleInlineLyricsView();
+
+            _showTimeLeft = config.PlayerShowTimeLeft;
+            RefreshPositionLabel();
 
             SetFullscreenActive(config.MediaPlayerFullscreenActive);
         }
@@ -363,14 +372,13 @@ namespace musicpresense
 
             anim.Completed += (_, _) =>
             {
-                // Release the animation hold so width can be set directly again.
                 SettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
                 SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
                 SettingsPaneBorder.Visibility = Visibility.Collapsed;
                 SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
-                Grid.SetColumnSpan(PlayerPaneBorder, 3);
-                PlayerPaneBorder.CornerRadius = new CornerRadius(12);
-                PlayerPaneBorder.BorderThickness = new Thickness(0);
+                if (!_playerSettingsPaneOpen)
+                    Grid.SetColumnSpan(PlayerPaneBorder, 5);
+                UpdatePlayerCornerRadius();
                 UpdateGradientClip();
 
                 BtnCollapseSettingsPane.Visibility = Visibility.Collapsed;
@@ -392,34 +400,33 @@ namespace musicpresense
                 SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
                 BtnShowSettingsPane.Visibility = Visibility.Collapsed;
                 BtnCollapseSettingsPane.Visibility = Visibility.Collapsed;
-                Grid.SetColumnSpan(PlayerPaneBorder, 3);
-                PlayerPaneBorder.CornerRadius = new CornerRadius(12);
-                PlayerPaneBorder.BorderThickness = new Thickness(0);
+                UpdatePlayerCornerRadius();
                 UpdateGradientClip();
                 return;
             }
 
-            // If the window is too narrow to show both panes, grow it first.
-            if (ActualWidth < SettingsAutoCollapseThreshold)
-                Width = SettingsAutoExpandWidth;
+            double collapseThreshold = _panesSwapped ? PlayerSettingsAutoCollapseThreshold : SettingsAutoCollapseThreshold;
+            double expandWidth = _panesSwapped ? PlayerSettingsAutoExpandWidth : SettingsAutoExpandWidth;
+            // If the other pane is also open, we need room for both.
+            if (_playerSettingsPaneOpen) expandWidth += _panesSwapped ? DefaultSettingsWidth : DefaultPlayerSettingsWidth;
+            if (ActualWidth < collapseThreshold || (_playerSettingsPaneOpen && ActualWidth < expandWidth))
+                Width = expandWidth;
 
-            // Restore player column layout before animating.
             _settingsPaneOpen = true;
             PersistRuntimeState();
             Grid.SetColumnSpan(PlayerPaneBorder, 1);
-            PlayerPaneBorder.CornerRadius = new CornerRadius(6);
             PlayerPaneBorder.BorderThickness = new Thickness(1);
             SplitterColumn.Width = new GridLength(8, GridUnitType.Pixel);
             SettingsPaneBorder.Visibility = Visibility.Visible;
             BtnShowSettingsPane.Visibility = Visibility.Collapsed;
             BtnCollapseSettingsPane.Visibility = Visibility.Visible;
             BtnCollapseSettingsPane.IsEnabled = false;
+            UpdatePlayerCornerRadius();
 
             ClampSettingsColumnWidth();
-            double targetWidth = Math.Min(DefaultSettingsWidth, SettingsColumn.MaxWidth > 0 ? SettingsColumn.MaxWidth : DefaultSettingsWidth);
-            // Reset to 0 so the animation always slides in from nothing.
-            // ClampSettingsColumnWidth sets Width to the target which would
-            // cause the animation to start at the end and appear instant.
+            double targetWidth = Math.Min(
+                _panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth,
+                SettingsColumn.MaxWidth > 0 ? SettingsColumn.MaxWidth : (_panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth));
             SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
             double fromWidth = 0;
 
@@ -442,7 +449,6 @@ namespace musicpresense
             SettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
         }
 
-        // Track the last cover path shown so we never re-fade the same image on each update tick
         private string? _lastCoverImagePath;
         private bool _hasSong = false;
         private bool _isPlaying = false;
@@ -469,39 +475,24 @@ namespace musicpresense
             TxtAlbum.Text = normalizedAlbum;
             RenderTransportIcons(isPlaying);
 
-            // Auxiliary icons (seek, volume, lyrics, audio link) resolve their brush
-            // from _hasSong, so they need to re-render whenever song state changes.
             RenderAuxiliaryIcons();
             RefreshVolumeIcon();
 
             _currentCoverPath = string.IsNullOrWhiteSpace(coverPath) ? null : coverPath;
 
-            // Only crossfade the cover image when it actually changes
             if (!string.Equals(_lastCoverImagePath, _currentCoverPath, StringComparison.OrdinalIgnoreCase))
             {
                 _lastCoverImagePath = _currentCoverPath;
                 FadeCoverImage(_currentCoverPath);
             }
 
-            // Gradient background: null path → solid dark. ApplyCoverGradientBackground
-            // already has its own _lastGradientSourcePath guard so repeated calls are cheap.
             ApplyCoverGradientBackground(hasSong ? _currentCoverPath : null);
             ApplyPlayerTextColor(hasSong);
 
-            // Lyrics brush colors depend on _hasSong. Only rebuild when that flips,
-            // not on every poll tick.
             if (_lyricsViewActive && _lyricsLines.Count > 0 && hasSongChanged)
                 AdoptLyricsData(new LyricsOverlayManager.LyricsTrackData(_lyricsLines, _lyricsAreTimed));
         }
 
-        /// <summary>
-        /// White text on the player pane whenever a song is active (background is always dark).
-        /// When idle in light mode, clear the override so theme black shows on white background.
-        /// We set the property on each TextBlock directly because the implicit TextBlock style
-        /// merged from MainWindow.xaml (and the parent Button's Foreground for the position
-        /// label) both beat values inherited from the parent Border. The progress slider's
-        /// fill and thumb are template-bound to its Foreground, so setting that recolors them.
-        /// </summary>
         private void ApplyPlayerTextColor(bool hasSong)
         {
             if (hasSong)
@@ -535,10 +526,6 @@ namespace musicpresense
             }
         }
 
-        /// <summary>
-        /// Call this from the host application whenever the color theme changes.
-        /// Re-extracts the gradient and re-renders all icons with the new brush.
-        /// </summary>
         public void NotifyThemeChanged()
         {
             if (!Dispatcher.CheckAccess())
@@ -547,24 +534,20 @@ namespace musicpresense
                 return;
             }
 
-            // Bust the gradient cache so it re-extracts and crossfades.
             _lastGradientSourcePath = null;
             ApplyCoverGradientBackground(_hasSong ? _currentCoverPath : null);
 
-            // Re-apply text color in case idle + theme flipped.
             ApplyPlayerTextColor(_hasSong);
 
-            // Re-render all icons with the freshly resolved brush.
             RenderTransportIcons(isPlaying: _isPlaying);
             RenderAuxiliaryIcons();
             RefreshVolumeIcon();
-            RenderSettingsPaneArrowIcon();
+            RenderSettingsPaneArrowIcons();
             RenderHelpButtonIcon();
             RenderFullscreenButtonIcon();
             RefreshAudioQualityButton();
             RefreshAlwaysOnTopButton();
 
-            // Lyrics panel uses theme-aware brushes; rebuild colors.
             if (_lyricsViewActive && _lyricsLines.Count > 0)
                 AdoptLyricsData(new LyricsOverlayManager.LyricsTrackData(_lyricsLines, _lyricsAreTimed));
         }
@@ -573,7 +556,7 @@ namespace musicpresense
         {
             try
             {
-                App.Config.MediaPlayerSettingsPaneOpen = _settingsPaneOpen;
+                App.Config.MediaPlayerSettingsPaneOpen = _panesSwapped ? _playerSettingsPaneOpen : _settingsPaneOpen;
                 App.Config.MediaPlayerInlineLyricsViewActive = _lyricsViewActive;
                 App.Config.MediaPlayerFullscreenActive = _isFullscreen;
                 MusicConfigManager.Save(App.Config);
@@ -595,10 +578,6 @@ namespace musicpresense
                 : trimmed;
         }
 
-        /// <summary>
-        /// Called every poll cycle. Sets the wall-clock anchor so the smooth timer
-        /// can interpolate position between polls regardless of update cycle length.
-        /// </summary>
         public void UpdateProgress(long positionMs, long durationMs)
         {
             if (!Dispatcher.CheckAccess())
@@ -625,10 +604,7 @@ namespace musicpresense
 
             ProgressSlider.Maximum = durationMs;
 
-            // Show skip buttons inline in transport row for songs > 10 minutes
-            var seekVisibility = durationMs > 10 * 60 * 1000L ? Visibility.Visible : Visibility.Collapsed;
-            BtnSeekBack.Visibility = seekVisibility;
-            BtnSeekFwd.Visibility = seekVisibility;
+            RefreshSeekButtonVisibility();
 
             TxtDurationLabel.Text = FormatMs(durationMs);
         }
@@ -646,12 +622,6 @@ namespace musicpresense
             RefreshPositionLabel();
         }
 
-        // ── Connection Info ───────────────────────────────────────────────────
-
-        /// <summary>
-        /// Call this from the host to update connection status.
-        /// statusColor should be the same Color used elsewhere in the app for that state.
-        /// </summary>
         public void SetConnectionStatus(string status, string detail, Color statusColor)
         {
             if (!Dispatcher.CheckAccess())
@@ -660,10 +630,293 @@ namespace musicpresense
                 return;
             }
 
+            bool wasDisconnected = _connectionStatusText.StartsWith("Not connected")
+                                   || _connectionStatusText.StartsWith("Wi-Fi port");
+            bool isConnected = !status.StartsWith("Not connected")
+                               && !status.StartsWith("Wi-Fi port");
+
             _connectionStatusText = status;
             _connectionDetailText = detail;
             _connectionColor = statusColor;
             RefreshConnectionButton();
+
+            // Fire an immediate battery poll the first time a device becomes reachable
+            // so the icon isn't blank until the 2.5-minute timer ticks.
+            if (isConnected && wasDisconnected)
+                _ = PollBatteryAsync();
+        }
+
+        // ── Player settings pane (right side) ────────────────────────────────
+
+        private const double DefaultPlayerSettingsWidth = 280;
+
+        private void ClampPlayerSettingsColumnWidth()
+        {
+            if (!_playerSettingsPaneOpen) return;
+            double available = ActualWidth - 28;
+            if (available <= 0) return;
+            double defaultWidth = _panesSwapped ? DefaultSettingsWidth : DefaultPlayerSettingsWidth;
+            double max = Math.Min(defaultWidth, available * SettingsMaxWidthFraction);
+            if (max <= 0) return;
+            PlayerSettingsColumn.MaxWidth = max;
+            PlayerSettingsColumn.Width = new GridLength(max, GridUnitType.Pixel);
+        }
+
+        private void CollapsePlayerSettingsPane()
+        {
+            _playerSettingsPaneOpen = false;
+            PersistRuntimeState();
+            double fromWidth = PlayerSettingsColumn.Width.IsAbsolute
+                ? PlayerSettingsColumn.Width.Value
+                : DefaultPlayerSettingsWidth;
+
+            BtnCollapsePlayerSettingsPane.IsEnabled = false;
+            BtnShowPlayerSettingsPane.Visibility = Visibility.Collapsed;
+
+            var anim = new GridLengthAnimation
+            {
+                From = new GridLength(fromWidth, GridUnitType.Pixel),
+                To = new GridLength(0, GridUnitType.Pixel),
+                Duration = SettingsPaneAnimDuration,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+            };
+
+            anim.Completed += (_, _) =>
+            {
+                PlayerSettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+                PlayerSettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
+                PlayerSettingsPaneBorder.Visibility = Visibility.Collapsed;
+                PlayerSettingsSplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
+                UpdatePlayerCornerRadius();
+                UpdateGradientClip();
+
+                BtnCollapsePlayerSettingsPane.Visibility = Visibility.Collapsed;
+                BtnShowPlayerSettingsPane.Visibility = Visibility.Visible;
+                BtnShowPlayerSettingsPane.IsEnabled = true;
+            };
+
+            PlayerSettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
+        }
+
+        private void ShowPlayerSettingsPane()
+        {
+            if (PlayerSettingsHost.Content == null)
+            {
+                CollapsePlayerSettingsPane();
+                return;
+            }
+
+            double collapseThreshold = _panesSwapped ? SettingsAutoCollapseThreshold : PlayerSettingsAutoCollapseThreshold;
+            double expandWidth = _panesSwapped ? SettingsAutoExpandWidth : PlayerSettingsAutoExpandWidth;
+            // If the other pane is also open, we need room for both.
+            if (_settingsPaneOpen) expandWidth += _panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth;
+            if (ActualWidth < collapseThreshold || (_settingsPaneOpen && ActualWidth < expandWidth))
+                Width = expandWidth;
+
+            _playerSettingsPaneOpen = true;
+            PersistRuntimeState();
+            Grid.SetColumnSpan(PlayerPaneBorder, 1);
+            PlayerPaneBorder.BorderThickness = new Thickness(1);
+            PlayerSettingsSplitterColumn.Width = new GridLength(8, GridUnitType.Pixel);
+            PlayerSettingsPaneBorder.Visibility = Visibility.Visible;
+            BtnShowPlayerSettingsPane.Visibility = Visibility.Collapsed;
+            BtnCollapsePlayerSettingsPane.Visibility = Visibility.Visible;
+            BtnCollapsePlayerSettingsPane.IsEnabled = false;
+            UpdatePlayerCornerRadius();
+
+            ClampPlayerSettingsColumnWidth();
+            double defaultWidth = _panesSwapped ? DefaultSettingsWidth : DefaultPlayerSettingsWidth;
+            double targetWidth = Math.Min(
+                defaultWidth,
+                PlayerSettingsColumn.MaxWidth > 0 ? PlayerSettingsColumn.MaxWidth : defaultWidth);
+            PlayerSettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
+
+            var anim = new GridLengthAnimation
+            {
+                From = new GridLength(0, GridUnitType.Pixel),
+                To = new GridLength(targetWidth, GridUnitType.Pixel),
+                Duration = SettingsPaneAnimDuration,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+            };
+
+            anim.Completed += (_, _) =>
+            {
+                PlayerSettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+                PlayerSettingsColumn.Width = new GridLength(targetWidth, GridUnitType.Pixel);
+                BtnCollapsePlayerSettingsPane.IsEnabled = true;
+                UpdateGradientClip();
+            };
+
+            PlayerSettingsColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
+        }
+
+        private void BtnCollapsePlayerSettingsPane_Click(object sender, RoutedEventArgs e)
+            => CollapsePlayerSettingsPane();
+
+        private void BtnShowPlayerSettingsPane_Click(object sender, RoutedEventArgs e)
+            => ShowPlayerSettingsPane();
+
+        private void UpdatePlayerCornerRadius()
+        {
+            bool left = _settingsPaneOpen;
+            bool right = _playerSettingsPaneOpen;
+
+            if (!left && !right)
+            {
+                Grid.SetColumnSpan(PlayerPaneBorder, 5);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(12);
+                PlayerPaneBorder.BorderThickness = new Thickness(0);
+            }
+            else if (left && !right)
+            {
+                Grid.SetColumnSpan(PlayerPaneBorder, 1);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(6, 12, 12, 6);
+                PlayerPaneBorder.BorderThickness = new Thickness(1);
+            }
+            else if (!left && right)
+            {
+                Grid.SetColumnSpan(PlayerPaneBorder, 1);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(12, 6, 6, 12);
+                PlayerPaneBorder.BorderThickness = new Thickness(1);
+            }
+            else
+            {
+                Grid.SetColumnSpan(PlayerPaneBorder, 1);
+                PlayerPaneBorder.CornerRadius = new CornerRadius(6);
+                PlayerPaneBorder.BorderThickness = new Thickness(1);
+            }
+        }
+
+        // ── Player settings: apply to live UI ────────────────────────────────
+
+        private void OnPlayerSettingChanged()
+        {
+            ApplyPlayerSettings();
+            RefreshAudioQualityButton();
+            ApplyPaneLayout();
+        }
+
+        public void ApplyPlayerSettings()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ApplyPlayerSettings); return; }
+
+            var c = App.Config;
+
+            TxtTitle.Visibility = c.PlayerShowTitle ? Visibility.Visible : Visibility.Collapsed;
+            TxtArtist.Visibility = c.PlayerShowArtist ? Visibility.Visible : Visibility.Collapsed;
+            TxtAlbum.Visibility = c.PlayerShowAlbum ? Visibility.Visible : Visibility.Collapsed;
+
+            Grid.SetRow(TxtArtist, c.PlayerSwapArtistAlbum ? 3 : 2);
+            Grid.SetRow(TxtAlbum, c.PlayerSwapArtistAlbum ? 2 : 3);
+            TxtArtist.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 10) : new Thickness(0, 0, 0, 2);
+            TxtAlbum.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 0, 10);
+
+            if (CoverBorder.Parent is Viewbox coverVb)
+            {
+                coverVb.Visibility = c.PlayerShowCover ? Visibility.Visible : Visibility.Collapsed;
+                coverVb.Effect = c.PlayerCoverShadow
+                    ? new DropShadowEffect { Color = Colors.Black, BlurRadius = 32, ShadowDepth = 8, Opacity = 0.55, Direction = 315 }
+                    : null;
+            }
+            double coverRadius = c.PlayerCoverRoundedCorners ? 10 : 0;
+            CoverBorder.CornerRadius = new CornerRadius(coverRadius);
+            CoverImageGrid.Clip = coverRadius > 0
+                ? new RectangleGeometry(new Rect(0, 0, 420, 420), coverRadius, coverRadius)
+                : null;
+
+            var textShadow = c.PlayerTextShadow
+                ? new DropShadowEffect { Color = Colors.Black, BlurRadius = 12, ShadowDepth = 1, Opacity = 0.65, Direction = 270 }
+                : null;
+            TxtTitle.Effect = textShadow;
+            TxtArtist.Effect = textShadow;
+            TxtAlbum.Effect = textShadow;
+
+            ApplyPillMode(BtnConnectionInfo, c.PillModeConnection);
+            ApplyPillMode(BtnAudioLink, c.PillModeAudioLink);
+            ApplyPillMode(BtnAudioQuality, c.PillModeQuality);
+            ApplyPillMode(BtnAlwaysOnTop, c.PillModeAlwaysOnTop);
+            BtnConnectionTop.Visibility = c.PillModeConnection == 3 ? Visibility.Visible : Visibility.Collapsed;
+
+            BtnVolume.Visibility = c.PlayerShowVolumeButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnLyrics.Visibility = c.PlayerShowLyricsButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnBattery.Visibility = c.PlayerShowBattery ? Visibility.Visible : Visibility.Collapsed;
+            BtnHelp.Visibility = c.PlayerShowHelpButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnFullscreen.Visibility = c.PlayerShowFullscreenButton ? Visibility.Visible : Visibility.Collapsed;
+
+            RefreshSeekButtonVisibility();
+
+            _lastGradientSourcePath = null;
+            ApplyCoverGradientBackground(_hasSong ? _currentCoverPath : null);
+        }
+
+        private static void ApplyPillMode(Button pill, int mode)
+        {
+            // Mode 3 = Top (connection only): collapse pill, show top icon instead.
+            // The top icon visibility is handled separately in ApplyPlayerSettings.
+            if (mode == 2 || mode == 3) { pill.Visibility = Visibility.Collapsed; return; }
+            pill.Visibility = Visibility.Visible;
+            if (pill.Content is StackPanel sp)
+                foreach (UIElement child in sp.Children)
+                    if (child is TextBlock tb)
+                        tb.Visibility = mode == 1 ? Visibility.Collapsed : Visibility.Visible;
+            // Connection pill mini: only the dot remains — clear text margin and use equal padding so it's circular.
+            if (pill.Name == "BtnConnectionInfo")
+            {
+                pill.Padding = mode == 1 ? new Thickness(8) : new Thickness(10, 4, 10, 4);
+                if (pill.Content is StackPanel csp)
+                    foreach (UIElement child in csp.Children)
+                        if (child is System.Windows.Shapes.Ellipse dot)
+                            dot.Margin = mode == 1 ? new Thickness(0) : new Thickness(0, 0, 5, 0);
+            }
+        }
+
+        // ── Pane side swap ────────────────────────────────────────────────────
+
+        private void ApplyPaneLayout()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ApplyPaneLayout); return; }
+
+            bool swap = App.Config.SwapSettingsLocation;
+            if (swap == _panesSwapped) return;
+
+            // Remember which content types were open before the swap.
+            bool mainWasOpen = _panesSwapped ? _playerSettingsPaneOpen : _settingsPaneOpen;
+            bool playerWasOpen = _panesSwapped ? _settingsPaneOpen : _playerSettingsPaneOpen;
+
+            // Collapse both panes instantly (no animation) to avoid void states.
+            _settingsPaneOpen = false;
+            _playerSettingsPaneOpen = false;
+            SettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
+            PlayerSettingsColumn.Width = new GridLength(0, GridUnitType.Pixel);
+            SplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
+            PlayerSettingsSplitterColumn.Width = new GridLength(0, GridUnitType.Pixel);
+            SettingsPaneBorder.Visibility = Visibility.Collapsed;
+            PlayerSettingsPaneBorder.Visibility = Visibility.Collapsed;
+            BtnCollapseSettingsPane.Visibility = Visibility.Collapsed;
+            BtnCollapsePlayerSettingsPane.Visibility = Visibility.Collapsed;
+            BtnShowSettingsPane.Visibility = Visibility.Visible;
+            BtnShowPlayerSettingsPane.Visibility = Visibility.Visible;
+            Grid.SetColumnSpan(PlayerPaneBorder, 5);
+            UpdatePlayerCornerRadius();
+
+            // Move content to new hosts.
+            var mainContent = MainSettingsHost.Content;
+            MainSettingsHost.Content = null;
+            _panesSwapped = swap;
+            MainSettingsHost.Content = mainContent;
+            (_panesSwapped ? (ContentControl)SettingsHost : PlayerSettingsHost).Content = _playerSettingsPane;
+
+            // Reopen whatever was open before, using the correct column for the new positions.
+            if (mainWasOpen)
+            {
+                if (_panesSwapped) ShowPlayerSettingsPane(); else ShowSettingsPane();
+            }
+            if (playerWasOpen)
+            {
+                if (_panesSwapped) ShowSettingsPane(); else ShowPlayerSettingsPane();
+            }
+
+            RenderSettingsPaneArrowIcons();
         }
     }
 }

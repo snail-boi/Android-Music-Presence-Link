@@ -127,6 +127,8 @@ namespace musicpresense
             {
                 Opacity = _alwaysOnTop ? 0.85 : 0.45
             };
+
+            ApplyPillMode(BtnAlwaysOnTop, App.Config?.PillModeAlwaysOnTop ?? 0);
         }
 
         // ── Connection Info ─────────────────────────────────────────────────────
@@ -141,6 +143,37 @@ namespace musicpresense
         {
             ConnectionDot.Fill = new SolidColorBrush(_connectionColor);
             BtnConnectionInfo.BorderBrush = new SolidColorBrush(_connectionColor) { Opacity = 0.7 };
+            RenderConnectionTopIcon();
+        }
+
+        private void RenderConnectionTopIcon()
+        {
+            if (BtnConnectionTop == null) return;
+            var brush = new SolidColorBrush(_connectionColor);
+
+            Viewbox icon;
+            string status = _connectionStatusText ?? "";
+            if (status.StartsWith("USB"))
+                icon = BuildUsbIcon(brush, 36);
+            else if (status.StartsWith("TCP"))
+                icon = BuildTcpIcon(brush, 36);
+            else if (status.StartsWith("Wireless"))
+                icon = BuildWdIcon(brush, 36);
+            else if (status.StartsWith("Wi-Fi port"))
+                icon = BuildPortLostIcon(brush, 36);
+            else
+                icon = BuildNoConnectionIcon(brush, 36);
+
+            BtnConnectionTop.Content = icon;
+            BtnConnectionTop.ToolTip = $"Connection: {status}";
+        }
+
+        private void BtnConnectionTop_Click(object sender, RoutedEventArgs e)
+        {
+            TxtConnectionStatus.Text = _connectionStatusText;
+            TxtConnectionDetail.Text = _connectionDetailText;
+            ConnectionInfoPopup.PlacementTarget = BtnConnectionTop;
+            ConnectionInfoPopup.IsOpen = !ConnectionInfoPopup.IsOpen;
         }
 
         // ── Help / What's this? ───────────────────────────────────────────────
@@ -164,12 +197,21 @@ namespace musicpresense
             BtnSeekBack.Content = BuildSeekIcon(brush, -30, 30);
             BtnSeekFwd.Content = BuildSeekIcon(brush, 30, 30);
         }
-        private void RenderSettingsPaneArrowIcon()
+        private void RenderSettingsPaneArrowIcons()
         {
             var iconBrush = TryFindResource("ThemeControlForegroundBrush") as Brush ?? Brushes.White;
-            BtnShowSettingsPane.Content = BuildRevealSettingsArrowIcon(iconBrush);
+            bool swap = App.Config?.SwapSettingsLocation ?? false;
+
+            // Left pane: open arrow points right normally, left when swapped (player settings live here).
+            BtnShowSettingsPane.Content = swap ? BuildCollapseSettingsArrowIcon(iconBrush) : BuildRevealSettingsArrowIcon(iconBrush);
             if (BtnCollapseSettingsPane != null)
-                BtnCollapseSettingsPane.Content = BuildCollapseSettingsArrowIcon(iconBrush);
+                BtnCollapseSettingsPane.Content = swap ? BuildRevealSettingsArrowIcon(iconBrush) : BuildCollapseSettingsArrowIcon(iconBrush);
+
+            // Right pane: open arrow points left normally, right when swapped (main settings live here).
+            if (BtnShowPlayerSettingsPane != null)
+                BtnShowPlayerSettingsPane.Content = swap ? BuildRevealSettingsArrowIcon(iconBrush) : BuildCollapseSettingsArrowIcon(iconBrush);
+            if (BtnCollapsePlayerSettingsPane != null)
+                BtnCollapsePlayerSettingsPane.Content = swap ? BuildCollapseSettingsArrowIcon(iconBrush) : BuildRevealSettingsArrowIcon(iconBrush);
         }
         private void RenderTransportIcons(bool isPlaying)
         {

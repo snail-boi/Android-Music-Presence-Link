@@ -105,8 +105,9 @@ namespace musicpresense
             }
             else
             {
-                var colors = ExtractGradientColors(imagePath);
-                newBrush = BuildFourToneCornerBrush(colors.topLeft, colors.topRight, colors.bottomLeft, colors.bottomRight);
+                int samplePoints = App.Config?.PlayerGradientSamplePoints ?? 8;
+                var colors = ExtractGradientColors(imagePath, samplePoints);
+                newBrush = BuildGradientBrush(colors, samplePoints);
             }
 
             // First call (initial paint): fill layer A immediately, no fade.
@@ -140,6 +141,42 @@ namespace musicpresense
 
             _useLayerA = !_useLayerA;
         }
+        private static Brush BuildGradientBrush(
+            (Color topLeft, Color topRight, Color bottomLeft, Color bottomRight,
+             Color top, Color bottom, Color left, Color right) c,
+            int samplePoints)
+        {
+            if (samplePoints == 2)
+                return BuildFourToneCornerBrush(c.topLeft, c.topLeft, c.bottomRight, c.bottomRight);
+            if (samplePoints == 4)
+                return BuildFourToneCornerBrush(c.topLeft, c.topRight, c.bottomLeft, c.bottomRight);
+
+            // 6 or 8: 3x3 bitmap so edge-centre samples blend smoothly.
+            Color centre = Color.FromRgb(
+                (byte)((c.topLeft.R + c.topRight.R + c.bottomLeft.R + c.bottomRight.R) / 4),
+                (byte)((c.topLeft.G + c.topRight.G + c.bottomLeft.G + c.bottomRight.G) / 4),
+                (byte)((c.topLeft.B + c.topRight.B + c.bottomLeft.B + c.bottomRight.B) / 4));
+
+            Color[] grid =
+            {
+                c.topLeft,    c.top,    c.topRight,
+                c.left,       centre,   c.right,
+                c.bottomLeft, c.bottom, c.bottomRight,
+            };
+
+            var bmp = new WriteableBitmap(3, 3, 96, 96, PixelFormats.Bgra32, null);
+            var px = new byte[3 * 3 * 4];
+            for (int i = 0; i < grid.Length; i++)
+            {
+                px[i * 4 + 0] = grid[i].B; px[i * 4 + 1] = grid[i].G;
+                px[i * 4 + 2] = grid[i].R; px[i * 4 + 3] = 255;
+            }
+            bmp.WritePixels(new Int32Rect(0, 0, 3, 3), px, 3 * 4, 0);
+            bmp.Freeze();
+            var brush = new ImageBrush(bmp) { Stretch = Stretch.Fill };
+            brush.Freeze();
+            return brush;
+        }
         private static Brush BuildFourToneCornerBrush(Color topLeft, Color topRight, Color bottomLeft, Color bottomRight)
         {
             var bitmap = new WriteableBitmap(2, 2, 96, 96, PixelFormats.Bgra32, null);
@@ -163,10 +200,16 @@ namespace musicpresense
             brush.Freeze();
             return brush;
         }
-        private static (Color topLeft, Color topRight, Color bottomLeft, Color bottomRight) ExtractGradientColors(string? imagePath)
+        private static (Color topLeft, Color topRight, Color bottomLeft, Color bottomRight,
+                        Color top, Color bottom, Color left, Color right)
+            ExtractGradientColors(string? imagePath, int samplePoints = 8)
         {
+            var tl0 = DefaultTopLeft; var tr0 = DefaultTopRight;
+            var bl0 = DefaultBottomLeft; var br0 = DefaultBottomRight;
+            var fallback = (tl0, tr0, bl0, br0, tl0, bl0, tl0, tr0);
+
             if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
-                return (DefaultTopLeft, DefaultTopRight, DefaultBottomLeft, DefaultBottomRight);
+                return fallback;
 
             try
             {
@@ -184,85 +227,79 @@ namespace musicpresense
 
                 int width = formatted.PixelWidth;
                 int height = formatted.PixelHeight;
-                if (width <= 0 || height <= 0)
-                    return (DefaultTopLeft, DefaultTopRight, DefaultBottomLeft, DefaultBottomRight);
+                if (width <= 0 || height <= 0) return fallback;
 
                 int stride = width * 4;
                 var pixels = new byte[stride * height];
                 formatted.CopyPixels(pixels, stride, 0);
 
-                long tlR = 0, tlG = 0, tlB = 0, tlCount = 0;
-                long trR = 0, trG = 0, trB = 0, trCount = 0;
-                long blR = 0, blG = 0, blB = 0, blCount = 0;
-                long brR = 0, brG = 0, brB = 0, brCount = 0;
+                long tlR = 0, tlG = 0, tlB = 0, tlN = 0, trR = 0, trG = 0, trB = 0, trN = 0;
+                long blR = 0, blG = 0, blB = 0, blN = 0, brR = 0, brG = 0, brB = 0, brN = 0;
+                long tR = 0, tG = 0, tB = 0, tN = 0, boR = 0, boG = 0, boB = 0, boN = 0;
+                long lR = 0, lG = 0, lB = 0, lN = 0, rR = 0, rG = 0, rB = 0, rN = 0;
+
+                int hw = width / 2, hh = height / 2;
+                int cx0 = width / 4, cx1 = 3 * width / 4;
+                int cy0 = height / 4, cy1 = 3 * height / 4;
 
                 for (int y = 0; y < height; y++)
                 {
                     int rowStart = y * stride;
-                    bool isTop = y < (height / 2);
+                    bool isTop = y < hh;
 
                     for (int x = 0; x < width; x++)
                     {
                         int i = rowStart + (x * 4);
-                        byte b = pixels[i];
-                        byte g = pixels[i + 1];
-                        byte r = pixels[i + 2];
-                        byte a = pixels[i + 3];
+                        byte b = pixels[i]; byte g = pixels[i + 1]; byte r = pixels[i + 2]; byte a = pixels[i + 3];
 
-                        if (a < 24)
-                            continue;
-
+                        if (a < 24) continue;
                         int max = Math.Max(r, Math.Max(g, b));
                         int min = Math.Min(r, Math.Min(g, b));
-                        int saturation = max - min;
+                        if (max < 20 || (max - min) < 8) continue;
 
-                        if (max < 20 || saturation < 8)
-                            continue;
+                        bool isLeft = x < hw;
+                        if (isTop && isLeft) { tlR += r; tlG += g; tlB += b; tlN++; }
+                        else if (isTop) { trR += r; trG += g; trB += b; trN++; }
+                        else if (isLeft) { blR += r; blG += g; blB += b; blN++; }
+                        else { brR += r; brG += g; brB += b; brN++; }
 
-                        bool isLeft = x < (width / 2);
-                        if (isTop && isLeft)
+                        if (samplePoints >= 6)
                         {
-                            tlR += r; tlG += g; tlB += b; tlCount++;
+                            if (y < hh / 2 && x >= cx0 && x < cx1) { tR += r; tG += g; tB += b; tN++; }
+                            if (y >= height - hh / 2 && x >= cx0 && x < cx1) { boR += r; boG += g; boB += b; boN++; }
                         }
-                        else if (isTop)
+                        if (samplePoints == 8)
                         {
-                            trR += r; trG += g; trB += b; trCount++;
-                        }
-                        else if (isLeft)
-                        {
-                            blR += r; blG += g; blB += b; blCount++;
-                        }
-                        else
-                        {
-                            brR += r; brG += g; brB += b; brCount++;
+                            if (x < hw / 2 && y >= cy0 && y < cy1) { lR += r; lG += g; lB += b; lN++; }
+                            if (x >= width - hw / 2 && y >= cy0 && y < cy1) { rR += r; rG += g; rB += b; rN++; }
                         }
                     }
                 }
 
-                if (tlCount == 0 && trCount == 0 && blCount == 0 && brCount == 0)
-                    return (DefaultTopLeft, DefaultTopRight, DefaultBottomLeft, DefaultBottomRight);
+                if (tlN == 0 && trN == 0 && blN == 0 && brN == 0) return fallback;
 
-                Color Avg(long r, long g, long b, long count, Color fallback)
-                {
-                    if (count <= 0) return fallback;
-                    return Color.FromRgb((byte)(r / count), (byte)(g / count), (byte)(b / count));
-                }
+                Color Avg(long r, long g, long b, long n, Color fb)
+                    => n <= 0 ? fb : Color.FromRgb((byte)(r / n), (byte)(g / n), (byte)(b / n));
 
-                var tl = Avg(tlR, tlG, tlB, tlCount, DefaultTopLeft);
-                var tr = Avg(trR, trG, trB, trCount, DefaultTopRight);
-                var bl = Avg(blR, blG, blB, blCount, DefaultBottomLeft);
-                var br = Avg(brR, brG, brB, brCount, DefaultBottomRight);
+                var tl = Avg(tlR, tlG, tlB, tlN, DefaultTopLeft);
+                var tr = Avg(trR, trG, trB, trN, DefaultTopRight);
+                var bl = Avg(blR, blG, blB, blN, DefaultBottomLeft);
+                var br = Avg(brR, brG, brB, brN, DefaultBottomRight);
+                var tc = Avg(tR, tG, tB, tN, Color.FromRgb((byte)((tl.R + tr.R) / 2), (byte)((tl.G + tr.G) / 2), (byte)((tl.B + tr.B) / 2)));
+                var bc = Avg(boR, boG, boB, boN, Color.FromRgb((byte)((bl.R + br.R) / 2), (byte)((bl.G + br.G) / 2), (byte)((bl.B + br.B) / 2)));
+                var lc = Avg(lR, lG, lB, lN, Color.FromRgb((byte)((tl.R + bl.R) / 2), (byte)((tl.G + bl.G) / 2), (byte)((tl.B + bl.B) / 2)));
+                var rc = Avg(rR, rG, rB, rN, Color.FromRgb((byte)((tr.R + br.R) / 2), (byte)((tr.G + br.G) / 2), (byte)((tr.B + br.B) / 2)));
 
                 tl = BlendWith(tl, Color.FromRgb(255, 255, 255), 0.06);
                 tr = BlendWith(tr, Color.FromRgb(255, 255, 255), 0.06);
                 bl = BlendWith(bl, Color.FromRgb(0, 0, 0), 0.25);
                 br = BlendWith(br, Color.FromRgb(0, 0, 0), 0.25);
 
-                return (tl, tr, bl, br);
+                return (tl, tr, bl, br, tc, bc, lc, rc);
             }
             catch
             {
-                return (DefaultTopLeft, DefaultTopRight, DefaultBottomLeft, DefaultBottomRight);
+                return fallback;
             }
         }
         private static Color BlendWith(Color source, Color mix, double ratio)
