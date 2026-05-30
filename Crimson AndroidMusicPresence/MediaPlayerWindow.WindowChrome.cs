@@ -152,15 +152,15 @@ namespace musicpresense
             Viewbox icon;
             string status = _connectionStatusText ?? "";
             if (status.StartsWith("USB"))
-                icon = BuildUsbIcon(brush, 28);
+                icon = BuildUsbIcon(brush, 36);
             else if (status.StartsWith("TCP"))
-                icon = BuildTcpIcon(brush, 28);
+                icon = BuildTcpIcon(brush, 36);
             else if (status.StartsWith("Wireless"))
-                icon = BuildWdIcon(brush, 28);
+                icon = BuildWdIcon(brush, 36);
             else if (status.StartsWith("Wi-Fi port"))
-                icon = BuildPortLostIcon(brush, 28);
+                icon = BuildPortLostIcon(brush, 36);
             else
-                icon = BuildNoConnectionIcon(brush, 28);
+                icon = BuildNoConnectionIcon(brush, 36);
 
             BtnConnectionTop.Content = icon;
             BtnConnectionTop.ToolTip = $"Connection: {status}";

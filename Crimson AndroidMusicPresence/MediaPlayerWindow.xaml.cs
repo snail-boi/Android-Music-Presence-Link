@@ -795,6 +795,8 @@ namespace musicpresense
 
             Grid.SetRow(TxtArtist, c.PlayerSwapArtistAlbum ? 3 : 2);
             Grid.SetRow(TxtAlbum, c.PlayerSwapArtistAlbum ? 2 : 3);
+            TxtArtist.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 10) : new Thickness(0, 0, 0, 2);
+            TxtAlbum.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 0, 10);
 
             if (CoverBorder.Parent is Viewbox coverVb)
                 coverVb.Visibility = c.PlayerShowCover ? Visibility.Visible : Visibility.Collapsed;

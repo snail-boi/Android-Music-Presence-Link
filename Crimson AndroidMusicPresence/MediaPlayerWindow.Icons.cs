@@ -659,37 +659,60 @@ namespace musicpresense
 
         // ── Connection top-mode icons ─────────────────────────────────────────
 
-        private static Viewbox BuildUsbIcon(Brush brush, double size = 28)
+        private static Viewbox BuildUsbIcon(Brush brush, double size = 36)
         {
-            // Canvas: 24 wide × 28 tall. Icon in top ~18px, label in bottom 8px.
-            const double W = 24, H = 28, cx = 12, iconTop = 1;
+            // USB trident built from SVG path (viewBox 475x228 scaled to ~28x13.5)
+            const double W = 32, H = 30, s = 0.059, ox = 1.5, oy = 1;
             var canvas = new Canvas { Width = W, Height = H };
-            // Vertical stem
-            canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx, Y1 = iconTop, X2 = cx, Y2 = iconTop + 13, Stroke = brush, StrokeThickness = 1.8, StrokeEndLineCap = PenLineCap.Round, StrokeStartLineCap = PenLineCap.Round });
-            // Left prong
-            canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx, Y1 = iconTop + 3, X2 = cx - 4, Y2 = iconTop + 3, Stroke = brush, StrokeThickness = 1.5, StrokeEndLineCap = PenLineCap.Round });
-            canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx - 4, Y1 = iconTop + 3, X2 = cx - 4, Y2 = iconTop + 6, Stroke = brush, StrokeThickness = 1.5, StrokeEndLineCap = PenLineCap.Round });
-            // Right prong
-            canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx, Y1 = iconTop + 5, X2 = cx + 4, Y2 = iconTop + 5, Stroke = brush, StrokeThickness = 1.5, StrokeEndLineCap = PenLineCap.Round });
-            canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx + 4, Y1 = iconTop + 5, X2 = cx + 4, Y2 = iconTop + 8, Stroke = brush, StrokeThickness = 1.5, StrokeEndLineCap = PenLineCap.Round });
-            // Square on right prong
-            var sq = new System.Windows.Shapes.Rectangle { Width = 3, Height = 3, Fill = brush, RadiusX = 0.5, RadiusY = 0.5 };
-            canvas.Children.Add(sq); Canvas.SetLeft(sq, cx + 2.5); Canvas.SetTop(sq, iconTop + 7.5);
-            // Circle on left prong
-            var dot = new System.Windows.Shapes.Ellipse { Width = 3, Height = 3, Fill = brush };
-            canvas.Children.Add(dot); Canvas.SetLeft(dot, cx - 5.5); Canvas.SetTop(dot, iconTop + 5.5);
-            // Plug connector at bottom of stem
-            var plug = new System.Windows.Shapes.Rectangle { Width = 8, Height = 4, Fill = brush, RadiusX = 1, RadiusY = 1 };
-            canvas.Children.Add(plug); Canvas.SetLeft(plug, cx - 4); Canvas.SetTop(plug, iconTop + 13);
-            // Centered "USB" label
-            var tb = new TextBlock { Text = "USB", FontSize = 6, Foreground = brush, FontWeight = FontWeights.SemiBold, Width = W, TextAlignment = TextAlignment.Center };
-            canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 21);
+            var path = new System.Windows.Shapes.Path { Fill = brush };
+            var pg = new PathGeometry();
+            pg.FillRule = FillRule.Nonzero;
+            var fig = new PathFigure { StartPoint = new Point(462.836 * s + ox, 114.054 * s + oy), IsClosed = true, IsFilled = true };
+            fig.Segments.Add(new LineSegment(new Point(412.799 * s + ox, 85.158 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(412.799 * s + ox, 105.771 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(157.046 * s + ox, 105.771 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(206.844 * s + ox, 53.159 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(211.082 * s + ox, 49.762 * s + oy), new Point(216.627 * s + ox, 47.379 * s + oy), new Point(222.331 * s + ox, 47.247 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(264.153 * s + ox, 47.231 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(267.572 * s + ox, 56.972 * s + oy), new Point(276.756 * s + ox, 64.003 * s + oy), new Point(287.674 * s + ox, 64.003 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(301.486 * s + ox, 64.003 * s + oy), new Point(312.695 * s + ox, 52.795 * s + oy), new Point(312.695 * s + ox, 38.978 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(312.695 * s + ox, 25.155 * s + oy), new Point(301.487 * s + ox, 13.951 * s + oy), new Point(287.674 * s + ox, 13.951 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(276.756 * s + ox, 13.951 * s + oy), new Point(267.572 * s + ox, 20.978 * s + oy), new Point(264.153 * s + ox, 30.711 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(222.821 * s + ox, 30.704 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(211.619 * s + ox, 30.704 * s + oy), new Point(199.881 * s + ox, 36.85 * s + oy), new Point(192.41 * s + ox, 44.055 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(139.564 * s + ox, 99.873 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(135.335 * s + ox, 103.265 * s + oy), new Point(129.793 * s + ox, 105.633 * s + oy), new Point(124.093 * s + ox, 105.769 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(95.161 * s + ox, 105.769 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(91.326 * s + ox, 86.656 * s + oy), new Point(74.448 * s + ox, 72.256 * s + oy), new Point(54.202 * s + ox, 72.256 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(31.119 * s + ox, 72.256 * s + oy), new Point(12.408 * s + ox, 90.967 * s + oy), new Point(12.408 * s + ox, 114.043 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(12.408 * s + ox, 137.126 * s + oy), new Point(31.119 * s + ox, 155.838 * s + oy), new Point(54.202 * s + ox, 155.838 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(74.452 * s + ox, 155.838 * s + oy), new Point(91.33 * s + ox, 141.426 * s + oy), new Point(95.165 * s + ox, 122.297 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(186.681 * s + ox, 122.297 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(192.37 * s + ox, 122.442 * s + oy), new Point(197.905 * s + ox, 124.813 * s + oy), new Point(202.13 * s + ox, 128.209 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(254.957 * s + ox, 184.021 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(262.432 * s + ox, 191.229 * s + oy), new Point(274.175 * s + ox, 197.371 * s + oy), new Point(285.379 * s + ox, 197.371 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(325.211 * s + ox, 197.362 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(325.211 * s + ox, 214.139 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(375.261 * s + ox, 214.139 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(375.261 * s + ox, 164.094 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(325.211 * s + ox, 164.094 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(325.211 * s + ox, 180.849 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(284.891 * s + ox, 180.830 * s + oy), true));
+            fig.Segments.Add(new BezierSegment(new Point(279.186 * s + ox, 180.699 * s + oy), new Point(273.635 * s + ox, 178.319 * s + oy), new Point(269.399 * s + ox, 174.922 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(219.59 * s + ox, 122.3 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(412.799 * s + ox, 122.3 * s + oy), true));
+            fig.Segments.Add(new LineSegment(new Point(412.799 * s + ox, 142.946 * s + oy), true));
+            pg.Figures.Add(fig);
+            path.Data = pg;
+            canvas.Children.Add(path);
+            var tb = new TextBlock { Text = "USB", FontSize = 9.5, Foreground = brush, FontWeight = FontWeights.SemiBold, Width = W, TextAlignment = TextAlignment.Center };
+            canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 16);
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
         private static void AddWifiWaves(Canvas canvas, Brush brush, double cx, double baseY, bool slashed = false)
         {
-            double[] radii = { 3.5, 6.5, 9.5 };
+            double[] radii = { 5, 9, 13 };
             for (int i = 0; i < radii.Length; i++)
             {
                 double r = radii[i];
@@ -703,58 +726,59 @@ namespace musicpresense
                 fig.Segments.Add(new ArcSegment(new Point(x2, y2), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
                 var geo = new PathGeometry();
                 geo.Figures.Add(fig);
-                canvas.Children.Add(new System.Windows.Shapes.Path { Data = geo, Stroke = brush, StrokeThickness = 1.8, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, Fill = Brushes.Transparent });
+                canvas.Children.Add(new System.Windows.Shapes.Path { Data = geo, Stroke = brush, StrokeThickness = 2.2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, Fill = Brushes.Transparent });
             }
-            var wdot = new System.Windows.Shapes.Ellipse { Width = 3, Height = 3, Fill = brush };
-            canvas.Children.Add(wdot); Canvas.SetLeft(wdot, cx - 1.5); Canvas.SetTop(wdot, baseY + 1);
+            // Dot sits at the arc origin point
+            var wdot = new System.Windows.Shapes.Ellipse { Width = 4, Height = 4, Fill = brush };
+            canvas.Children.Add(wdot); Canvas.SetLeft(wdot, cx - 2); Canvas.SetTop(wdot, baseY - 1);
             if (slashed)
-                canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx - 8, Y1 = baseY + 9, X2 = cx + 8, Y2 = baseY - 9, Stroke = brush, StrokeThickness = 1.8, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, Opacity = 0.9 });
+                canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx - 13, Y1 = baseY + 12, X2 = cx + 13, Y2 = baseY - 12, Stroke = brush, StrokeThickness = 2.2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, Opacity = 0.9 });
         }
 
-        private static Viewbox BuildTcpIcon(Brush brush, double size = 28)
+        private static Viewbox BuildTcpIcon(Brush brush, double size = 36)
         {
-            const double W = 24, H = 28;
+            const double W = 32, H = 36, cx = W / 2;
             var canvas = new Canvas { Width = W, Height = H };
-            AddWifiWaves(canvas, brush, cx: W / 2, baseY: 4);
-            var tb = new TextBlock { Text = "TCP", FontSize = 6, Foreground = brush, FontWeight = FontWeights.SemiBold, Width = W, TextAlignment = TextAlignment.Center };
-            canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 21);
+            AddWifiWaves(canvas, brush, cx: cx, baseY: 14);
+            var tb = new TextBlock { Text = "TCP", FontSize = 8.5, Foreground = brush, FontWeight = FontWeights.SemiBold, Width = W, TextAlignment = TextAlignment.Center };
+            canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 22);
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
-        private static Viewbox BuildWdIcon(Brush brush, double size = 28)
+        private static Viewbox BuildWdIcon(Brush brush, double size = 36)
         {
-            const double W = 24, H = 28;
+            const double W = 32, H = 36, cx = W / 2;
             var canvas = new Canvas { Width = W, Height = H };
-            AddWifiWaves(canvas, brush, cx: W / 2, baseY: 4);
-            var tb = new TextBlock { Text = "WD", FontSize = 6, Foreground = brush, FontWeight = FontWeights.SemiBold, Width = W, TextAlignment = TextAlignment.Center };
-            canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 21);
+            AddWifiWaves(canvas, brush, cx: cx, baseY: 14);
+            var tb = new TextBlock { Text = "WD", FontSize = 8.5, Foreground = brush, FontWeight = FontWeights.SemiBold, Width = W, TextAlignment = TextAlignment.Center };
+            canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 22);
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
-        private static Viewbox BuildPortLostIcon(Brush brush, double size = 28)
+        private static Viewbox BuildPortLostIcon(Brush brush, double size = 36)
         {
-            const double W = 24, H = 28;
+            const double W = 32, H = 36, cx = W / 2;
             var canvas = new Canvas { Width = W, Height = H };
-            AddWifiWaves(canvas, brush, cx: W / 2, baseY: 4, slashed: true);
-            var tb = new TextBlock { Text = "TCP", FontSize = 6, Foreground = brush, FontWeight = FontWeights.SemiBold, Opacity = 0.7, Width = W, TextAlignment = TextAlignment.Center };
-            canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 21);
+            AddWifiWaves(canvas, brush, cx: cx, baseY: 14, slashed: true);
+            var tb = new TextBlock { Text = "TCP", FontSize = 8.5, Foreground = brush, FontWeight = FontWeights.SemiBold, Opacity = 0.7, Width = W, TextAlignment = TextAlignment.Center };
+            canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 22);
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
-        private static Viewbox BuildNoConnectionIcon(Brush brush, double size = 28)
+        private static Viewbox BuildNoConnectionIcon(Brush brush, double size = 36)
         {
-            const double W = 24, H = 28, cx = 12;
+            const double W = 32, H = 36, cx = W / 2;
             var canvas = new Canvas { Width = W, Height = H };
             var tri = new PathFigure { StartPoint = new Point(cx, 2) };
-            tri.Segments.Add(new LineSegment(new Point(cx + 8, 17), true));
-            tri.Segments.Add(new LineSegment(new Point(cx - 8, 17), true));
+            tri.Segments.Add(new LineSegment(new Point(cx + 12, 24), true));
+            tri.Segments.Add(new LineSegment(new Point(cx - 12, 24), true));
             tri.Segments.Add(new LineSegment(new Point(cx, 2), true));
             var triGeo = new PathGeometry();
             triGeo.Figures.Add(tri);
-            canvas.Children.Add(new System.Windows.Shapes.Path { Data = triGeo, Stroke = brush, StrokeThickness = 1.6, StrokeLineJoin = PenLineJoin.Round, Fill = Brushes.Transparent });
-            canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx, Y1 = 7, X2 = cx, Y2 = 12, Stroke = brush, StrokeThickness = 1.6, StrokeEndLineCap = PenLineCap.Round, StrokeStartLineCap = PenLineCap.Round });
-            var excDot = new System.Windows.Shapes.Ellipse { Width = 1.8, Height = 1.8, Fill = brush };
-            canvas.Children.Add(excDot); Canvas.SetLeft(excDot, cx - 0.9); Canvas.SetTop(excDot, 13.5);
+            canvas.Children.Add(new System.Windows.Shapes.Path { Data = triGeo, Stroke = brush, StrokeThickness = 2, StrokeLineJoin = PenLineJoin.Round, Fill = Brushes.Transparent });
+            canvas.Children.Add(new System.Windows.Shapes.Line { X1 = cx, Y1 = 10, X2 = cx, Y2 = 17, Stroke = brush, StrokeThickness = 2, StrokeEndLineCap = PenLineCap.Round, StrokeStartLineCap = PenLineCap.Round });
+            var excDot = new System.Windows.Shapes.Ellipse { Width = 2.5, Height = 2.5, Fill = brush };
+            canvas.Children.Add(excDot); Canvas.SetLeft(excDot, cx - 1.25); Canvas.SetTop(excDot, 19);
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
