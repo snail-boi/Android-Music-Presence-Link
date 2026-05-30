@@ -131,6 +131,10 @@ namespace musicpresense
         // Persisted time-display toggle: false = elapsed, true = remaining.
         public bool PlayerShowTimeLeft { get; set; } = false;
 
+        // Shadow effects
+        public bool PlayerCoverShadow { get; set; } = false;
+        public bool PlayerTextShadow { get; set; } = false;
+
         // Layout
         public bool PlayerSwapArtistAlbum { get; set; } = false;
         public bool PlayerCoverRoundedCorners { get; set; } = true;

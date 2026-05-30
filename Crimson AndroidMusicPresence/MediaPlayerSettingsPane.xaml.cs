@@ -43,6 +43,8 @@ namespace musicpresense
                 // Cover
                 ChkShowCover.IsChecked = c.PlayerShowCover;
                 ChkCoverRounded.IsChecked = c.PlayerCoverRoundedCorners;
+                ChkCoverShadow.IsChecked = c.PlayerCoverShadow;
+                ChkTextShadow.IsChecked = c.PlayerTextShadow;
                 UpdateGradientButtons(c.PlayerGradientSamplePoints);
 
                 // Controls
@@ -161,6 +163,8 @@ namespace musicpresense
         private void ChkSwapArtistAlbum_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerSwapArtistAlbum = ChkSwapArtistAlbum.IsChecked == true; SaveAndNotify(); } }
         private void ChkShowCover_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowCover = ChkShowCover.IsChecked == true; SaveAndNotify(); } }
         private void ChkCoverRounded_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerCoverRoundedCorners = ChkCoverRounded.IsChecked == true; SaveAndNotify(); } }
+        private void ChkCoverShadow_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerCoverShadow = ChkCoverShadow.IsChecked == true; SaveAndNotify(); } }
+        private void ChkTextShadow_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerTextShadow = ChkTextShadow.IsChecked == true; SaveAndNotify(); } }
         private void ChkShowVolume_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowVolumeButton = ChkShowVolume.IsChecked == true; SaveAndNotify(); } }
         private void ChkShowLyrics_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowLyricsButton = ChkShowLyrics.IsChecked == true; SaveAndNotify(); } }
         private void ChkShowBattery_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowBattery = ChkShowBattery.IsChecked == true; SaveAndNotify(); } }

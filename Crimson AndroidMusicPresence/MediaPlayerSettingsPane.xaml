@@ -288,6 +288,32 @@
                           Unchecked="ChkCoverRounded_Changed" />
             </Grid>
 
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Cover shadow" Style="{StaticResource RowLabel}" />
+                <CheckBox x:Name="ChkCoverShadow"
+                          Grid.Column="1"
+                          Style="{StaticResource ToggleSwitchStyle}"
+                          Checked="ChkCoverShadow_Changed"
+                          Unchecked="ChkCoverShadow_Changed" />
+            </Grid>
+
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Text shadow" Style="{StaticResource RowLabel}" />
+                <CheckBox x:Name="ChkTextShadow"
+                          Grid.Column="1"
+                          Style="{StaticResource ToggleSwitchStyle}"
+                          Checked="ChkTextShadow_Changed"
+                          Unchecked="ChkTextShadow_Changed" />
+            </Grid>
+
             <!-- Gradient amount segmented control -->
             <Grid Margin="0,0,0,20">
                 <Grid.ColumnDefinitions>

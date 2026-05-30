@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
@@ -811,12 +812,24 @@ namespace musicpresense
             TxtAlbum.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 0, 10);
 
             if (CoverBorder.Parent is Viewbox coverVb)
+            {
                 coverVb.Visibility = c.PlayerShowCover ? Visibility.Visible : Visibility.Collapsed;
+                coverVb.Effect = c.PlayerCoverShadow
+                    ? new DropShadowEffect { Color = Colors.Black, BlurRadius = 32, ShadowDepth = 8, Opacity = 0.55, Direction = 315 }
+                    : null;
+            }
             double coverRadius = c.PlayerCoverRoundedCorners ? 10 : 0;
             CoverBorder.CornerRadius = new CornerRadius(coverRadius);
             CoverImageGrid.Clip = coverRadius > 0
                 ? new RectangleGeometry(new Rect(0, 0, 420, 420), coverRadius, coverRadius)
                 : null;
+
+            var textShadow = c.PlayerTextShadow
+                ? new DropShadowEffect { Color = Colors.Black, BlurRadius = 12, ShadowDepth = 1, Opacity = 0.65, Direction = 270 }
+                : null;
+            TxtTitle.Effect = textShadow;
+            TxtArtist.Effect = textShadow;
+            TxtAlbum.Effect = textShadow;
 
             ApplyPillMode(BtnConnectionInfo, c.PillModeConnection);
             ApplyPillMode(BtnAudioLink, c.PillModeAudioLink);
