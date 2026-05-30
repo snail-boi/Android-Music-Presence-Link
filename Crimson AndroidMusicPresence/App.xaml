@@ -25,7 +25,7 @@
                             <Border x:Name="Track"
                                     Width="40" Height="22"
                                     CornerRadius="11"
-                                    Background="#E53935">
+                                    Background="#606060">
                                 <!-- Thumb -->
                                 <Grid>
                                     <Ellipse x:Name="Thumb"
@@ -71,7 +71,7 @@
                                         <Storyboard>
                                             <ColorAnimation Storyboard.TargetName="Track"
                                                             Storyboard.TargetProperty="Background.Color"
-                                                            To="#E53935"
+                                                            To="#606060"
                                                             Duration="0:0:0.15" />
                                             <DoubleAnimation Storyboard.TargetName="ThumbTranslate"
                                                              Storyboard.TargetProperty="X"
