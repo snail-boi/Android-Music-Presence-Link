@@ -103,6 +103,8 @@ namespace musicpresense
 
                 if (level > 100) level = 100;
 
+                Debugger.show($"[BATTERY] level={level}% status={status} ac={acPowered} charging={charging}");
+
                 Dispatcher.Invoke(() =>
                 {
                     _batteryLevel = level;

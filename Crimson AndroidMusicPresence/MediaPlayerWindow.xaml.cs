@@ -628,10 +628,20 @@ namespace musicpresense
                 return;
             }
 
+            bool wasDisconnected = _connectionStatusText.StartsWith("Not connected")
+                                   || _connectionStatusText.StartsWith("Wi-Fi port");
+            bool isConnected = !status.StartsWith("Not connected")
+                               && !status.StartsWith("Wi-Fi port");
+
             _connectionStatusText = status;
             _connectionDetailText = detail;
             _connectionColor = statusColor;
             RefreshConnectionButton();
+
+            // Fire an immediate battery poll the first time a device becomes reachable
+            // so the icon isn't blank until the 2.5-minute timer ticks.
+            if (isConnected && wasDisconnected)
+                _ = PollBatteryAsync();
         }
 
         // ── Player settings pane (right side) ────────────────────────────────
