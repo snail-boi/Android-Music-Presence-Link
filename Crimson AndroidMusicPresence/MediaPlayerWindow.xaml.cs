@@ -336,6 +336,9 @@ namespace musicpresense
             if (_lyricsViewActive != config.MediaPlayerInlineLyricsViewActive)
                 ToggleInlineLyricsView();
 
+            _showTimeLeft = config.PlayerShowTimeLeft;
+            RefreshPositionLabel();
+
             SetFullscreenActive(config.MediaPlayerFullscreenActive);
         }
 
@@ -600,9 +603,7 @@ namespace musicpresense
 
             ProgressSlider.Maximum = durationMs;
 
-            var seekVisibility = durationMs > 10 * 60 * 1000L ? Visibility.Visible : Visibility.Collapsed;
-            BtnSeekBack.Visibility = seekVisibility;
-            BtnSeekFwd.Visibility = seekVisibility;
+            RefreshSeekButtonVisibility();
 
             TxtDurationLabel.Text = FormatMs(durationMs);
         }
@@ -828,6 +829,8 @@ namespace musicpresense
             BtnBattery.Visibility = c.PlayerShowBattery ? Visibility.Visible : Visibility.Collapsed;
             BtnHelp.Visibility = c.PlayerShowHelpButton ? Visibility.Visible : Visibility.Collapsed;
             BtnFullscreen.Visibility = c.PlayerShowFullscreenButton ? Visibility.Visible : Visibility.Collapsed;
+
+            RefreshSeekButtonVisibility();
 
             _lastGradientSourcePath = null;
             ApplyCoverGradientBackground(_hasSong ? _currentCoverPath : null);

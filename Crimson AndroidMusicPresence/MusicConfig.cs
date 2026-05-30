@@ -123,6 +123,13 @@ namespace musicpresense
         public bool PlayerShowBattery { get; set; } = true;
         public bool PlayerShowHelpButton { get; set; } = true;
         public bool PlayerShowFullscreenButton { get; set; } = true;
+        // When false the seek buttons are always hidden.
+        // When true they appear only for tracks >= PlayerSeekButtonThresholdSeconds.
+        public bool PlayerShowSeekButtons { get; set; } = true;
+        // Minimum track length in seconds before seek buttons appear (default 600 = 10 min).
+        public int PlayerSeekButtonThresholdSeconds { get; set; } = 600;
+        // Persisted time-display toggle: false = elapsed, true = remaining.
+        public bool PlayerShowTimeLeft { get; set; } = false;
 
         // Layout
         public bool PlayerSwapArtistAlbum { get; set; } = false;

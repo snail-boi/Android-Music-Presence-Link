@@ -10,6 +10,7 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Opacity" Value="0.55" />
             <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Margin" Value="0,0,0,8" />
         </Style>
 
         <Style x:Key="RowLabel" TargetType="TextBlock">
@@ -87,6 +88,44 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Input textbox style -->
+        <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CaretBrush" Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalScrollBarVisibility="Hidden"
+                                          HorizontalScrollBarVisibility="Hidden" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeForegroundBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="1.5" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -349,7 +388,7 @@
                           Unchecked="ChkShowHelp_Changed" />
             </Grid>
 
-            <Grid Margin="0,0,0,20">
+            <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -360,6 +399,54 @@
                           Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowFullscreen_Changed"
                           Unchecked="ChkShowFullscreen_Changed" />
+            </Grid>
+
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Seek buttons" Style="{StaticResource RowLabel}" />
+                <CheckBox x:Name="ChkShowSeekButtons"
+                          Grid.Column="1"
+                          Style="{StaticResource ToggleSwitchStyle}"
+                          Checked="ChkShowSeekButtons_Changed"
+                          Unchecked="ChkShowSeekButtons_Changed" />
+            </Grid>
+
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Seek button visibility" Style="{StaticResource RowLabel}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBox x:Name="TxtSeekButtonThreshold"
+                             Width="70"
+                             TextAlignment="Center"
+                             Style="{StaticResource InputTextBoxStyle}"
+                             TextChanged="TxtSeekButtonThreshold_Changed" />
+                    <Button x:Name="BtnSeekThresholdUnit"
+                            Margin="4,0,0,0"
+                            MinWidth="45"
+                            Padding="6,0"
+                            Style="{StaticResource CycleButtonStyle}"
+                            Click="BtnSeekThresholdUnit_Click"
+                            Content="sec" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Time format (click to toggle)" Style="{StaticResource RowLabel}" />
+                <Button x:Name="BtnTimeFormat"
+                        Grid.Column="1"
+                        Style="{StaticResource CycleButtonStyle}"
+                        Content="Elapsed"
+                        Click="BtnTimeFormat_Click" />
             </Grid>
 
             <!-- Divider -->

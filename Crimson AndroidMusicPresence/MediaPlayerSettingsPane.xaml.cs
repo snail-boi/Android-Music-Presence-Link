@@ -51,6 +51,16 @@ namespace musicpresense
                 ChkShowBattery.IsChecked = c.PlayerShowBattery;
                 ChkShowHelp.IsChecked = c.PlayerShowHelpButton;
                 ChkShowFullscreen.IsChecked = c.PlayerShowFullscreenButton;
+                ChkShowSeekButtons.IsChecked = c.PlayerShowSeekButtons;
+
+                // Seek threshold: stored as raw seconds, display in whatever unit fits.
+                int threshSec = c.PlayerSeekButtonThresholdSeconds;
+                bool useMin = threshSec % 60 == 0;
+                BtnSeekThresholdUnit.Content = useMin ? "min" : "sec";
+                TxtSeekButtonThreshold.Text = useMin ? (threshSec / 60).ToString() : threshSec.ToString();
+
+                // Time format button
+                BtnTimeFormat.Content = c.PlayerShowTimeLeft ? "Remaining" : "Elapsed";
 
                 // Layout
                 ChkSwapSettingsLocation.IsChecked = c.SwapSettingsLocation;
@@ -156,6 +166,86 @@ namespace musicpresense
         private void ChkShowBattery_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowBattery = ChkShowBattery.IsChecked == true; SaveAndNotify(); } }
         private void ChkShowHelp_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowHelpButton = ChkShowHelp.IsChecked == true; SaveAndNotify(); } }
         private void ChkShowFullscreen_Changed(object sender, RoutedEventArgs e) { if (!_loading) { App.Config.PlayerShowFullscreenButton = ChkShowFullscreen.IsChecked == true; SaveAndNotify(); } }
+
+        private void ChkShowSeekButtons_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_loading) return;
+            App.Config.PlayerShowSeekButtons = ChkShowSeekButtons.IsChecked == true;
+            SaveAndNotify();
+        }
+
+        private void TxtSeekButtonThreshold_Changed(object sender, TextChangedEventArgs e)
+        {
+            if (_loading) return;
+            if (!int.TryParse(TxtSeekButtonThreshold.Text.Trim(), out int val) || val <= 0) return;
+            bool isMin = BtnSeekThresholdUnit.Content as string == "min";
+            App.Config.PlayerSeekButtonThresholdSeconds = isMin ? val * 60 : val;
+            SaveAndNotify();
+        }
+
+        private void BtnSeekThresholdUnit_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading) return;
+            bool currentlyMin = BtnSeekThresholdUnit.Content as string == "min";
+            if (currentlyMin)
+            {
+                // Switch to sec: convert displayed value
+                if (int.TryParse(TxtSeekButtonThreshold.Text.Trim(), out int min))
+                {
+                    _loading = true;
+                    TxtSeekButtonThreshold.Text = (min * 60).ToString();
+                    _loading = false;
+                }
+                BtnSeekThresholdUnit.Content = "sec";
+            }
+            else
+            {
+                // Switch to min: only if current seconds value is divisible by 60
+                if (int.TryParse(TxtSeekButtonThreshold.Text.Trim(), out int sec) && sec % 60 == 0)
+                {
+                    _loading = true;
+                    TxtSeekButtonThreshold.Text = (sec / 60).ToString();
+                    _loading = false;
+                }
+                else
+                {
+                    // Not evenly divisible; round to nearest minute
+                    if (int.TryParse(TxtSeekButtonThreshold.Text.Trim(), out int secR))
+                    {
+                        int rounded = (int)Math.Round(secR / 60.0);
+                        if (rounded < 1) rounded = 1;
+                        _loading = true;
+                        TxtSeekButtonThreshold.Text = rounded.ToString();
+                        _loading = false;
+                    }
+                }
+                BtnSeekThresholdUnit.Content = "min";
+            }
+            // Re-read and save after unit flip
+            if (int.TryParse(TxtSeekButtonThreshold.Text.Trim(), out int v) && v > 0)
+            {
+                bool nowMin = BtnSeekThresholdUnit.Content as string == "min";
+                App.Config.PlayerSeekButtonThresholdSeconds = nowMin ? v * 60 : v;
+                SaveAndNotify();
+            }
+        }
+
+        // Called by the player window when the user clicks the time label directly,
+        // so the settings pane button label stays in sync.
+        public void SyncTimeFormatButton(bool showTimeLeft)
+        {
+            BtnTimeFormat.Content = showTimeLeft ? "Remaining" : "Elapsed";
+        }
+
+        private void BtnTimeFormat_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading) return;
+            App.Config.PlayerShowTimeLeft = !App.Config.PlayerShowTimeLeft;
+            BtnTimeFormat.Content = App.Config.PlayerShowTimeLeft ? "Remaining" : "Elapsed";
+            SaveAndNotify();
+            // Sync the live player window immediately.
+            (Window.GetWindow(this) as MediaPlayerWindow)?.SyncTimeFormatFromConfig();
+        }
 
         private void ChkSwapSettingsLocation_Changed(object sender, RoutedEventArgs e)
         {
