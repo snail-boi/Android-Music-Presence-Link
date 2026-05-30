@@ -27,10 +27,14 @@ namespace musicpresense
         private const double DefaultSettingsWidth = 500;
         // Maximum fraction of the window width the settings pane may occupy.
         private const double SettingsMaxWidthFraction = 0.75;
-        // Window width below which the settings pane auto-collapses.
-        private const double SettingsAutoCollapseThreshold = 950;
-        // Window width the window expands to when opening the pane on a narrow window.
-        private const double SettingsAutoExpandWidth = 950;
+        // Window width below which the settings pane (500px) auto-collapses.
+        private const double SettingsAutoCollapseThreshold = 1030;
+        // Window width the window expands to when opening the settings pane.
+        private const double SettingsAutoExpandWidth = 1030;
+        // Window width below which the player settings pane (280px) auto-collapses.
+        private const double PlayerSettingsAutoCollapseThreshold = 810;
+        // Window width the window expands to when opening the player settings pane.
+        private const double PlayerSettingsAutoExpandWidth = 810;
         // ─────────────────────────────────────────────────────────────────────
 
         private readonly Func<Task> _pauseAction;
@@ -202,9 +206,13 @@ namespace musicpresense
         {
             if (!e.WidthChanged) return;
 
+            double mainThreshold = _panesSwapped ? PlayerSettingsAutoCollapseThreshold : SettingsAutoCollapseThreshold;
+            double playerThreshold = _panesSwapped ? SettingsAutoCollapseThreshold : PlayerSettingsAutoCollapseThreshold;
+
             if (_settingsPaneOpen)
             {
-                if (ActualWidth < SettingsAutoCollapseThreshold)
+                double threshold = mainThreshold + (_playerSettingsPaneOpen ? (_panesSwapped ? DefaultSettingsWidth : DefaultPlayerSettingsWidth) : 0);
+                if (ActualWidth < threshold)
                     CollapseSettingsPane();
                 else
                     ClampSettingsColumnWidth();
@@ -212,7 +220,8 @@ namespace musicpresense
 
             if (_playerSettingsPaneOpen)
             {
-                if (ActualWidth < SettingsAutoCollapseThreshold)
+                double threshold = playerThreshold + (_settingsPaneOpen ? (_panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth) : 0);
+                if (ActualWidth < threshold)
                     CollapsePlayerSettingsPane();
                 else
                     ClampPlayerSettingsColumnWidth();
@@ -222,14 +231,11 @@ namespace musicpresense
         private void ClampSettingsColumnWidth()
         {
             if (!_settingsPaneOpen) return;
-
             double available = ActualWidth - 28;
             if (available <= 0) return;
-
             double defaultWidth = _panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth;
             double max = Math.Min(defaultWidth, available * SettingsMaxWidthFraction);
             if (max <= 0) return;
-
             SettingsColumn.MaxWidth = max;
             SettingsColumn.Width = new GridLength(max, GridUnitType.Pixel);
         }
@@ -395,8 +401,12 @@ namespace musicpresense
                 return;
             }
 
-            if (ActualWidth < SettingsAutoCollapseThreshold)
-                Width = SettingsAutoExpandWidth;
+            double collapseThreshold = _panesSwapped ? PlayerSettingsAutoCollapseThreshold : SettingsAutoCollapseThreshold;
+            double expandWidth = _panesSwapped ? PlayerSettingsAutoExpandWidth : SettingsAutoExpandWidth;
+            // If the other pane is also open, we need room for both.
+            if (_playerSettingsPaneOpen) expandWidth += _panesSwapped ? DefaultSettingsWidth : DefaultPlayerSettingsWidth;
+            if (ActualWidth < collapseThreshold || (_playerSettingsPaneOpen && ActualWidth < expandWidth))
+                Width = expandWidth;
 
             _settingsPaneOpen = true;
             PersistRuntimeState();
@@ -684,8 +694,12 @@ namespace musicpresense
                 return;
             }
 
-            if (ActualWidth < SettingsAutoCollapseThreshold)
-                Width = SettingsAutoExpandWidth;
+            double collapseThreshold = _panesSwapped ? SettingsAutoCollapseThreshold : PlayerSettingsAutoCollapseThreshold;
+            double expandWidth = _panesSwapped ? SettingsAutoExpandWidth : PlayerSettingsAutoExpandWidth;
+            // If the other pane is also open, we need room for both.
+            if (_settingsPaneOpen) expandWidth += _panesSwapped ? DefaultPlayerSettingsWidth : DefaultSettingsWidth;
+            if (ActualWidth < collapseThreshold || (_settingsPaneOpen && ActualWidth < expandWidth))
+                Width = expandWidth;
 
             _playerSettingsPaneOpen = true;
             PersistRuntimeState();
