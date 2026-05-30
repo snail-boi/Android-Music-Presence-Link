@@ -29,6 +29,21 @@ namespace musicpresense
 
 		private async Task AutoGatherDeviceInfoAsync()
 		{
+           if (GetSelectedWifiMode() == WirelessMode.WirelessDebugging)
+			{
+                await RunWirelessPairingAsync();
+				return;
+			}
+
+			try
+			{
+				await AdbHelper.RunAdbAsync("disconnect");
+			}
+			catch
+			{
+				// Ignore disconnect failures and continue with USB detection.
+			}
+
 			var usbSerial = await GetConnectedUsbDeviceAsync();
 			if (string.IsNullOrWhiteSpace(usbSerial))
 			{
@@ -40,20 +55,7 @@ namespace musicpresense
 			var port = 0;
 			var ip = "none";
 
-			// In WirelessDebugging mode, the wifi address comes from the pair
-			// flow (ip:random_port discovered via mDNS), not from
-			// service.adb.tcp.port. Don't overwrite it here.
-			var currentMode = GetSelectedWifiMode();
-			if (currentMode == WirelessMode.WirelessDebugging)
-			{
-				MessageBox.Show(
-					"Auto-detect skipped Wi-Fi setup because Wireless Debugging mode is selected. "
-					+ "Use the 'Pair phone' button to set up wireless.",
-					"Wireless Debugging Mode",
-					MessageBoxButton.OK,
-					MessageBoxImage.Information);
-			}
-			else if (MessageBox.Show("do you want to enable WiFi", "May be incompatible with certain networks", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
+          if (MessageBox.Show("do you want to enable WiFi", "May be incompatible with certain networks", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
 			{
 				_config.IsWifiEnabled = false;
 			}
@@ -65,27 +67,22 @@ namespace musicpresense
 
 			}
 
-			if (currentMode != WirelessMode.WirelessDebugging)
+          if (!string.IsNullOrWhiteSpace(ip))
 			{
-				if (!string.IsNullOrWhiteSpace(ip))
+				if (_config.IsWifiEnabled == true)
 				{
-					if (_config.IsWifiEnabled == true)
-					{
-						TxtWifi.Text = $"{ip}:{port}";
-					}
-					else
-					{
-						TxtWifi.Text = "";
-					}
-
+					TxtWifi.Text = $"{ip}:{port}";
 				}
 				else
 				{
-					MessageBox.Show("Could not read the device Wi-Fi IP address.", "Wi-Fi Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+					TxtWifi.Text = "";
 				}
-			}
 
-			var deviceNamePrompt = string.IsNullOrWhiteSpace(TxtDeviceName.Text) ? "" : TxtDeviceName.Text.Trim();
+			}
+			else
+			{
+				MessageBox.Show("Could not read the device Wi-Fi IP address.", "Wi-Fi Info", MessageBoxButton.OK, MessageBoxImage.Warning);
+			}
 
 			var nameDialog = new NameInputDialogue("Enter a name for this device:", "Device Name");
 			if (IsLoaded && IsVisible)
@@ -97,8 +94,7 @@ namespace musicpresense
 			{
 				return;
 			}
-			var deviceName = nameDialog.InputText; ;
-
+            var deviceName = nameDialog.InputText;
 
 			if (!string.IsNullOrWhiteSpace(deviceName))
 			{

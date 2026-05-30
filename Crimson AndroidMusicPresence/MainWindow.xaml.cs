@@ -123,12 +123,10 @@ namespace musicpresense
             BtnManageApps.Click += BtnManageApps_Click;
             BtnClearDisabledApps.Click += BtnClearDisabledApps_Click;
             BtnListCodecs.Click += BtnListCodecs_Click;
-            BtnAutoGather.Click += BtnAutoGather_Click;
             BtnPickRemoteRoot.Click += BtnPickRemoteRoot_Click;
             BtnClearCoverCache.Click += BtnClearCoverCache_Click;
             BtnOpenCoverCache.Click += BtnOpenCoverCache_Click;
             BtnOpenLogFolder.Click += BtnOpenLogFolder_Click;
-            BtnResetDevice.Click += BtnResetDevice_Click;
             LstAudioCodecs.SelectionChanged += LstAudioCodecs_SelectionChanged;
             ChkDarkMode.Checked += ChkDarkMode_CheckedChanged;
             ChkDarkMode.Unchecked += ChkDarkMode_CheckedChanged;

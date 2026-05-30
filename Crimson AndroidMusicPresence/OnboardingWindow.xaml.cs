@@ -97,6 +97,33 @@ namespace musicpresense
             UpdateStepUI();
         }
 
+        private void BtnWifiModeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            var nextMode = GetSelectedWifiMode() == WirelessMode.WirelessDebugging
+                ? WirelessMode.TcpIp
+                : WirelessMode.WirelessDebugging;
+
+            SetWifiMode(nextMode, updateConfig: true);
+        }
+
+        private void SetWifiMode(WirelessMode mode, bool updateConfig)
+        {
+            if (BtnWifiModeToggle != null)
+            {
+                BtnWifiModeToggle.Tag = mode.ToString();
+                BtnWifiModeToggle.Content = mode == WirelessMode.WirelessDebugging
+                    ? "Wi-Fi mode: Wireless Debugging"
+                    : "Wi-Fi mode: adb tcpip";
+            }
+
+            if (updateConfig)
+            {
+                _workingConfig.WifiMode = mode;
+            }
+
+            UpdatePairButtonVisibility();
+        }
+
         private void UpdateStepUI()
         {
             TxtStepTitle.Text = _stepTitles[_currentStep];
@@ -273,38 +300,28 @@ namespace musicpresense
         // -------------------------------------------------------------------
         private WirelessMode GetSelectedWifiMode()
         {
-            if (CmbWifiMode?.SelectedItem is ComboBoxItem item
-                && item.Tag is string tag
+            if (BtnWifiModeToggle?.Tag is string tag
                 && Enum.TryParse<WirelessMode>(tag, out var mode))
             {
                 return mode;
             }
-            return WirelessMode.TcpIp;
+
+            return _workingConfig?.WifiMode ?? WirelessMode.TcpIp;
         }
 
         private void SelectWifiModeFromConfig()
         {
-            if (CmbWifiMode == null) return;
-            foreach (var raw in CmbWifiMode.Items)
-            {
-                if (raw is ComboBoxItem item
-                    && item.Tag is string tag
-                    && Enum.TryParse<WirelessMode>(tag, out var mode)
-                    && mode == _workingConfig.WifiMode)
-                {
-                    CmbWifiMode.SelectedItem = item;
-                    return;
-                }
-            }
-            CmbWifiMode.SelectedIndex = 0;
+            SetWifiMode(_workingConfig?.WifiMode ?? WirelessMode.TcpIp, updateConfig: false);
         }
 
         private void UpdatePairButtonVisibility()
         {
-            if (BtnPairWireless == null) return;
-            BtnPairWireless.Visibility = GetSelectedWifiMode() == WirelessMode.WirelessDebugging
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            if (BtnAutoGather != null)
+            {
+                BtnAutoGather.Content = GetSelectedWifiMode() == WirelessMode.WirelessDebugging
+                    ? "Pair phone"
+                    : "Auto Detect USB";
+            }
 
             UpdateWifiFieldPresentation();
         }
@@ -325,6 +342,11 @@ namespace musicpresense
             {
                 TxtWifi.Text = _workingConfig.SelectedDeviceWiFi;
             }
+
+            if (TxtWifi != null && isWd)
+            {
+                TxtWifi.Text = _workingConfig.WifiMdnsServiceName ?? string.Empty;
+            }
         }
 
         private void SetWifiDisplayFromConfig()
@@ -344,6 +366,69 @@ namespace musicpresense
         private void CmbWifiMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdatePairButtonVisibility();
+        }
+
+        private async void BtnAutoGatherOrPair_Click(object sender, RoutedEventArgs e)
+        {
+            if (GetSelectedWifiMode() == WirelessMode.WirelessDebugging)
+            {
+                await BtnPairWireless_ClickAsync();
+                return;
+            }
+
+            BtnAutoGather_Click(sender, e);
+        }
+
+        private async Task BtnPairWireless_ClickAsync()
+        {
+            var dlg = new WifiPairDialog();
+            if (IsLoaded && IsVisible)
+                dlg.Owner = this;
+            if (dlg.ShowDialog() != true) return;
+
+            string ipPort = string.Empty;
+            if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
+            {
+                ipPort = await ReconnectViaMdnsWithRetryAsync(dlg.ServiceName);
+            }
+
+            if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
+            {
+                _workingConfig.WifiMdnsServiceName = dlg.ServiceName;
+                TxtWifi.Text = dlg.ServiceName;
+            }
+            if (!string.IsNullOrWhiteSpace(ipPort))
+            {
+                _workingConfig.SelectedDeviceWiFi = ipPort;
+                _workingConfig.IsWifiEnabled = true;
+            }
+
+            string usbSerial = string.Empty;
+            if (!string.IsNullOrWhiteSpace(dlg.ServiceName))
+            {
+                usbSerial = await GetWirelessDebuggingSerialAsync(dlg.ServiceName, ipPort).ConfigureAwait(true);
+            }
+
+            if (!string.IsNullOrWhiteSpace(usbSerial))
+            {
+                TxtUsbSerial.Text = usbSerial;
+                _workingConfig.SelectedDeviceUSB = usbSerial;
+            }
+
+            var nameDialog = new NameInputDialogue("Enter a name for this device:", "Device Name");
+            if (IsLoaded && IsVisible)
+            {
+                nameDialog.Owner = this;
+            }
+
+            if (nameDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(nameDialog.InputText))
+            {
+                TxtDeviceName.Text = nameDialog.InputText.Trim();
+                _workingConfig.SelectedDeviceName = TxtDeviceName.Text.Trim();
+            }
+
+            MusicConfigManager.Save(_workingConfig);
+            (Application.Current as App)?.UpdateConfig(_workingConfig);
         }
 
         private async void BtnPairWireless_Click(object sender, RoutedEventArgs e)
@@ -449,6 +534,15 @@ namespace musicpresense
 
         private async Task AutoGatherDeviceInfoAsync()
         {
+         try
+            {
+                await AdbHelper.RunAdbAsync("disconnect");
+            }
+            catch
+            {
+                // Ignore disconnect failures and continue with USB detection.
+            }
+
             var usbSerial = await GetConnectedUsbDeviceAsync();
             if (string.IsNullOrWhiteSpace(usbSerial))
             {

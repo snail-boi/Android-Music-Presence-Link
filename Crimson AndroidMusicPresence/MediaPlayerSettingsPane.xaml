@@ -171,7 +171,7 @@
                 <TextBlock Grid.Column="0" Text="Title" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowTitle"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowTitle_Changed"
                           Unchecked="ChkShowTitle_Changed" />
             </Grid>
@@ -184,7 +184,7 @@
                 <TextBlock Grid.Column="0" Text="Artist" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowArtist"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowArtist_Changed"
                           Unchecked="ChkShowArtist_Changed" />
             </Grid>
@@ -197,7 +197,7 @@
                 <TextBlock Grid.Column="0" Text="Album" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowAlbum"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowAlbum_Changed"
                           Unchecked="ChkShowAlbum_Changed" />
             </Grid>
@@ -210,7 +210,7 @@
                 <TextBlock Grid.Column="0" Text="Swap artist and album" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkSwapArtistAlbum"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkSwapArtistAlbum_Changed"
                           Unchecked="ChkSwapArtistAlbum_Changed" />
             </Grid>
@@ -231,7 +231,7 @@
                 <TextBlock Grid.Column="0" Text="Show cover" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowCover"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowCover_Changed"
                           Unchecked="ChkShowCover_Changed" />
             </Grid>
@@ -244,7 +244,7 @@
                 <TextBlock Grid.Column="0" Text="Rounded corners" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkCoverRounded"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkCoverRounded_Changed"
                           Unchecked="ChkCoverRounded_Changed" />
             </Grid>
@@ -305,7 +305,7 @@
                 <TextBlock Grid.Column="0" Text="Volume button" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowVolume"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowVolume_Changed"
                           Unchecked="ChkShowVolume_Changed" />
             </Grid>
@@ -318,7 +318,7 @@
                 <TextBlock Grid.Column="0" Text="Lyrics button" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowLyrics"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowLyrics_Changed"
                           Unchecked="ChkShowLyrics_Changed" />
             </Grid>
@@ -331,7 +331,7 @@
                 <TextBlock Grid.Column="0" Text="Battery indicator" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowBattery"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowBattery_Changed"
                           Unchecked="ChkShowBattery_Changed" />
             </Grid>
@@ -344,7 +344,7 @@
                 <TextBlock Grid.Column="0" Text="Help button" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowHelp"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowHelp_Changed"
                           Unchecked="ChkShowHelp_Changed" />
             </Grid>
@@ -357,7 +357,7 @@
                 <TextBlock Grid.Column="0" Text="Fullscreen button" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkShowFullscreen"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkShowFullscreen_Changed"
                           Unchecked="ChkShowFullscreen_Changed" />
             </Grid>
@@ -378,7 +378,7 @@
                 <TextBlock Grid.Column="0" Text="Switch settings location" Style="{StaticResource RowLabel}" />
                 <CheckBox x:Name="ChkSwapSettingsLocation"
                           Grid.Column="1"
-                          Style="{StaticResource ToggleRowStyle}"
+                          Style="{StaticResource ToggleSwitchStyle}"
                           Checked="ChkSwapSettingsLocation_Changed"
                           Unchecked="ChkSwapSettingsLocation_Changed" />
             </Grid>

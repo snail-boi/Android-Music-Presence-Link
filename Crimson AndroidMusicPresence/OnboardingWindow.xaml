@@ -555,45 +555,28 @@
                         <TextBlock Grid.Row="0" Style="{StaticResource InstructionText}"
                                    Margin="0,0,0,16"
                                    FontSize="14">
-                  Click <Run FontWeight="SemiBold">Auto Detect</Run> below and we'll find your phone, optionally pair wireless debugging, and ask you for a friendly name. You can also fill these fields in by hand if you know what you're doing.
+                  Click the button below and we'll find your phone, or pair wireless debugging if that's the mode you choose. You can also fill these fields in by hand if you know what you're doing.
                         </TextBlock>
 
-                        <Button Grid.Row="1"
-                                x:Name="BtnAutoGather"
-                                Content="🔍  Auto Detect My Phone"
-                                Style="{StaticResource PrimaryButton}"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,20"
-                                Padding="22,10"
-                                FontSize="14"
-                                Click="BtnAutoGather_Click" />
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
+                            <Button x:Name="BtnAutoGather"
+                                    Content="Auto Detect USB"
+                                    Style="{StaticResource PrimaryButton}"
+                                    HorizontalAlignment="Left"
+                                    Padding="22,10"
+                                    FontSize="14"
+                                    Click="BtnAutoGatherOrPair_Click" />
+                            <Button x:Name="BtnWifiModeToggle"
+                                    Content="mode: adb tcpip"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HorizontalAlignment="Left"
+                                    Margin="8,0,0,0"
+                                    Padding="18,10"
+                                    FontSize="13"
+                                    Click="BtnWifiModeToggle_Click" />
+                        </StackPanel>
 
-                        <TextBlock Grid.Row="2" Style="{StaticResource InstructionText}"
-                                   Margin="0,0,0,6"
-                                   FontSize="13">
-                 <Run FontWeight="SemiBold">Wi-Fi connection mode</Run> (Wireless Debugging is the recommended default):
-                        </TextBlock>
-
-                        <ComboBox Grid.Row="3" x:Name="CmbWifiMode"
-                                  Margin="0,0,0,16"
-                                  HorizontalAlignment="Left"
-                                  MinWidth="380"
-                                  SelectionChanged="CmbWifiMode_SelectionChanged">
-                            <ComboBoxItem Content="Classic (adb tcpip) - simplest, USB needed after every reboot" Tag="TcpIp" />
-                            <ComboBoxItem Content="Wireless Debugging (Android 11+) - one-time pair, survives reboots" Tag="WirelessDebugging" />
-                        </ComboBox>
-
-                        <Button Grid.Row="4"
-                                x:Name="BtnPairWireless"
-                                Content="🔗  Pair phone (Wireless Debugging)..."
-                                HorizontalAlignment="Left"
-                                Padding="18,8"
-                                Margin="0,0,0,16"
-                                FontSize="13"
-                                Visibility="Collapsed"
-                                Click="BtnPairWireless_Click" />
-
-                        <Grid Grid.Row="5" Margin="0,0,0,12">
+                        <Grid Grid.Row="2" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="*" />
@@ -605,7 +588,7 @@
                             <TextBox Grid.Column="1" x:Name="TxtUsbSerial" />
                         </Grid>
 
-                        <Grid Grid.Row="6" Margin="0,0,0,12">
+                        <Grid Grid.Row="3" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="*" />
@@ -617,7 +600,7 @@
                             <TextBox Grid.Column="1" x:Name="TxtWifi" />
                         </Grid>
 
-                        <Grid Grid.Row="7" Margin="0,0,0,12">
+                        <Grid Grid.Row="4" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="*" />
@@ -892,7 +875,8 @@
                                     <StackPanel>
                                         <CheckBox x:Name="ChkOpenInTaskbar"
                                                   Content="Show in taskbar"
-                                                  FontWeight="SemiBold" />
+                                                  FontWeight="SemiBold" 
+                                                  Style="{StaticResource ToggleSwitchStyle}"/>
                                         <TextBlock Style="{StaticResource HelperText}"
                                                    Margin="22,4,0,0">
 											When checked, the app runs quietly in the system tray near the clock.
@@ -905,7 +889,7 @@
                                         CornerRadius="6"
                                         Padding="16,12">
                                     <StackPanel>
-                                        <CheckBox x:Name="ChkStartWithWindows"
+                                        <CheckBox x:Name="ChkStartWithWindows" Style="{StaticResource ToggleSwitchStyle}"
                                                   Content="Start automatically when Windows starts"
                                                   FontWeight="SemiBold" />
                                         <TextBlock Style="{StaticResource HelperText}"

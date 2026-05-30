@@ -12,35 +12,26 @@ namespace musicpresense
     {
         private WirelessMode GetSelectedWifiMode()
         {
-            if (CmbWifiMode?.SelectedItem is ComboBoxItem item
-                && item.Tag is string tag
+            if (Tag is string tag
                 && Enum.TryParse<WirelessMode>(tag, out var mode))
             {
                 return mode;
             }
+
+            if (_config != null)
+                return _config.WifiMode;
+
             return WirelessMode.TcpIp;
         }
 
         private void SelectWifiModeFromConfig()
         {
-            if (CmbWifiMode == null) return;
-            foreach (var raw in CmbWifiMode.Items)
-            {
-                if (raw is ComboBoxItem item
-                    && item.Tag is string tag
-                    && Enum.TryParse<WirelessMode>(tag, out var mode)
-                    && mode == _config.WifiMode)
-                {
-                    CmbWifiMode.SelectedItem = item;
-                    return;
-                }
-            }
-            CmbWifiMode.SelectedIndex = 0;
+            SetWifiMode(_config?.WifiMode ?? WirelessMode.TcpIp, updateConfig: false);
         }
 
         private void UpdatePairButtonVisibility()
         {
-            UpdateWifiFieldVisibility();
+            UpdateWifiModeUi();
         }
 
         // Centralized show/hide for the wifi-related rows. Called whenever
@@ -59,8 +50,6 @@ namespace musicpresense
         //                          name is already stored.
         private void UpdateWifiFieldVisibility()
         {
-            if (CmbWifiMode == null) return;
-
             var mode = GetSelectedWifiMode();
             bool isWd = mode == WirelessMode.WirelessDebugging;
 
@@ -75,19 +64,60 @@ namespace musicpresense
             if (TxtMdnsService != null)
                 TxtMdnsService.Visibility = (isWd && hasMdns) ? Visibility.Visible : Visibility.Collapsed;
 
-            if (BtnPairWireless != null)
+            if (BtnAutoGather != null)
             {
-                BtnPairWireless.Visibility = isWd ? Visibility.Visible : Visibility.Collapsed;
-                BtnPairWireless.Content = hasMdns ? "Re-pair phone..." : "Pair phone...";
+                BtnAutoGather.Content = isWd ? (hasMdns ? "Re-pair phone" : "Pair phone") : "Auto-detect USB";
             }
         }
 
-        private void CmbWifiMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void BtnWifiModeToggle_Click(object sender, RoutedEventArgs e)
         {
-            UpdatePairButtonVisibility();
+            var nextMode = GetSelectedWifiMode() == WirelessMode.WirelessDebugging
+                ? WirelessMode.TcpIp
+                : WirelessMode.WirelessDebugging;
+
+            SetWifiMode(nextMode, updateConfig: true);
+        }
+
+        private async void BtnDeviceAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (GetSelectedWifiMode() == WirelessMode.WirelessDebugging)
+            {
+                await RunWirelessPairingAsync();
+                return;
+            }
+
+            await AutoGatherDeviceInfoAsync();
+        }
+
+        private void SetWifiMode(WirelessMode mode, bool updateConfig)
+        {
+            Tag = mode.ToString();
+
+            if (BtnWifiModeToggle != null)
+            {
+                BtnWifiModeToggle.Content = mode == WirelessMode.WirelessDebugging
+                    ? "mode: Wireless Debugging"
+                    : "mode: adb tcpip";
+            }
+
+            if (updateConfig && _config != null)
+                _config.WifiMode = mode;
+
+            UpdateWifiFieldVisibility();
+        }
+
+        private void UpdateWifiModeUi()
+        {
+            SetWifiMode(GetSelectedWifiMode(), updateConfig: false);
         }
 
         private async void BtnPairWireless_Click(object sender, RoutedEventArgs e)
+        {
+            await RunWirelessPairingAsync();
+        }
+
+        private async Task RunWirelessPairingAsync()
         {
             var dlg = new WifiPairDialog();
             if (IsLoaded && IsVisible)
