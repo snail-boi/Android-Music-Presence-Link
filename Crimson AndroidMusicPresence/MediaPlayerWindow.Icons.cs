@@ -430,7 +430,7 @@ namespace musicpresense
         }
 
         /// <summary>
-        /// Builds a small audio quality icon: a tuning slider / equalizer glyph.
+        /// Builds the fallback/custom audio quality icon: a tuning slider / equalizer glyph.
         /// Three vertical bars of varying heights with a small dot indicating the
         /// "knob" position on each.
         /// </summary>

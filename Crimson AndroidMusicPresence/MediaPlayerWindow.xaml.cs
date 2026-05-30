@@ -790,6 +790,7 @@ namespace musicpresense
         private void OnPlayerSettingChanged()
         {
             ApplyPlayerSettings();
+            RefreshAudioQualityButton();
             ApplyPaneLayout();
         }
 

@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 
 namespace musicpresense
 {
@@ -44,7 +45,7 @@ namespace musicpresense
             var brush = ResolveIconBrush();
             AudioQualityContent.Children.Clear();
 
-            var icon = BuildAudioQualityIcon(brush, 16);
+            var icon = BuildAudioQualityIconForPreset(brush, config, 16);
             AudioQualityContent.Children.Add(icon);
 
             var text = new TextBlock
@@ -75,6 +76,166 @@ namespace musicpresense
             Debugger.show("[MEDIAPLAYER] Audio quality pill pressed.");
             BuildAudioQualityMenu();
             AudioQualityPopup.IsOpen = !AudioQualityPopup.IsOpen;
+        }
+
+        private static Viewbox BuildAudioQualityIconForPreset(Brush brush, MusicConfig? config, double size = 18)
+        {
+            var preset = config == null ? null : AudioQualityPresets.MatchFromConfig(config);
+            var presetName = preset?.ShortName ?? AudioQualityPresets.CustomLabel;
+
+            return presetName switch
+            {
+                "Data Saver" => BuildLeafIcon(brush, size),
+                "Medium" => BuildWaterDropIcon(brush, size),
+                "High" => BuildSparkleIcon(brush, size),
+                "Lossless" => BuildLosslessWavesIcon(brush, size),
+                "Max" => BuildDiamondIcon(brush, size),
+                _ => BuildAudioQualityIcon(brush, size),
+            };
+        }
+
+        private static Viewbox BuildLeafIcon(Brush brush, double size = 18)
+        {
+            var canvas = new Canvas { Width = 20, Height = 20 };
+            canvas.Children.Add(new Path
+            {
+                Stroke = brush,
+                StrokeThickness = 1.7,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                StrokeLineJoin = PenLineJoin.Round,
+                Fill = Brushes.Transparent,
+                Data = Geometry.Parse("M 4,11 C 4,5.5 8.5,3 14,4 C 13,8 10.5,12.5 6.5,15.5 C 4.9,16.7 3.6,16.2 3,14.8 C 2.4,13.3 2.8,12 4,11 Z")
+            });
+            canvas.Children.Add(new Path
+            {
+                Stroke = brush,
+                StrokeThickness = 1.4,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                Data = Geometry.Parse("M 5.2,14.2 C 7.4,12.6 9.8,10.6 12.7,5.8")
+            });
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        private static Viewbox BuildWaterDropIcon(Brush brush, double size = 18)
+        {
+            var canvas = new Canvas { Width = 20, Height = 20 };
+            canvas.Children.Add(new Path
+            {
+                Fill = brush,
+                Stroke = brush,
+                StrokeThickness = 1.2,
+                StrokeLineJoin = PenLineJoin.Round,
+                Data = Geometry.Parse("M 10,2 C 10,2 4.5,8 4.5,12.2 C 4.5,16 7.1,18 10,18 C 12.9,18 15.5,16 15.5,12.2 C 15.5,8 10,2 10,2 Z")
+            });
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        private static Viewbox BuildSparkleIcon(Brush brush, double size = 18)
+        {
+            var canvas = new Canvas { Width = 20, Height = 20 };
+            canvas.Children.Add(new Path
+            {
+                Fill = brush,
+                Data = Geometry.Parse("M 10,2 L 12,7.8 L 18,10 L 12,12.2 L 10,18 L 8,12.2 L 2,10 L 8,7.8 Z")
+            });
+            canvas.Children.Add(new Path
+            {
+                Stroke = brush,
+                StrokeThickness = 1.4,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                Data = Geometry.Parse("M 10,4.8 L 10,15.2 M 4.8,10 L 15.2,10")
+            });
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        private static Viewbox BuildLosslessWavesIcon(Brush brush, double size = 18)
+        {
+            var canvas = new Canvas { Width = 20, Height = 20 };
+
+            void AddWave(double startY)
+            {
+                var wave = new Path
+                {
+                    Stroke = brush,
+                    StrokeThickness = 1.8,
+                    StrokeStartLineCap = PenLineCap.Round,
+                    StrokeEndLineCap = PenLineCap.Round,
+                    Fill = Brushes.Transparent
+                };
+
+                var geometry = new PathGeometry();
+                var figure = new PathFigure
+                {
+                    StartPoint = new Point(3, startY + 2)
+                };
+                figure.Segments.Add(new BezierSegment(new Point(6.2, startY), new Point(9.8, startY + 4), new Point(13, startY + 2), true));
+                geometry.Figures.Add(figure);
+                wave.Data = geometry;
+                canvas.Children.Add(wave);
+            }
+
+            AddWave(3);
+            AddWave(8);
+            AddWave(13);
+            return new Viewbox { Width = size, Height = size, Child = canvas };
+        }
+
+        private static Viewbox BuildDiamondIcon(Brush brush, double size = 18)
+        {
+            // Path 1: The outer frame/border from your SVG
+            var geometry1 = Geometry.Parse(
+                "M 1250.839844 1745.382812 L 1771.550781 1018.660156 L 1524.460938 754.941406 L 977.214844 754.941406 L 730.132812 1018.660156 Z " +
+                "M 1250.839844 1672.75 L 1716.941406 1022.238281 L 1506.128906 797.238281 L 995.554688 797.238281 L 784.742188 1022.238281 L 1250.839844 1672.75"
+            );
+
+            // Path 2: The internal facets from your SVG
+            var geometry2 = Geometry.Parse(
+                "M 1215.230469 1695.683594 L 1034.039062 1039.808594 L 745.285156 1039.808594 L 730.132812 1018.660156 L 749.949219 997.5 L 1022.351562 997.5 L 960.320312 772.96875 L 977.214844 754.941406 L 999.09375 754.941406 L 1059.058594 972 L 1224.308594 762.398438 L 1277.371094 762.398438 L 1442.621094 972 L 1502.589844 754.941406 L 1524.460938 754.941406 L 1541.359375 772.96875 L 1479.328125 997.5 L 1751.730469 997.5 L 1771.550781 1018.660156 L 1756.390625 1039.808594 L 1467.640625 1039.808594 L 1286.449219 1695.683594 L 1250.839844 1745.382812 Z " +
+                "M 1092.699219 997.5 L 1408.980469 997.5 L 1250.839844 797.238281 Z " +
+                "M 1077.789062 1039.808594 L 1250.839844 1666.191406 L 1423.890625 1039.808594 L 1077.789062 1039.808594"
+            );
+
+            // Combine bounds to calculate perfect centering and scaling
+            var bounds = Rect.Union(geometry1.Bounds, geometry2.Bounds);
+
+            var transform = new TransformGroup();
+            transform.Children.Add(new TranslateTransform(-bounds.X, -bounds.Y));
+            transform.Children.Add(new ScaleTransform(size / bounds.Width, size / bounds.Height));
+
+            var grid = new Grid();
+
+            // Outer Frame
+            grid.Children.Add(new Path
+            {
+                Data = geometry1,
+                Fill = brush,
+                Stroke = brush,
+                StrokeThickness = 0.6,
+                RenderTransform = transform,
+                Stretch = Stretch.None
+            });
+
+            // Inner Facets
+            grid.Children.Add(new Path
+            {
+                Data = geometry2,
+                Fill = brush,
+                Stroke = brush,
+                StrokeThickness = 0.6,
+                RenderTransform = transform,
+                Stretch = Stretch.None
+            });
+
+            return new Viewbox
+            {
+                Width = size,
+                Height = size,
+                Stretch = Stretch.None,
+                Child = grid
+            };
         }
         private void BuildAudioQualityMenu()
         {

@@ -127,6 +127,8 @@ namespace musicpresense
             {
                 Opacity = _alwaysOnTop ? 0.85 : 0.45
             };
+
+            ApplyPillMode(BtnAlwaysOnTop, App.Config?.PillModeAlwaysOnTop ?? 0);
         }
 
         // ── Connection Info ─────────────────────────────────────────────────────

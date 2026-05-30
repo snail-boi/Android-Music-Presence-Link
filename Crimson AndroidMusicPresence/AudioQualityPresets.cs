@@ -50,7 +50,7 @@ namespace musicpresense
             new Preset
             {
                 Name = "Default Quality (good for general audio)",
-                ShortName = "Default",
+                ShortName = "Medium",
                 Description = "Opus 128 kbps, balanced for general audio.",
                 Codec = "opus",
                 Bitrate = "128",
