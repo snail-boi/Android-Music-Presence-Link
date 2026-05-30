@@ -827,6 +827,15 @@ namespace musicpresense
                 foreach (UIElement child in sp.Children)
                     if (child is TextBlock tb)
                         tb.Visibility = mode == 1 ? Visibility.Collapsed : Visibility.Visible;
+            // Connection pill mini: only the dot remains — clear text margin and use equal padding so it's circular.
+            if (pill.Name == "BtnConnectionInfo")
+            {
+                pill.Padding = mode == 1 ? new Thickness(8) : new Thickness(10, 4, 10, 4);
+                if (pill.Content is StackPanel csp)
+                    foreach (UIElement child in csp.Children)
+                        if (child is System.Windows.Shapes.Ellipse dot)
+                            dot.Margin = mode == 1 ? new Thickness(0) : new Thickness(0, 0, 5, 0);
+            }
         }
 
         // ── Pane side swap ────────────────────────────────────────────────────

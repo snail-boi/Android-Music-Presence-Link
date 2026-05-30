@@ -65,6 +65,7 @@ namespace musicpresense
             // it stays legible over both cover-art gradients and the idle theme.
             var borderColor = (brush is SolidColorBrush scb) ? scb.Color : Colors.White;
             BtnAudioQuality.BorderBrush = new SolidColorBrush(borderColor) { Opacity = 0.45 };
+            ApplyPillMode(BtnAudioQuality, App.Config?.PillModeQuality ?? 0);
         }
         private void BtnAudioQuality_Click(object sender, RoutedEventArgs e)
         {
@@ -343,11 +344,11 @@ namespace musicpresense
             var brush = ResolveIconBrush();
             AudioLinkContent.Children.Clear();
 
-            AudioLinkContent.Children.Add(BuildAudioLinkIcon(brush, _audioLinkActive, 14));
+            AudioLinkContent.Children.Add(BuildAudioLinkIcon(brush, _audioLinkActive, 16));
             AudioLinkContent.Children.Add(new TextBlock
             {
                 Text = _audioLinkActive ? "Audio on" : "Audio off",
-                FontSize = 11,
+                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(6, 0, 0, 0),
                 Foreground = brush
