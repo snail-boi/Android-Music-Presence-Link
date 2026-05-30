@@ -19,7 +19,7 @@ namespace musicpresense
         private readonly string[] _stepTitles =
         {
             "Welcome",
-            "Enable USB debugging",
+            "Enable wireless debugging",
             "Connect your phone",
             "Music and lyrics folders",
             "Allowed apps",
@@ -30,7 +30,7 @@ namespace musicpresense
         private readonly string[] _stepSubtitles =
         {
             "Welcome to Android Music Presence. Let's get you set up.",
-            "Your phone needs USB debugging turned on so we can talk to it.",
+            "Your phone needs Wireless Debugging turned on so we can talk to it.",
             "Plug in your phone, then click Auto Detect and we'll figure out the rest.",
             "Tell us where your music lives so we can fetch cover art and lyrics.",
             "Choose which Android apps may share what they're playing.",
@@ -89,6 +89,8 @@ namespace musicpresense
             TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyToggleScrcpyKey);
             TxtHotkeyToggleLyricsOverlay.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyToggleLyricsOverlayKey);
             TxtHotkeyCopyTrackInfo.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyCopyTrackInfoKey);
+            TxtHotkeyAudioQuality.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyAudioQualityKey);
+            TxtHotkeyAudioQuality.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyAudioQualityKey);
 
             SelectModifier(_workingConfig.HotkeyModifier);
             _ = LoadInstalledAppsAsync();
@@ -223,6 +225,7 @@ namespace musicpresense
             _workingConfig.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _workingConfig.HotkeyToggleScrcpyKey);
             _workingConfig.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _workingConfig.HotkeyToggleLyricsOverlayKey);
             _workingConfig.HotkeyCopyTrackInfoKey = ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _workingConfig.HotkeyCopyTrackInfoKey);
+            _workingConfig.HotkeyAudioQualityKey = ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _workingConfig.HotkeyAudioQualityKey);
 
             try
             {
@@ -242,21 +245,23 @@ namespace musicpresense
                     .Select(item => new EligibleAppConfig
                     {
                         PackageName = item.PackageName,
-                        IsEnabled = item.IsSelected,
-                        EnableCoverSearch = item.IsSelected && item.IsCoverSearchEnabled
+                        PresenceMode = item.PresenceMode,
+                        IsEnabled = item.PresenceMode != PresenceMode.Off,
+                        EnableCoverSearch = item.PresenceMode != PresenceMode.Off && item.EnableCoverSearch
                     })
                     .Where(item => !string.IsNullOrWhiteSpace(item.PackageName))
                     .GroupBy(item => item.PackageName, StringComparer.OrdinalIgnoreCase)
                     .Select(g => new EligibleAppConfig
                     {
                         PackageName = g.Key,
-                        IsEnabled = g.Any(x => x.IsEnabled),
+                        PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
+                        IsEnabled = g.Any(x => x.PresenceMode != PresenceMode.Off || x.IsEnabled),
                         EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
                     })
                     .ToList();
 
                 _workingConfig.AllowedApps = _workingConfig.EligibleApps
-                    .Where(a => a.IsEnabled)
+                    .Where(a => a.PresenceMode != PresenceMode.Off || a.IsEnabled)
                     .Select(a => a.PackageName)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -603,6 +608,7 @@ namespace musicpresense
                         g => new EligibleAppConfig
                         {
                             PackageName = g.Key,
+                            PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
                             IsEnabled = g.Any(x => x.IsEnabled),
                             EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
                         },
@@ -625,11 +631,11 @@ namespace musicpresense
                     {
                         if (eligible.TryGetValue(pkg, out var appConfig))
                         {
-                            _appPackages.Add(new AppPackageItem(pkg, appConfig.IsEnabled, appConfig.EnableCoverSearch));
+                            _appPackages.Add(new AppPackageItem(pkg, appConfig.PresenceMode, appConfig.EnableCoverSearch));
                         }
                         else
                         {
-                            _appPackages.Add(new AppPackageItem(pkg, false, false));
+                            _appPackages.Add(new AppPackageItem(pkg, PresenceMode.Off, false));
                         }
                     }
 
@@ -866,18 +872,19 @@ namespace musicpresense
 
         private void EnsureEligibleAppsFallback()
         {
-            if (!_workingConfig.EligibleApps.Any(a => a.IsEnabled))
+            if (!_workingConfig.EligibleApps.Any(a => a.PresenceMode != PresenceMode.Off || a.IsEnabled))
             {
                 _workingConfig.EligibleApps.Add(new EligibleAppConfig
                 {
                     PackageName = "in.krosbits.musicolet",
+                    PresenceMode = PresenceMode.Full,
                     IsEnabled = true,
                     EnableCoverSearch = true
                 });
             }
 
             _workingConfig.AllowedApps = _workingConfig.EligibleApps
-                .Where(a => a.IsEnabled)
+                .Where(a => a.PresenceMode != PresenceMode.Off || a.IsEnabled)
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -923,6 +930,23 @@ namespace musicpresense
         private void BtnRecordHotkeyCopyTrackInfo_Click(object sender, RoutedEventArgs e)
         {
             StartRecordingHotkey(k => TxtHotkeyCopyTrackInfo.Text = VirtualKeyToDisplayName(k));
+        }
+
+        private void BtnRecordHotkeyAudioQuality_Click(object sender, RoutedEventArgs e)
+        {
+            StartRecordingHotkey(k => TxtHotkeyAudioQuality.Text = VirtualKeyToDisplayName(k));
+        }
+
+        private void BtnPresenceMode_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is AppPackageItem item)
+                item.CyclePresenceMode();
+        }
+
+        private void BtnCover_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is AppPackageItem item)
+                item.ToggleCover();
         }
 
         private void StartRecordingHotkey(Action<int> onRecorded)
@@ -1106,7 +1130,8 @@ namespace musicpresense
                 {
                     PackageName = a.PackageName,
                     IsEnabled = a.IsEnabled,
-                    EnableCoverSearch = a.EnableCoverSearch
+                    EnableCoverSearch = a.EnableCoverSearch,
+                    PresenceMode = a.PresenceMode
                 }).ToList() ?? new List<EligibleAppConfig>(),
                 HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
                 HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
@@ -1125,36 +1150,80 @@ namespace musicpresense
             public event PropertyChangedEventHandler? PropertyChanged;
 
             public string PackageName { get; }
+            public string DisplayName => MainWindow.FormatPackageName(PackageName);
 
-            private bool _isSelected;
-            public bool IsSelected
+            private PresenceMode _presenceMode;
+            public PresenceMode PresenceMode
             {
-                get => _isSelected;
+                get => _presenceMode;
                 set
                 {
-                    if (_isSelected == value) return;
-                    _isSelected = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+                    if (_presenceMode == value) return;
+                    _presenceMode = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PresenceMode)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PresenceModeLabel)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PresenceModeColor)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PresenceModeBrush)));
                 }
             }
 
-            private bool _isCoverSearchEnabled;
-            public bool IsCoverSearchEnabled
+            private bool _enableCoverSearch;
+            public bool EnableCoverSearch
             {
-                get => _isCoverSearchEnabled;
+                get => _enableCoverSearch;
                 set
                 {
-                    if (_isCoverSearchEnabled == value) return;
-                    _isCoverSearchEnabled = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCoverSearchEnabled)));
+                    if (_enableCoverSearch == value) return;
+                    _enableCoverSearch = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EnableCoverSearch)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CoverLabel)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CoverColor)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CoverBrush)));
                 }
             }
 
-            public AppPackageItem(string packageName, bool isSelected, bool isCoverSearchEnabled)
+            public string PresenceModeLabel => _presenceMode switch
+            {
+                PresenceMode.Full => "Full",
+                PresenceMode.Half => "Half",
+                _ => "Off"
+            };
+
+            public string PresenceModeColor => _presenceMode switch
+            {
+                PresenceMode.Full => "#34C954",
+                PresenceMode.Half => "#3E7BFF",
+                _ => "#FF3B30"
+            };
+
+            public System.Windows.Media.Brush PresenceModeBrush => new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(PresenceModeColor));
+
+            public string CoverLabel => _enableCoverSearch ? "On" : "Off";
+            public string CoverColor => _enableCoverSearch ? "#34C954" : "#FF3B30";
+            public System.Windows.Media.Brush CoverBrush => new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(CoverColor));
+
+            public AppPackageItem(string packageName, PresenceMode presenceMode, bool enableCoverSearch)
             {
                 PackageName = packageName;
-                _isSelected = isSelected;
-                _isCoverSearchEnabled = isCoverSearchEnabled;
+                _presenceMode = presenceMode;
+                _enableCoverSearch = enableCoverSearch;
+            }
+
+            public void CyclePresenceMode()
+            {
+                PresenceMode = PresenceMode switch
+                {
+                    PresenceMode.Full => PresenceMode.Half,
+                    PresenceMode.Half => PresenceMode.Off,
+                    _ => PresenceMode.Full
+                };
+            }
+
+            public void ToggleCover()
+            {
+                EnableCoverSearch = !EnableCoverSearch;
             }
         }
 
