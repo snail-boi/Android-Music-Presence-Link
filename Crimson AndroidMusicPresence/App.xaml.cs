@@ -548,6 +548,8 @@ namespace musicpresense
             if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
                 return;
 
+            bool trackChanged = title != _lastMediaPlayerTitle || artist != _lastMediaPlayerArtist;
+
             _lastMediaPlayerTitle = title;
             _lastMediaPlayerArtist = artist;
             _lastMediaPlayerAlbum = album;
@@ -564,7 +566,7 @@ namespace musicpresense
                 _mediaPlayerWindow.UpdateTrack(title, artist, album, coverPath, isPlaying);
                 _mediaPlayerWindow.UpdateProgress(positionMs, durationMs);
 
-                if (App.Config.NextSongMode != NextSongMode.Off)
+                if (App.Config.NextSongMode != NextSongMode.Off && trackChanged)
                     _ = UpdateNextSongNeighboursAsync(title, artist);
             });
         }

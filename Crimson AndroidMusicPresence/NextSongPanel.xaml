@@ -1,96 +1,97 @@
 <UserControl x:Class="musicpresense.NextSongPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             IsHitTestVisible="False">
-    <UserControl.Resources>
-        <Style x:Key="NextSongLabelStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Opacity" Value="0.55" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-            <Setter Property="MaxWidth" Value="160" />
-        </Style>
-        <Style x:Key="NextSongTitleStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-            <Setter Property="MaxWidth" Value="160" />
-            <Setter Property="TextWrapping" Value="NoWrap" />
-        </Style>
-    </UserControl.Resources>
+             Width="140"
+             Height="220">
 
-    <!-- Outer border with semi-transparent background -->
-    <Border x:Name="RootBorder"
-            Background="#CC000000"
-            CornerRadius="8"
-            Padding="10,8"
-            Opacity="0"
-            Visibility="Collapsed">
-        <StackPanel>
-            <!-- Cover art image (full art mode only) -->
-            <Border x:Name="CoverBorder"
-                    Width="120"
-                    Height="120"
-                    CornerRadius="6"
-                    ClipToBounds="True"
-                    Margin="0,0,0,8"
+    <Grid x:Name="RootPanel"
+          Visibility="Collapsed"
+          Width="140"
+          Height="220"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Bottom"
+          SnapsToDevicePixels="True"
+          UseLayoutRounding="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="140" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="22" />
+            <RowDefinition Height="30" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="CoverBorder"
+                Grid.Row="0"
+                Width="140"
+                Height="140"
+                CornerRadius="0"
+                ClipToBounds="True"
+                Visibility="Collapsed">
+            <Image x:Name="CoverImage"
+                   Stretch="UniformToFill"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+        </Border>
+
+        <TextBlock x:Name="TxtDirection"
+                   Grid.Row="2"
+                   Width="140"
+                   FontSize="14"
+                   FontWeight="SemiBold"
+                   Opacity="0.55"
+                   TextTrimming="CharacterEllipsis"
+                   TextWrapping="NoWrap"
+                   TextAlignment="Center"
+                   Height="18"
+                   Margin="0,0,0,2" />
+
+        <TextBlock x:Name="TxtTitle"
+                   Grid.Row="3"
+                   Width="140"
+                   FontSize="16"
+                   FontWeight="SemiBold"
+                   TextTrimming="CharacterEllipsis"
+                   TextWrapping="NoWrap"
+                   Height="22"
+                   TextAlignment="Center"
+                   VerticalAlignment="Top"
+                   Margin="0,0,0,2" />
+
+        <StackPanel x:Name="PanelStale"
+                    Grid.Row="4"
+                    Width="140"
                     Visibility="Collapsed">
-                <Image x:Name="CoverImage"
-                       Stretch="UniformToFill" />
-            </Border>
-
-            <!-- Direction label -->
-            <TextBlock x:Name="TxtDirection"
-                       Style="{StaticResource NextSongLabelStyle}"
-                       Foreground="White"
-                       Margin="0,0,0,2" />
-
-            <!-- Song title -->
-            <TextBlock x:Name="TxtTitle"
-                       Style="{StaticResource NextSongTitleStyle}"
-                       Foreground="White" />
-
-            <!-- Stale list indicator with refresh button -->
-            <StackPanel x:Name="PanelStale"
-                        Visibility="Collapsed"
-                        Margin="0,4,0,0">
-                <TextBlock Text="List may be outdated"
-                           FontSize="11"
-                           Opacity="0.7"
-                           Foreground="White"
-                           TextWrapping="Wrap"
-                           MaxWidth="160"
-                           Margin="0,0,0,4" />
-                <Button x:Name="BtnRefresh"
-                        Content="Refresh list"
-                        FontSize="11"
-                        Padding="8,4"
-                        Cursor="Hand"
-                        IsHitTestVisible="True"
-                        Background="#44FFFFFF"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Click="BtnRefresh_Click">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="Bd"
-                                    Background="{TemplateBinding Background}"
-                                    CornerRadius="5"
-                                    Padding="{TemplateBinding Padding}">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#66FFFFFF" />
-                                </Trigger>
-                                <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#88FFFFFF" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
-            </StackPanel>
+            <TextBlock Text="List may be outdated"
+                       FontSize="13"
+                       Opacity="0.6"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,4" />
+            <Button x:Name="BtnRefresh"
+                    Content="Refresh list"
+                    FontSize="13"
+                    Padding="6,3"
+                    Cursor="Hand"
+                    BorderThickness="0"
+                    Click="BtnRefresh_Click">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="#44888888"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#66888888" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#88888888" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
         </StackPanel>
-    </Border>
+
+    </Grid>
 </UserControl>

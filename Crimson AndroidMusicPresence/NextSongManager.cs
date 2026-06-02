@@ -44,6 +44,7 @@ namespace musicpresense
         /// </summary>
         public async Task ScanAsync(string deviceId, List<string> remoteRoots, NextSongSortMode sortMode)
         {
+            Debugger.show($"[NEXTSONG] ScanAsync started. Device: {deviceId}, roots: {remoteRoots.Count}, sort: {sortMode}");
             var entries = new List<LibraryEntry>();
 
             foreach (var root in remoteRoots)
@@ -51,13 +52,10 @@ namespace musicpresense
                 var escapedRoot = root.Replace("\"", "\\\"");
                 Debugger.show($"[NEXTSONG] Scanning root: {root}");
 
-                // find + stat: get full paths and epoch-second mtime in one ADB call.
-                // -print0 / xargs -0 handle filenames with spaces safely.
-                // stat -c "%n %Y" outputs: <full path> <epoch seconds>
-                // The epoch is always the last whitespace-separated token so filenames
-                // with spaces are unambiguous to parse.
-                var output = await AdbHelper.RunAdbCaptureAsync(
-                    $"-s {deviceId} shell find \"{escapedRoot}\" -type f -print0 | xargs -0 stat -c \"%n %Y\"").ConfigureAwait(false);
+                var cmd = $"-s {deviceId} shell find \"{escapedRoot}\" -type f -print0 | xargs -0 stat -c \"%n %Y\"";
+                Debugger.show($"[NEXTSONG] ADB command: {cmd}");
+
+                var output = await AdbHelper.RunAdbCaptureAsync(cmd).ConfigureAwait(false);
 
                 if (string.IsNullOrWhiteSpace(output))
                 {
@@ -65,21 +63,24 @@ namespace musicpresense
                     continue;
                 }
 
+                Debugger.show($"[NEXTSONG] Raw output length: {output.Length} chars");
+
                 var parsed = ParseStatOutput(output);
                 entries.AddRange(parsed);
-                Debugger.show($"[NEXTSONG] Found {parsed.Count} audio files in: {root}");
+                Debugger.show($"[NEXTSONG] Parsed {parsed.Count} audio files from root: {root}");
             }
 
             Debugger.show($"[NEXTSONG] Total entries before sort: {entries.Count}");
 
             var sorted = Sort(entries, sortMode);
+            Debugger.show($"[NEXTSONG] Sort complete. Mode: {sortMode}, entries: {sorted.Count}");
 
             await WriteListAsync(sorted).ConfigureAwait(false);
 
             _entries = sorted;
             _loaded = true;
 
-            Debugger.show($"[NEXTSONG] Scan complete. {_entries.Count} entries saved.");
+            Debugger.show($"[NEXTSONG] ScanAsync complete. {_entries.Count} entries in memory.");
         }
 
         /// <summary>
@@ -87,10 +88,12 @@ namespace musicpresense
         /// </summary>
         public async Task ResortAsync(NextSongSortMode sortMode)
         {
+            Debugger.show($"[NEXTSONG] ResortAsync started. New mode: {sortMode}");
             await EnsureLoadedAsync().ConfigureAwait(false);
+            Debugger.show($"[NEXTSONG] Resorting {_entries.Count} entries.");
             _entries = Sort(_entries, sortMode);
             await WriteListAsync(_entries).ConfigureAwait(false);
-            Debugger.show($"[NEXTSONG] Resorted {_entries.Count} entries by {sortMode}.");
+            Debugger.show($"[NEXTSONG] ResortAsync complete. {_entries.Count} entries written.");
         }
 
         // ── Match ─────────────────────────────────────────────────────────────
@@ -109,19 +112,27 @@ namespace musicpresense
         /// </summary>
         public async Task<NeighbourResult> FindNeighboursAsync(string? title, string? artist)
         {
+            Debugger.show($"[NEXTSONG] FindNeighboursAsync. Title: \"{title}\", Artist: \"{artist}\"");
             await EnsureLoadedAsync().ConfigureAwait(false);
 
             if (_entries.Count == 0)
+            {
+                Debugger.show("[NEXTSONG] Entry list is empty, returning not found.");
                 return new NeighbourResult(null, null, null, null, false);
+            }
 
             if (string.IsNullOrWhiteSpace(title))
+            {
+                Debugger.show("[NEXTSONG] Title is null/empty, returning not found.");
                 return new NeighbourResult(null, null, null, null, false);
+            }
 
             int bestIndex = -1;
             int bestScore = int.MinValue;
 
             string normTitle = NormalizeForMatch(title);
             string normArtist = NormalizeForMatch(artist ?? string.Empty);
+            Debugger.show($"[NEXTSONG] Normalized title: \"{normTitle}\", artist: \"{normArtist}\"");
 
             for (int i = 0; i < _entries.Count; i++)
             {
@@ -134,9 +145,15 @@ namespace musicpresense
                 }
             }
 
-            // Minimum score threshold: the filename must meaningfully contain the title.
+            Debugger.show($"[NEXTSONG] Best match index: {bestIndex}, score: {bestScore}");
+
             if (bestIndex < 0 || bestScore < 10)
+            {
+                Debugger.show($"[NEXTSONG] No match found (score {bestScore} below threshold). Returning not found.");
                 return new NeighbourResult(null, null, null, null, false);
+            }
+
+            Debugger.show($"[NEXTSONG] Matched: \"{_entries[bestIndex].RemotePath}\"");
 
             string? prevPath = null, prevTitle = null;
             string? nextPath = null, nextTitle = null;
@@ -145,12 +162,22 @@ namespace musicpresense
             {
                 prevPath = _entries[bestIndex - 1].RemotePath;
                 prevTitle = FilenameToDisplayTitle(prevPath);
+                Debugger.show($"[NEXTSONG] Prev [{bestIndex - 1}]: \"{prevPath}\"");
+            }
+            else
+            {
+                Debugger.show("[NEXTSONG] No previous entry (matched at index 0).");
             }
 
             if (bestIndex < _entries.Count - 1)
             {
                 nextPath = _entries[bestIndex + 1].RemotePath;
                 nextTitle = FilenameToDisplayTitle(nextPath);
+                Debugger.show($"[NEXTSONG] Next [{bestIndex + 1}]: \"{nextPath}\"");
+            }
+            else
+            {
+                Debugger.show("[NEXTSONG] No next entry (matched at last index).");
             }
 
             return new NeighbourResult(prevPath, prevTitle, nextPath, nextTitle, true);
@@ -228,32 +255,36 @@ namespace musicpresense
         private static List<LibraryEntry> ParseStatOutput(string output)
         {
             var result = new List<LibraryEntry>();
+            int skippedNonAudio = 0;
+            int skippedMalformed = 0;
 
             foreach (var rawLine in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var line = rawLine.TrimEnd();
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
-                // Find the last space to split path from epoch.
                 int lastSpace = line.LastIndexOf(' ');
-                if (lastSpace < 1) continue;
+                if (lastSpace < 1) { skippedMalformed++; continue; }
 
                 var pathPart = line.Substring(0, lastSpace).Trim();
                 var epochPart = line.Substring(lastSpace + 1).Trim();
 
-                if (string.IsNullOrWhiteSpace(pathPart)) continue;
-                if (!pathPart.StartsWith('/')) continue;
+                if (string.IsNullOrWhiteSpace(pathPart)) { skippedMalformed++; continue; }
+                if (!pathPart.StartsWith('/')) { skippedMalformed++; continue; }
 
                 var ext = Path.GetExtension(pathPart).ToLowerInvariant();
-                if (!AudioExtensions.Contains(ext)) continue;
+                if (!AudioExtensions.Contains(ext)) { skippedNonAudio++; continue; }
 
                 DateTime date = DateTime.MinValue;
                 if (long.TryParse(epochPart, out long epoch))
                     date = DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime;
+                else
+                    Debugger.show($"[NEXTSONG] Failed to parse epoch \"{epochPart}\" for: {pathPart}");
 
                 result.Add(new LibraryEntry(pathPart, date));
             }
 
+            Debugger.show($"[NEXTSONG] ParseStatOutput: {result.Count} accepted, {skippedNonAudio} non-audio skipped, {skippedMalformed} malformed skipped.");
             return result;
         }
 
@@ -295,34 +326,28 @@ namespace musicpresense
         /// </summary>
         private static Dictionary<string, string> BuildPathIndex(List<LibraryEntry> entries)
         {
-            // Collect every directory component from every path.
-            // A "segment" here is any slash-delimited prefix that ends with '/'.
-            // We count how many entries each segment appears in.
+            Debugger.show($"[NEXTSONG] BuildPathIndex: analysing {entries.Count} entries for shared segments.");
             var segmentCounts = new Dictionary<string, int>(StringComparer.Ordinal);
 
             foreach (var entry in entries)
             {
                 var path = entry.RemotePath;
-                // Walk all directory prefixes of the path.
                 int pos = 0;
                 while (true)
                 {
                     int slash = path.IndexOf('/', pos + 1);
                     if (slash < 0) break;
-                    var segment = path.Substring(0, slash + 1); // includes trailing slash
+                    var segment = path.Substring(0, slash + 1);
                     segmentCounts.TryGetValue(segment, out int c);
                     segmentCounts[segment] = c + 1;
                     pos = slash;
                 }
             }
 
-            // Only index segments used by more than one entry.
             var rng = new Random();
             var used = new HashSet<string>();
-            var index = new Dictionary<string, string>(StringComparer.Ordinal); // segment -> id
+            var index = new Dictionary<string, string>(StringComparer.Ordinal);
 
-            // Sort descending by length so longer (more specific) prefixes get IDs first.
-            // This maximises compression since we replace the longest matching prefix.
             foreach (var kvp in segmentCounts.OrderByDescending(k => k.Key.Length))
             {
                 if (kvp.Value < 2) continue;
@@ -331,8 +356,10 @@ namespace musicpresense
                 do { id = rng.Next(10000, 99999).ToString(); } while (used.Contains(id));
                 used.Add(id);
                 index[kvp.Key] = id;
+                Debugger.show($"[NEXTSONG] Index: {id} = \"{kvp.Key}\" (used by {kvp.Value} entries)");
             }
 
+            Debugger.show($"[NEXTSONG] BuildPathIndex complete. {index.Count} segments indexed.");
             return index;
         }
 
@@ -359,32 +386,31 @@ namespace musicpresense
         {
             try
             {
+                Debugger.show($"[NEXTSONG] WriteListAsync: writing {entries.Count} entries.");
                 var dir = Path.GetDirectoryName(_listFilePath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                     Directory.CreateDirectory(dir);
 
-                // Build compression index.
                 var segmentToId = BuildPathIndex(entries);
-                // Invert for storage: id -> segment.
                 var idToSegment = segmentToId.ToDictionary(k => k.Value, k => k.Key);
 
-                // Write path index file (only if there are shared segments).
                 if (idToSegment.Count > 0)
                 {
                     var indexLines = idToSegment.Select(kvp => $"{kvp.Key}\t{kvp.Value}");
                     await File.WriteAllLinesAsync(_pathIndexFilePath, indexLines, Encoding.UTF8).ConfigureAwait(false);
+                    Debugger.show($"[NEXTSONG] Path index written to: {_pathIndexFilePath}");
                 }
                 else if (File.Exists(_pathIndexFilePath))
                 {
                     File.Delete(_pathIndexFilePath);
+                    Debugger.show("[NEXTSONG] No shared segments; deleted stale path index.");
                 }
 
-                // Write main list with compressed paths.
                 var lines = entries.Select(e =>
                     $"{CompressPath(e.RemotePath, segmentToId)}\t{e.DateModified:O}");
                 await File.WriteAllLinesAsync(_listFilePath, lines, Encoding.UTF8).ConfigureAwait(false);
 
-                Debugger.show($"[NEXTSONG] Wrote {entries.Count} entries, {idToSegment.Count} shared path segments indexed.");
+                Debugger.show($"[NEXTSONG] List written to: {_listFilePath} ({entries.Count} entries, {idToSegment.Count} indexed segments).");
             }
             catch (Exception ex)
             {
@@ -398,40 +424,53 @@ namespace musicpresense
 
             try
             {
-                if (!File.Exists(_listFilePath)) return;
+                Debugger.show($"[NEXTSONG] EnsureLoadedAsync: loading from disk.");
 
-                // Load path index if present.
+                if (!File.Exists(_listFilePath))
+                {
+                    Debugger.show("[NEXTSONG] List file not found, nothing to load.");
+                    return;
+                }
+
                 var idToSegment = new Dictionary<string, string>(StringComparer.Ordinal);
                 if (File.Exists(_pathIndexFilePath))
                 {
-                    foreach (var line in await File.ReadAllLinesAsync(_pathIndexFilePath, Encoding.UTF8).ConfigureAwait(false))
+                    var indexLines = await File.ReadAllLinesAsync(_pathIndexFilePath, Encoding.UTF8).ConfigureAwait(false);
+                    foreach (var line in indexLines)
                     {
                         var parts = line.Split('\t');
                         if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[0]))
-                            idToSegment[parts[0].Trim()] = parts[1]; // id -> segment
+                            idToSegment[parts[0].Trim()] = parts[1];
                     }
+                    Debugger.show($"[NEXTSONG] Path index loaded: {idToSegment.Count} segments.");
+                }
+                else
+                {
+                    Debugger.show("[NEXTSONG] No path index file, paths stored as-is.");
                 }
 
-                // Load entries and expand compressed paths.
                 var rawLines = await File.ReadAllLinesAsync(_listFilePath, Encoding.UTF8).ConfigureAwait(false);
                 var entries = new List<LibraryEntry>(rawLines.Length);
+                int expandedCount = 0;
+                int failedCount = 0;
 
                 foreach (var line in rawLines)
                 {
                     var parts = line.Split('\t');
-                    if (parts.Length < 1 || string.IsNullOrWhiteSpace(parts[0])) continue;
+                    if (parts.Length < 1 || string.IsNullOrWhiteSpace(parts[0])) { failedCount++; continue; }
 
                     var storedPath = parts[0];
                     var date = parts.Length > 1 && DateTime.TryParse(parts[1], out var d) ? d : DateTime.MinValue;
 
-                    // Expand: if first segment before '/' is a numeric ID, replace it.
                     var fullPath = ExpandPath(storedPath, idToSegment);
+                    if (fullPath != storedPath) expandedCount++;
+
                     entries.Add(new LibraryEntry(fullPath, date));
                 }
 
                 _entries = entries;
                 _loaded = true;
-                Debugger.show($"[NEXTSONG] Loaded {_entries.Count} entries from disk.");
+                Debugger.show($"[NEXTSONG] Loaded {_entries.Count} entries ({expandedCount} paths expanded, {failedCount} lines skipped).");
             }
             catch (Exception ex)
             {

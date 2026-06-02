@@ -1,12 +1,20 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace musicpresense
 {
     public partial class NextSongPanel : UserControl
     {
+        private string _directionLabel = string.Empty;
+        private string _title = string.Empty;
+        private string? _coverPath;
+        private bool _showCover = true;
+        private bool _roundedCorners = true;
+        private bool _isStale;
+
         public event Action? RefreshRequested;
 
         public NextSongPanel()
@@ -14,89 +22,110 @@ namespace musicpresense
             InitializeComponent();
         }
 
-        /// <summary>
-        /// Shows the panel with a song title (text only mode).
-        /// </summary>
         public void ShowTextOnly(string directionLabel, string title)
         {
-            TxtDirection.Text = directionLabel;
-            TxtTitle.Text = title;
-            CoverBorder.Visibility = Visibility.Collapsed;
-            PanelStale.Visibility = Visibility.Collapsed;
-            TxtTitle.Visibility = Visibility.Visible;
-            TxtDirection.Visibility = Visibility.Visible;
-            RootBorder.IsHitTestVisible = false;
-            RootBorder.Visibility = Visibility.Visible;
-            RootBorder.Opacity = 1;
+            _directionLabel = directionLabel;
+            _title = title;
+            _coverPath = null;
+            _isStale = false;
+            ApplyState();
         }
 
-        /// <summary>
-        /// Shows the panel with cover art and title (full art mode).
-        /// </summary>
         public void ShowWithCover(string directionLabel, string title, string? coverPath)
         {
-            TxtDirection.Text = directionLabel;
-            TxtTitle.Text = title;
-            PanelStale.Visibility = Visibility.Collapsed;
-            TxtTitle.Visibility = Visibility.Visible;
-            TxtDirection.Visibility = Visibility.Visible;
-
-            if (!string.IsNullOrWhiteSpace(coverPath) && System.IO.File.Exists(coverPath))
-            {
-                try
-                {
-                    var bmp = new BitmapImage();
-                    bmp.BeginInit();
-                    bmp.UriSource = new Uri(coverPath, UriKind.Absolute);
-                    bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.EndInit();
-                    bmp.Freeze();
-                    CoverImage.Source = bmp;
-                    CoverBorder.Visibility = Visibility.Visible;
-                }
-                catch
-                {
-                    CoverBorder.Visibility = Visibility.Collapsed;
-                }
-            }
-            else
-            {
-                CoverBorder.Visibility = Visibility.Collapsed;
-            }
-
-            RootBorder.IsHitTestVisible = false;
-            RootBorder.Visibility = Visibility.Visible;
-            RootBorder.Opacity = 1;
+            _directionLabel = directionLabel;
+            _title = title;
+            _coverPath = coverPath;
+            _isStale = false;
+            ApplyState();
         }
 
-        /// <summary>
-        /// Shows the stale-list indicator with a refresh button instead of song info.
-        /// Only shown on one panel (whichever side is configured to host it).
-        /// </summary>
+        public void SetRoundedCorners(bool rounded)
+        {
+            _roundedCorners = rounded;
+            ApplyState();
+        }
+
+        public void SetShowCover(bool showCover)
+        {
+            _showCover = showCover;
+            ApplyState();
+        }
+
         public void ShowStale()
         {
-            TxtTitle.Visibility = Visibility.Collapsed;
-            TxtDirection.Visibility = Visibility.Collapsed;
-            CoverBorder.Visibility = Visibility.Collapsed;
-            PanelStale.Visibility = Visibility.Visible;
-            RootBorder.IsHitTestVisible = true;
-            RootBorder.Visibility = Visibility.Visible;
-            RootBorder.Opacity = 1;
+            _coverPath = null;
+            _isStale = true;
+            ApplyState();
         }
 
-        /// <summary>
-        /// Hides the panel completely.
-        /// </summary>
         public void Hide()
         {
-            RootBorder.Visibility = Visibility.Collapsed;
-            RootBorder.Opacity = 0;
+            RootPanel.Visibility = Visibility.Collapsed;
             CoverImage.Source = null;
+            PanelStale.Visibility = Visibility.Collapsed;
         }
 
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             RefreshRequested?.Invoke();
+        }
+
+        private void ApplyState()
+        {
+            if (_isStale)
+            {
+                CoverBorder.Visibility = Visibility.Collapsed;
+                CoverImage.Source = null;
+                CoverBorder.Clip = null;
+                TxtDirection.Visibility = Visibility.Collapsed;
+                TxtTitle.Visibility = Visibility.Collapsed;
+                PanelStale.Visibility = Visibility.Visible;
+                RootPanel.Visibility = Visibility.Visible;
+                return;
+            }
+
+            PanelStale.Visibility = Visibility.Collapsed;
+            TxtDirection.Text = _directionLabel;
+            TxtTitle.Text = _title;
+            TxtDirection.Visibility = Visibility.Visible;
+            TxtTitle.Visibility = Visibility.Visible;
+
+            var radius = _roundedCorners ? new CornerRadius(6) : new CornerRadius(0);
+            CoverBorder.CornerRadius = radius;
+
+            bool showCover = _showCover && !string.IsNullOrWhiteSpace(_coverPath) && System.IO.File.Exists(_coverPath);
+            if (showCover)
+            {
+                try
+                {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.UriSource = new Uri(_coverPath!, UriKind.Absolute);
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    CoverImage.Source = bmp;
+                    CoverBorder.Visibility = Visibility.Visible;
+                    CoverBorder.Clip = _roundedCorners
+                        ? new RectangleGeometry(new Rect(0, 0, CoverBorder.Width, CoverBorder.Height), 6, 6)
+                        : null;
+                }
+                catch
+                {
+                    CoverImage.Source = null;
+                    CoverBorder.Visibility = Visibility.Collapsed;
+                    CoverBorder.Clip = null;
+                }
+            }
+            else
+            {
+                CoverImage.Source = null;
+                CoverBorder.Visibility = Visibility.Collapsed;
+                CoverBorder.Clip = null;
+            }
+
+            RootPanel.Visibility = Visibility.Visible;
         }
     }
 }

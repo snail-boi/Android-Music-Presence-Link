@@ -279,57 +279,70 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- Cover art area: hosts cover image AND the inline lyrics view (toggled by BtnLyrics).
-                         Both occupy the same square; lyrics is hidden by default. -->
                     <Grid Grid.Row="0"
                           Margin="0,16,0,24">
-                        <Viewbox Stretch="Uniform"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center">
-                            <Border x:Name="CoverBorder"
-                                Width="420"
-                                Height="420"
-                                CornerRadius="10"
-                                ClipToBounds="True"
-                                SnapsToDevicePixels="True">
-                                <Border.Background>
-                                    <SolidColorBrush Color="#22000000" />
-                                </Border.Background>
-                                <Grid x:Name="CoverImageGrid">
-                                    <Grid.Clip>
-                                        <RectangleGeometry Rect="0,0,420,420" RadiusX="10" RadiusY="10" />
-                                    </Grid.Clip>
-                                    <!-- Crossfade layer A (outgoing) -->
-                                    <Image x:Name="ImgCoverA"
-                                       Stretch="UniformToFill"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       SnapsToDevicePixels="True"
-                                       RenderOptions.BitmapScalingMode="HighQuality"
-                                       Opacity="1" />
-                                    <!-- Crossfade layer B (incoming) -->
-                                    <Image x:Name="ImgCoverB"
-                                       Stretch="UniformToFill"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       SnapsToDevicePixels="True"
-                                       RenderOptions.BitmapScalingMode="HighQuality"
-                                       Opacity="0" />
-                                    <!-- Invisible hit-test overlay for right-click context menu -->
-                                    <Border x:Name="CoverContextMenuHost" Background="Transparent">
-                                        <Border.ContextMenu>
-                                            <ContextMenu>
-                                                <MenuItem Header="Save cover image..." Click="SaveCoverMenuItem_Click" />
-                                                <MenuItem Header="Copy track info" Click="CopyCoverInfoMenuItem_Click" />
-                                            </ContextMenu>
-                                        </Border.ContextMenu>
-                                    </Border>
-                                </Grid>
-                            </Border>
+                        <Viewbox x:Name="CoverViewbox"
+                                 Stretch="Uniform"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="420" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="140" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border x:Name="PrevPanelHost"
+                                        Grid.Column="0"
+                                        VerticalAlignment="Bottom" />
+
+                                <Border x:Name="CoverBorder"
+                                        Grid.Column="2"
+                                        Width="420"
+                                        Height="420"
+                                        CornerRadius="10"
+                                        ClipToBounds="True"
+                                        SnapsToDevicePixels="True">
+                                    <Border.Background>
+                                        <SolidColorBrush Color="#22000000" />
+                                    </Border.Background>
+                                    <Grid x:Name="CoverImageGrid">
+                                        <Grid.Clip>
+                                            <RectangleGeometry Rect="0,0,420,420" RadiusX="10" RadiusY="10" />
+                                        </Grid.Clip>
+                                        <Image x:Name="ImgCoverA"
+                                               Stretch="UniformToFill"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               SnapsToDevicePixels="True"
+                                               RenderOptions.BitmapScalingMode="HighQuality"
+                                               Opacity="1" />
+                                        <Image x:Name="ImgCoverB"
+                                               Stretch="UniformToFill"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               SnapsToDevicePixels="True"
+                                               RenderOptions.BitmapScalingMode="HighQuality"
+                                               Opacity="0" />
+                                        <Border x:Name="CoverContextMenuHost" Background="Transparent">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Save cover image..." Click="SaveCoverMenuItem_Click" />
+                                                    <MenuItem Header="Copy track info" Click="CopyCoverInfoMenuItem_Click" />
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Border x:Name="NextPanelHost"
+                                        Grid.Column="4"
+                                        VerticalAlignment="Bottom" />
+                            </Grid>
                         </Viewbox>
 
-                        <!-- Inline lyrics view: occupies the same square as the cover when shown.
-                             Code-behind toggles Visibility and populates LyricsItemsHost. -->
                         <Grid x:Name="LyricsViewHost"
                               Visibility="Collapsed"
                               HorizontalAlignment="Stretch"
@@ -345,8 +358,6 @@
                                             Orientation="Vertical"
                                             HorizontalAlignment="Stretch" />
                             </ScrollViewer>
-
-                            <!-- Empty/loading state -->
                             <TextBlock x:Name="LyricsEmptyState"
                                        Text="No lyrics found for this track"
                                        FontSize="14"
@@ -358,8 +369,6 @@
                                        Visibility="Collapsed" />
                         </Grid>
                     </Grid>
-
-                    <!-- Track title, big and bold, centered -->
                     <TextBlock x:Name="TxtTitle"
                            Grid.Row="1"
                            Margin="0,0,0,6"
@@ -816,6 +825,7 @@
                             ToolTip="Toggle full screen"
                             Click="BtnFullscreen_Click" />
                 </Grid>
+
             </Grid>
         </Border>
 
