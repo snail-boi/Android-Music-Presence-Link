@@ -62,6 +62,21 @@ namespace musicpresense
         Full = 2
     }
 
+    public enum NextSongMode
+    {
+        Off = 0,
+        TextOnly = 1,
+        FullArt = 2
+    }
+
+    public enum NextSongSortMode
+    {
+        FilenameAZ = 0,
+        FilenameZA = 1,
+        DateModifiedNewest = 2,
+        DateModifiedOldest = 3
+    }
+
     public sealed class EligibleAppConfig
     {
         public string PackageName { get; set; } = string.Empty;
@@ -164,6 +179,10 @@ namespace musicpresense
         public string LyricsSearchFolderOverride { get; set; } = string.Empty;
         public string CoverArtFileNamePatterns { get; set; } = "cover.jpg;cover.png;folder.jpg";
         public string CopyTrackInfoTemplate { get; set; } = "{artist} - {title}";
+
+        // Next/previous song feature
+        public NextSongMode NextSongMode { get; set; } = NextSongMode.Off;
+        public NextSongSortMode NextSongSortMode { get; set; } = NextSongSortMode.FilenameAZ;
 
         public List<string> AllowedApps { get; set; } = new List<string> { };
         public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();

@@ -269,7 +269,7 @@
                     <Rectangle x:Name="GradientLayerB" Opacity="0" />
                 </Grid>
 
-                <Grid>
+                <Grid x:Name="PlayerGrid">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />

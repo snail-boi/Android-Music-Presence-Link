@@ -496,6 +496,74 @@
                           Unchecked="ChkSwapSettingsLocation_Changed" />
             </Grid>
 
+            <!-- Divider -->
+            <Border BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    Margin="0,0,0,20" />
+
+            <!-- ── NEXT / PREVIOUS SONG ──────────────────────────────────────── -->
+            <TextBlock Text="NEXT / PREVIOUS SONG" Style="{StaticResource SectionHeading}" />
+
+            <TextBlock Text="Based on a local library scan. May not always be 100% accurate."
+                       FontSize="11"
+                       Opacity="0.55"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,10" />
+
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Mode" Style="{StaticResource RowLabel}" />
+                <Button x:Name="BtnNextSongMode"
+                        Grid.Column="1"
+                        Style="{StaticResource CycleButtonStyle}"
+                        Click="BtnNextSongMode_Click" />
+            </Grid>
+
+            <!-- Sort and rescan: only visible when mode is not Off -->
+            <StackPanel x:Name="PanelNextSongOptions" Visibility="Collapsed">
+
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Sort order" Style="{StaticResource RowLabel}" />
+                    <Button x:Name="BtnNextSongSort"
+                            Grid.Column="1"
+                            Style="{StaticResource CycleButtonStyle}"
+                            Click="BtnNextSongSort_Click" />
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Library list" Style="{StaticResource RowLabel}" />
+                        <TextBlock x:Name="TxtNextSongListStatus"
+                                   FontSize="11"
+                                   Opacity="0.55"
+                                   Margin="0,2,0,0" />
+                        <TextBlock Text="Scanning can be slow on large libraries."
+                                   FontSize="11"
+                                   Opacity="0.45"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="200"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+                    <Button x:Name="BtnRescanLibrary"
+                            Grid.Column="1"
+                            Style="{StaticResource CycleButtonStyle}"
+                            Content="Rescan"
+                            Click="BtnRescanLibrary_Click" />
+                </Grid>
+
+            </StackPanel>
+
         </StackPanel>
     </ScrollViewer>
 </UserControl>

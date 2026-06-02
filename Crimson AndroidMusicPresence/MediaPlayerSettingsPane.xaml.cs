@@ -66,6 +66,11 @@ namespace musicpresense
 
                 // Layout
                 ChkSwapSettingsLocation.IsChecked = c.SwapSettingsLocation;
+
+                // Next / previous song
+                UpdateNextSongModeButton();
+                UpdateNextSongSortButton();
+                RefreshNextSongListStatus();
             }
             finally
             {
@@ -256,6 +261,74 @@ namespace musicpresense
             if (_loading) return;
             App.Config.SwapSettingsLocation = ChkSwapSettingsLocation.IsChecked == true;
             SaveAndNotify();
+        }
+
+        // ── Next / Previous song ──────────────────────────────────────────────
+
+        private static readonly string[] NextSongModeLabels = { "Off", "Text only", "Full art" };
+        private static readonly string[] NextSongSortLabels = { "A-Z", "Z-A", "Newest", "Oldest" };
+
+        private void UpdateNextSongModeButton()
+        {
+            var mode = App.Config.NextSongMode;
+            BtnNextSongMode.Content = NextSongModeLabels[(int)mode];
+            BtnNextSongMode.Opacity = mode == NextSongMode.Off ? 0.45 : 1.0;
+            PanelNextSongOptions.Visibility = mode == NextSongMode.Off ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void UpdateNextSongSortButton()
+        {
+            BtnNextSongSort.Content = NextSongSortLabels[(int)App.Config.NextSongSortMode];
+        }
+
+        public void RefreshNextSongListStatus()
+        {
+            var path = AppPaths.GetDataPath("library_list.txt");
+            if (System.IO.File.Exists(path))
+            {
+                var info = new System.IO.FileInfo(path);
+                TxtNextSongListStatus.Text = $"Last scan: {info.LastWriteTime:g}";
+            }
+            else
+            {
+                TxtNextSongListStatus.Text = "No list yet";
+            }
+        }
+
+        private void BtnNextSongMode_Click(object sender, RoutedEventArgs e)
+        {
+            var next = (NextSongMode)(((int)App.Config.NextSongMode + 1) % 3);
+            App.Config.NextSongMode = next;
+            UpdateNextSongModeButton();
+            RefreshNextSongListStatus();
+            SaveAndNotify();
+        }
+
+        private void BtnNextSongSort_Click(object sender, RoutedEventArgs e)
+        {
+            var next = (NextSongSortMode)(((int)App.Config.NextSongSortMode + 1) % 4);
+            var prev = App.Config.NextSongSortMode;
+            App.Config.NextSongSortMode = next;
+            UpdateNextSongSortButton();
+            SaveAndNotify();
+            // If sort changed and list exists, resort without a rescan.
+            if (prev != next)
+                (Application.Current as App)?.ResortNextSongListAsync();
+        }
+
+        private void BtnRescanLibrary_Click(object sender, RoutedEventArgs e)
+        {
+            BtnRescanLibrary.IsEnabled = false;
+            BtnRescanLibrary.Content = "Scanning...";
+            (Application.Current as App)?.RescanNextSongLibraryAsync(() =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    BtnRescanLibrary.IsEnabled = true;
+                    BtnRescanLibrary.Content = "Rescan";
+                    RefreshNextSongListStatus();
+                });
+            });
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
