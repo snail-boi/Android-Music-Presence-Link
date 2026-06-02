@@ -265,13 +265,17 @@ namespace musicpresense
 
         // ── Next / Previous song ──────────────────────────────────────────────
 
-        private static readonly string[] NextSongModeLabels = { "Off", "Text only", "Full art" };
+        // Display labels indexed by NextSongMode enum value (Off=0, TextOnly=1, FullArt=2, Kirsten=3)
+        private static readonly string[] NextSongModeLabels = { "Off", "Text only", "Full art", "Kirsten" };
         private static readonly string[] NextSongSortLabels = { "A-Z", "Z-A", "Newest", "Oldest" };
 
         private void UpdateNextSongModeButton()
         {
             var mode = App.Config.NextSongMode;
-            BtnNextSongMode.Content = NextSongModeLabels[(int)mode];
+            int idx = (int)mode;
+            BtnNextSongMode.Content = idx >= 0 && idx < NextSongModeLabels.Length
+                ? NextSongModeLabels[idx]
+                : "Off";
             BtnNextSongMode.Opacity = mode == NextSongMode.Off ? 0.45 : 1.0;
             PanelNextSongOptions.Visibility = mode == NextSongMode.Off ? Visibility.Collapsed : Visibility.Visible;
         }
@@ -297,7 +301,15 @@ namespace musicpresense
 
         private void BtnNextSongMode_Click(object sender, RoutedEventArgs e)
         {
-            var next = (NextSongMode)(((int)App.Config.NextSongMode + 1) % 3);
+            // Cycle order: FullArt -> TextOnly -> Off -> Kirsten -> FullArt
+            var next = App.Config.NextSongMode switch
+            {
+                NextSongMode.FullArt => NextSongMode.TextOnly,
+                NextSongMode.TextOnly => NextSongMode.Off,
+                NextSongMode.Off => NextSongMode.Kirsten,
+                NextSongMode.Kirsten => NextSongMode.FullArt,
+                _ => NextSongMode.FullArt
+            };
             App.Config.NextSongMode = next;
             UpdateNextSongModeButton();
             RefreshNextSongListStatus();

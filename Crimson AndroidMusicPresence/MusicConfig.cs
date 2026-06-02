@@ -66,7 +66,8 @@ namespace musicpresense
     {
         Off = 0,
         TextOnly = 1,
-        FullArt = 2
+        FullArt = 2,
+        Kirsten = 3
     }
 
     public enum NextSongSortMode

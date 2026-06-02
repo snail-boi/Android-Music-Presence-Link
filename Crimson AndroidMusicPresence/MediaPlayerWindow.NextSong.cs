@@ -55,16 +55,9 @@ namespace musicpresense
             _prevPanel.SetShowCover(App.Config.PlayerShowCover);
             _nextPanel.SetShowCover(App.Config.PlayerShowCover);
 
-            if (mode == NextSongMode.TextOnly)
-            {
-                _prevPanel.Height = 220;
-                _nextPanel.Height = 220;
-            }
-            else
-            {
-                _prevPanel.Height = 220;
-                _nextPanel.Height = 220;
-            }
+            // Kirsten mode: smaller inset panels that partially overlap the main cover.
+            bool kirsten = mode == NextSongMode.Kirsten;
+            ApplyKirstenLayout(kirsten);
 
             if (mode == NextSongMode.Off)
             {
@@ -117,6 +110,59 @@ namespace musicpresense
             }
         }
 
+        /// <summary>
+        /// Applies or removes the Kirsten layout: in Kirsten mode the panels are narrower
+        /// and use negative margins so they slide inward to overlap the edges of the main cover.
+        /// The panels' Panel.ZIndex is raised so they render on top of the cover image.
+        /// In all other modes the layout is restored to its default side-by-side position.
+        /// </summary>
+        private void ApplyKirstenLayout(bool kirsten)
+        {
+            // How many pixels the panel should overlap into the cover from each side.
+            const double overlapIntocover = 90;
+            // Spacer column width between panel column and cover column is 12px.
+            const double spacerWidth = 12;
+            // Panel width to use in Kirsten mode.
+            const double kirstenPanelWidth = 110;
+            const double kirstenPanelHeight = 160;
+            // Normal panel size.
+            const double normalPanelHeight = 220;
+
+            if (kirsten)
+            {
+                // Pull PrevPanelHost right so it overlaps the left edge of the cover.
+                // Margin on the right side = -(spacerWidth + overlapIntocover).
+                PrevPanelHost.Margin = new System.Windows.Thickness(0, 0, -(spacerWidth + overlapIntocover), 0);
+                PrevPanelHost.VerticalAlignment = System.Windows.VerticalAlignment.Bottom;
+                System.Windows.Controls.Panel.SetZIndex(PrevPanelHost, 5);
+
+                // Pull NextPanelHost left so it overlaps the right edge of the cover.
+                NextPanelHost.Margin = new System.Windows.Thickness(-(spacerWidth + overlapIntocover), 0, 0, 0);
+                NextPanelHost.VerticalAlignment = System.Windows.VerticalAlignment.Bottom;
+                System.Windows.Controls.Panel.SetZIndex(NextPanelHost, 5);
+
+                _prevPanel.Width = kirstenPanelWidth;
+                _prevPanel.Height = kirstenPanelHeight;
+                _nextPanel.Width = kirstenPanelWidth;
+                _nextPanel.Height = kirstenPanelHeight;
+            }
+            else
+            {
+                PrevPanelHost.Margin = new System.Windows.Thickness(0);
+                PrevPanelHost.VerticalAlignment = System.Windows.VerticalAlignment.Bottom;
+                System.Windows.Controls.Panel.SetZIndex(PrevPanelHost, 0);
+
+                NextPanelHost.Margin = new System.Windows.Thickness(0);
+                NextPanelHost.VerticalAlignment = System.Windows.VerticalAlignment.Bottom;
+                System.Windows.Controls.Panel.SetZIndex(NextPanelHost, 0);
+
+                _prevPanel.Width = 140;
+                _prevPanel.Height = normalPanelHeight;
+                _nextPanel.Width = 140;
+                _nextPanel.Height = normalPanelHeight;
+            }
+        }
+
         internal void HideNeighbourPanels()
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(HideNeighbourPanels); return; }
@@ -131,9 +177,11 @@ namespace musicpresense
 
             bool roundedCorners = App.Config.PlayerCoverRoundedCorners;
             bool showCover = App.Config.PlayerShowCover;
+            var mode = App.Config.NextSongMode;
 
-            if (App.Config.NextSongMode == NextSongMode.Off)
+            if (mode == NextSongMode.Off)
             {
+                ApplyKirstenLayout(false);
                 _prevPanel.Hide();
                 _nextPanel.Hide();
                 PrevPanelHost.Visibility = Visibility.Collapsed;
@@ -141,6 +189,7 @@ namespace musicpresense
                 return;
             }
 
+            ApplyKirstenLayout(mode == NextSongMode.Kirsten);
             _prevPanel.SetRoundedCorners(roundedCorners);
             _nextPanel.SetRoundedCorners(roundedCorners);
             _prevPanel.SetShowCover(showCover);

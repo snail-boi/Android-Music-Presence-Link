@@ -1640,7 +1640,7 @@ namespace musicpresense
                     return;
                 }
 
-                // FullArt: fire and forget cover fetches for both neighbours.
+                // FullArt and Kirsten: fire and forget cover fetches for both neighbours.
                 _ = FetchAndPushNeighbourCoversAsync(window, result, device);
             }
             catch (Exception ex)
