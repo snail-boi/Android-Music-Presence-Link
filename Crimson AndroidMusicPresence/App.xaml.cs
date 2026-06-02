@@ -608,7 +608,7 @@ namespace musicpresense
                     GetPhoneVolumeAsync,
                     (prev, target, max) => SetPhoneVolumeAsync(prev, target, max));
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
-                _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync());
+                _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask, () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
 
                 // Push current connection + scrcpy state into the freshly created window.
                 ApplyConnectionStateToMediaPlayer();
@@ -1647,6 +1647,14 @@ namespace musicpresense
             {
                 Debugger.show("[NEXTSONG] UpdateNextSongNeighboursAsync failed: " + ex.Message);
             }
+        }
+
+        internal Task RefreshNextSongNeighboursAsync()
+        {
+            if (_mediaPlayerWindow == null || !_mediaPlayerWindow.IsVisible || Config.NextSongMode == NextSongMode.Off)
+                return Task.CompletedTask;
+
+            return UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
         }
 
         private async Task FetchAndPushNeighbourCoversAsync(MediaPlayerWindow window, NextSongManager.NeighbourResult result, string device)

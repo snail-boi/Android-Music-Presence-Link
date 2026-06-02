@@ -296,6 +296,7 @@
 
                                 <Border x:Name="PrevPanelHost"
                                         Grid.Column="0"
+                                        Margin="0,0,0,0"
                                         VerticalAlignment="Bottom" />
 
                                 <Border x:Name="CoverBorder"
@@ -339,6 +340,7 @@
 
                                 <Border x:Name="NextPanelHost"
                                         Grid.Column="4"
+                                        Margin="0,0,0,0"
                                         VerticalAlignment="Bottom" />
                             </Grid>
                         </Viewbox>

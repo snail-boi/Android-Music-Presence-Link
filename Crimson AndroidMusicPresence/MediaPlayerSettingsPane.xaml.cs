@@ -302,6 +302,18 @@ namespace musicpresense
             UpdateNextSongModeButton();
             RefreshNextSongListStatus();
             SaveAndNotify();
+            var app = Application.Current as App;
+            if (app != null)
+            {
+                if (next == NextSongMode.Off)
+                {
+                    app.RefreshNextSongNeighboursAsync();
+                }
+                else
+                {
+                    _ = app.RefreshNextSongNeighboursAsync();
+                }
+            }
         }
 
         private void BtnNextSongSort_Click(object sender, RoutedEventArgs e)

@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -14,6 +15,11 @@ namespace musicpresense
         private bool _showCover = true;
         private bool _roundedCorners = true;
         private bool _isStale;
+        private bool _isPrevious;
+        private bool _textOnlyMode;
+
+        public event Action? PreviousRequested;
+        public event Action? NextRequested;
 
         public event Action? RefreshRequested;
 
@@ -27,6 +33,7 @@ namespace musicpresense
             _directionLabel = directionLabel;
             _title = title;
             _coverPath = null;
+            _textOnlyMode = true;
             _isStale = false;
             ApplyState();
         }
@@ -36,8 +43,14 @@ namespace musicpresense
             _directionLabel = directionLabel;
             _title = title;
             _coverPath = coverPath;
+            _textOnlyMode = false;
             _isStale = false;
             ApplyState();
+        }
+
+        public void SetDirection(bool isPrevious)
+        {
+            _isPrevious = isPrevious;
         }
 
         public void SetRoundedCorners(bool rounded)
@@ -55,6 +68,7 @@ namespace musicpresense
         public void ShowStale()
         {
             _coverPath = null;
+            _textOnlyMode = false;
             _isStale = true;
             ApplyState();
         }
@@ -69,6 +83,17 @@ namespace musicpresense
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             RefreshRequested?.Invoke();
+        }
+
+        private void UserControl_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isStale)
+                return;
+
+            if (_isPrevious)
+                PreviousRequested?.Invoke();
+            else
+                NextRequested?.Invoke();
         }
 
         private void ApplyState()
@@ -90,6 +115,10 @@ namespace musicpresense
             TxtTitle.Text = _title;
             TxtDirection.Visibility = Visibility.Visible;
             TxtTitle.Visibility = Visibility.Visible;
+
+            TitleHost.MinHeight = _textOnlyMode ? 58 : 22;
+            TxtTitle.MaxHeight = _textOnlyMode ? 84 : 42;
+            TxtTitle.TextWrapping = _textOnlyMode ? TextWrapping.Wrap : TextWrapping.NoWrap;
 
             var radius = _roundedCorners ? new CornerRadius(6) : new CornerRadius(0);
             CoverBorder.CornerRadius = radius;
