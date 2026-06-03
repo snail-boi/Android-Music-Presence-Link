@@ -1,0 +1,109 @@
+<UserControl x:Class="musicpresense.NextSongPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="140"
+             Height="220"
+             Background="Transparent"
+             >
+
+    <Grid x:Name="RootPanel"
+          Visibility="Collapsed"
+          Width="140"
+              Height="220"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Bottom"
+          Background="Transparent"
+          SnapsToDevicePixels="True"
+          UseLayoutRounding="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="140" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="42" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="CoverBorder"
+                Grid.Row="0"
+                Width="140"
+                Height="140"
+                CornerRadius="0"
+                ClipToBounds="True"
+                Visibility="Collapsed"
+                Cursor="Hand"
+                MouseLeftButtonUp="UserControl_MouseLeftButtonUp">
+            <Image x:Name="CoverImage"
+                   Stretch="UniformToFill"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+        </Border>
+
+        <TextBlock x:Name="TxtDirection"
+                   Grid.Row="2"
+                   Width="140"
+                   FontSize="14"
+                   FontWeight="SemiBold"
+                   Opacity="0.55"
+                   TextTrimming="CharacterEllipsis"
+                   TextWrapping="NoWrap"
+                   TextAlignment="Center"
+                   Height="18"
+                    Cursor="Hand"
+                    MouseLeftButtonUp="UserControl_MouseLeftButtonUp"
+                   Margin="0,0,0,2" />
+
+        <Grid x:Name="TitleHost"
+              Grid.Row="3"
+              Width="140"
+              MinHeight="22">
+            <TextBlock x:Name="TxtTitle"
+                       Width="140"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"
+                       MaxHeight="96"
+                       TextAlignment="Center"
+                       VerticalAlignment="Top"
+                       Cursor="Hand"
+                       MouseLeftButtonUp="UserControl_MouseLeftButtonUp"
+                       Margin="0,0,0,2" />
+        </Grid>
+
+        <StackPanel x:Name="PanelStale"
+                    Grid.Row="4"
+                    Width="140"
+                    Visibility="Collapsed">
+            <TextBlock Text="List may be outdated"
+                       FontSize="13"
+                       Opacity="0.6"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,4" />
+            <Button x:Name="BtnRefresh"
+                    Content="Refresh list"
+                    FontSize="13"
+                    Padding="6,3"
+                    Cursor="Hand"
+                    BorderThickness="0"
+                    Click="BtnRefresh_Click">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="#44888888"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#66888888" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#88888888" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </StackPanel>
+
+    </Grid>
+</UserControl>

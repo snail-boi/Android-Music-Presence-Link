@@ -792,6 +792,7 @@ namespace musicpresense
         private void OnPlayerSettingChanged()
         {
             ApplyPlayerSettings();
+            RefreshNextSongPanelSettings();
             RefreshAudioQualityButton();
             ApplyPaneLayout();
         }
@@ -811,10 +812,10 @@ namespace musicpresense
             TxtArtist.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 10) : new Thickness(0, 0, 0, 2);
             TxtAlbum.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 0, 10);
 
-            if (CoverBorder.Parent is Viewbox coverVb)
+            if (CoverViewbox != null)
             {
-                coverVb.Visibility = c.PlayerShowCover ? Visibility.Visible : Visibility.Collapsed;
-                coverVb.Effect = c.PlayerCoverShadow
+                CoverViewbox.Visibility = c.PlayerShowCover ? Visibility.Visible : Visibility.Collapsed;
+                CoverViewbox.Effect = c.PlayerCoverShadow
                     ? new DropShadowEffect { Color = Colors.Black, BlurRadius = 32, ShadowDepth = 8, Opacity = 0.55, Direction = 315 }
                     : null;
             }

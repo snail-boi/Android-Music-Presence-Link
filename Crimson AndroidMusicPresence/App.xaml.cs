@@ -29,6 +29,7 @@ namespace musicpresense
         private Process? _scrcpyProcess;
         private LyricsOverlayManager? _lyricsOverlayManager;
         private MediaPlayerWindow? _mediaPlayerWindow;
+        private NextSongManager _nextSongManager = new NextSongManager();
         private HwndSource? _hotkeySource;
         private const string StartupRunValueName = "AndroidMusicPresenceLink";
 
@@ -547,6 +548,8 @@ namespace musicpresense
             if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
                 return;
 
+            bool trackChanged = title != _lastMediaPlayerTitle || artist != _lastMediaPlayerArtist;
+
             _lastMediaPlayerTitle = title;
             _lastMediaPlayerArtist = artist;
             _lastMediaPlayerAlbum = album;
@@ -562,6 +565,9 @@ namespace musicpresense
 
                 _mediaPlayerWindow.UpdateTrack(title, artist, album, coverPath, isPlaying);
                 _mediaPlayerWindow.UpdateProgress(positionMs, durationMs);
+
+                if (App.Config.NextSongMode != NextSongMode.Off && trackChanged)
+                    _ = UpdateNextSongNeighboursAsync(title, artist);
             });
         }
 
@@ -602,6 +608,7 @@ namespace musicpresense
                     GetPhoneVolumeAsync,
                     (prev, target, max) => SetPhoneVolumeAsync(prev, target, max));
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
+                _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask, () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
 
                 // Push current connection + scrcpy state into the freshly created window.
                 ApplyConnectionStateToMediaPlayer();
@@ -1591,6 +1598,169 @@ namespace musicpresense
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-    }
 
+        // ── Next / Previous song ──────────────────────────────────────────────
+
+        private async Task UpdateNextSongNeighboursAsync(string? title, string? artist)
+        {
+            try
+            {
+                var mode = Config.NextSongMode;
+                if (mode == NextSongMode.Off) return;
+
+                var window = _mediaPlayerWindow;
+                if (window == null || !window.IsVisible) return;
+
+                var device = _presenceService?.CurrentDevice ?? string.Empty;
+                var roots = Config.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
+
+                // First enable and no list: trigger a scan automatically.
+                if (!_nextSongManager.IsListPresent)
+                {
+                    if (string.IsNullOrWhiteSpace(device) || roots.Count == 0)
+                    {
+                        window.UpdateNeighbours(new NextSongManager.NeighbourResult(null, null, null, null, false), mode, null, null);
+                        return;
+                    }
+
+                    await _nextSongManager.ScanAsync(device, roots, Config.NextSongSortMode).ConfigureAwait(false);
+                }
+
+                var result = await _nextSongManager.FindNeighboursAsync(title, artist).ConfigureAwait(false);
+
+                if (!result.Found)
+                {
+                    await Dispatcher.InvokeAsync(() => window.UpdateNeighbours(result, mode, null, null));
+                    return;
+                }
+
+                if (mode == NextSongMode.TextOnly)
+                {
+                    await Dispatcher.InvokeAsync(() => window.UpdateNeighbours(result, mode, null, null));
+                    return;
+                }
+
+                // FullArt and Kirsten: fire and forget cover fetches for both neighbours.
+                _ = FetchAndPushNeighbourCoversAsync(window, result, device, mode);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[NEXTSONG] UpdateNextSongNeighboursAsync failed: " + ex.Message);
+            }
+        }
+
+        internal Task RefreshNextSongNeighboursAsync()
+        {
+            if (_mediaPlayerWindow == null || !_mediaPlayerWindow.IsVisible || Config.NextSongMode == NextSongMode.Off)
+                return Task.CompletedTask;
+
+            return UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
+        }
+
+        private async Task FetchAndPushNeighbourCoversAsync(MediaPlayerWindow window, NextSongManager.NeighbourResult result, string device, NextSongMode mode)
+        {
+            try
+            {
+                var cacheManager = _presenceService?.GetCoverCacheManager();
+                if (cacheManager == null)
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                        window.UpdateNeighbours(result, mode, null, null));
+                    return;
+                }
+
+                string? prevCover = null;
+                string? nextCover = null;
+
+                if (!string.IsNullOrWhiteSpace(result.PrevPath))
+                {
+                    try
+                    {
+                        var r = await cacheManager.GetImagePathForNowPlayingAsync(device, result.PrevPath, Config.SelectedDeviceName).ConfigureAwait(false);
+                        prevCover = r.ImagePath;
+                    }
+                    catch { }
+                }
+
+                if (!string.IsNullOrWhiteSpace(result.NextPath))
+                {
+                    try
+                    {
+                        var r = await cacheManager.GetImagePathForNowPlayingAsync(device, result.NextPath, Config.SelectedDeviceName).ConfigureAwait(false);
+                        nextCover = r.ImagePath;
+                    }
+                    catch { }
+                }
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (_mediaPlayerWindow == null || !_mediaPlayerWindow.IsVisible) return;
+                    window.UpdateNeighbours(result, mode, prevCover, nextCover);
+                });
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[NEXTSONG] FetchAndPushNeighbourCoversAsync failed: " + ex.Message);
+            }
+        }
+
+        internal void RescanNextSongLibraryAsync(Action? onComplete = null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var device = _presenceService?.CurrentDevice ?? string.Empty;
+                    var roots = Config.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
+
+                    if (string.IsNullOrWhiteSpace(device) || roots.Count == 0)
+                    {
+                        Debugger.show("[NEXTSONG] Rescan skipped: no device or no roots configured.");
+                        onComplete?.Invoke();
+                        return;
+                    }
+
+                    _nextSongManager.InvalidateCache();
+                    await _nextSongManager.ScanAsync(device, roots, Config.NextSongSortMode).ConfigureAwait(false);
+
+                    // Re-run neighbour lookup with the last known track.
+                    await Dispatcher.InvokeAsync(async () =>
+                    {
+                        if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible && Config.NextSongMode != NextSongMode.Off)
+                            await UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debugger.show("[NEXTSONG] RescanNextSongLibraryAsync failed: " + ex.Message);
+                }
+                finally
+                {
+                    onComplete?.Invoke();
+                }
+            });
+        }
+
+        internal void ResortNextSongListAsync()
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _nextSongManager.ResortAsync(Config.NextSongSortMode).ConfigureAwait(false);
+
+                    await Dispatcher.InvokeAsync(async () =>
+                    {
+                        if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible && Config.NextSongMode != NextSongMode.Off)
+                            await UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debugger.show("[NEXTSONG] ResortNextSongListAsync failed: " + ex.Message);
+                }
+            });
+        }
+
+    }
 }

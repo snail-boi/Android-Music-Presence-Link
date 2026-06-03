@@ -39,6 +39,7 @@ namespace musicpresense
         public string? CurrentArtist { get; private set; }
         public string? CurrentAlbum { get; private set; }
         public string? CurrentCoverPath { get; private set; }
+        internal CoverCacheManager CoverCache => cacheManager;
 
         // Android only reports the last scrub position, so realPositionMs is the
         // value we manually tick forward each poll cycle inside

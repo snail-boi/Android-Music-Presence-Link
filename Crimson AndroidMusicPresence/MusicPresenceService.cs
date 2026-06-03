@@ -36,6 +36,7 @@ namespace musicpresense
         private int _reparseTicksRemaining;
 
         internal string CurrentDevice => _currentDevice;
+        internal CoverCacheManager? GetCoverCacheManager() => _mediaController.CoverCache;
         internal event Action<TrayIconState>? TrayStateChanged;
         internal event Action<string?, string?, string?>? NowPlayingChanged;
         internal event Action<string?, string?, string?, bool, long>? LyricsPlaybackChanged;
