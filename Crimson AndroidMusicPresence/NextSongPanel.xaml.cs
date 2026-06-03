@@ -17,6 +17,7 @@ namespace musicpresense
         private bool _isStale;
         private bool _isPrevious;
         private bool _textOnlyMode;
+        private bool _coverOnly;
 
         public event Action? PreviousRequested;
         public event Action? NextRequested;
@@ -62,6 +63,16 @@ namespace musicpresense
         public void SetShowCover(bool showCover)
         {
             _showCover = showCover;
+            ApplyState();
+        }
+
+        /// <summary>
+        /// When true, the direction label and title are hidden so only the cover
+        /// thumbnail is shown (used by Kirsten mode). Does not affect any other mode.
+        /// </summary>
+        public void SetCoverOnly(bool coverOnly)
+        {
+            _coverOnly = coverOnly;
             ApplyState();
         }
 
@@ -113,8 +124,8 @@ namespace musicpresense
             PanelStale.Visibility = Visibility.Collapsed;
             TxtDirection.Text = _directionLabel;
             TxtTitle.Text = _title;
-            TxtDirection.Visibility = Visibility.Visible;
-            TxtTitle.Visibility = Visibility.Visible;
+            TxtDirection.Visibility = _coverOnly ? Visibility.Collapsed : Visibility.Visible;
+            TxtTitle.Visibility = _coverOnly ? Visibility.Collapsed : Visibility.Visible;
 
             TitleHost.MinHeight = _textOnlyMode ? 58 : 22;
             TxtTitle.MaxHeight = _textOnlyMode ? 84 : 42;

@@ -1641,7 +1641,7 @@ namespace musicpresense
                 }
 
                 // FullArt and Kirsten: fire and forget cover fetches for both neighbours.
-                _ = FetchAndPushNeighbourCoversAsync(window, result, device);
+                _ = FetchAndPushNeighbourCoversAsync(window, result, device, mode);
             }
             catch (Exception ex)
             {
@@ -1657,7 +1657,7 @@ namespace musicpresense
             return UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
         }
 
-        private async Task FetchAndPushNeighbourCoversAsync(MediaPlayerWindow window, NextSongManager.NeighbourResult result, string device)
+        private async Task FetchAndPushNeighbourCoversAsync(MediaPlayerWindow window, NextSongManager.NeighbourResult result, string device, NextSongMode mode)
         {
             try
             {
@@ -1665,7 +1665,7 @@ namespace musicpresense
                 if (cacheManager == null)
                 {
                     await Dispatcher.InvokeAsync(() =>
-                        window.UpdateNeighbours(result, NextSongMode.FullArt, null, null));
+                        window.UpdateNeighbours(result, mode, null, null));
                     return;
                 }
 
@@ -1695,7 +1695,7 @@ namespace musicpresense
                 await Dispatcher.InvokeAsync(() =>
                 {
                     if (_mediaPlayerWindow == null || !_mediaPlayerWindow.IsVisible) return;
-                    window.UpdateNeighbours(result, NextSongMode.FullArt, prevCover, nextCover);
+                    window.UpdateNeighbours(result, mode, prevCover, nextCover);
                 });
             }
             catch (Exception ex)
