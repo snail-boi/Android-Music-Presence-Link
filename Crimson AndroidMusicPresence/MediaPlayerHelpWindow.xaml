@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Media Player Help"
         Width="560"
-        Height="640"
+        Height="780"
         MinWidth="440"
         MinHeight="420"
         WindowStartupLocation="CenterOwner"
@@ -144,7 +144,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Audio Link" Style="{StaticResource ItemLabel}" />
                             <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
-                                       Text="Starts or stops streaming your phone's audio through this PC." />
+                                       Text="Starts or stops streaming your phone's audio through this PC. If the connection drops unexpectedly, auto-recovery will try to reconnect on its own. Auto-recovery can be disabled in Settings, and is automatically disabled when the polling interval is set above 1 second." />
                         </Grid>
 
                         <Grid Margin="0,8">
@@ -164,7 +164,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Volume icon" Style="{StaticResource ItemLabel}" />
                             <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
-                                       Text="Opens a volume slider when phone audio is reachable, or +/- buttons otherwise." />
+                                       Text="Opens a volume slider. Shows PC-side audio session volume when Audio Link is active, or phone volume otherwise." />
                         </Grid>
 
                         <Grid Margin="0,8">
@@ -172,9 +172,9 @@
                                 <ColumnDefinition Width="130" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Skip 30s" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="0" Text="Seek buttons" Style="{StaticResource ItemLabel}" />
                             <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
-                                       Text="Skip-back and skip-forward buttons appear only on tracks longer than 10 minutes." />
+                                       Text="Skip back and skip forward by 30 seconds. Visibility is controlled by the threshold set in Player Settings. By default they appear only on tracks longer than a set duration." />
                         </Grid>
 
                         <Grid Margin="0,8">
@@ -231,7 +231,96 @@
                     <StackPanel>
                         <TextBlock Text="Settings panel" Style="{StaticResource FirstSectionHeading}" />
                         <TextBlock Style="{StaticResource ItemBody}"
-                                   Text="Open the full settings by clicking the arrow on the right edge of the window." />
+                                   Text="Open the full app settings by clicking the arrow on the left edge of the window (or the right edge if the layout is swapped)." />
+                    </StackPanel>
+                </Border>
+
+                <!-- PLAYER SETTINGS -->
+                <Border Style="{StaticResource SectionCard}">
+                    <StackPanel>
+                        <TextBlock Text="Player settings" Style="{StaticResource FirstSectionHeading}" />
+                        <TextBlock Style="{StaticResource ItemBody}" Margin="0,0,0,10"
+                                   Text="Open the player settings by clicking the arrow on the right edge of the window (or the left edge if the layout is swapped). Settings here affect only the media player window." />
+
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Pill buttons" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
+                                       Text="Control which status pills are shown and in which mode: Full (pill visible), Mini (icon only), or Off." />
+                        </Grid>
+
+                        <Grid Margin="0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Track info" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
+                                       Text="Toggle title, artist, and album labels individually. Artist and album display order can also be swapped." />
+                        </Grid>
+
+                        <Grid Margin="0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Cover" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
+                                       Text="Toggle cover art visibility, rounded corners, a drop shadow behind the cover, and a text shadow on the track labels. Gradient detail controls how many color samples are used for the background gradient." />
+                        </Grid>
+
+                        <Grid Margin="0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Controls" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
+                                       Text="Toggle individual buttons: volume, lyrics, battery indicator, help, fullscreen, and seek buttons." />
+                        </Grid>
+
+                        <Grid Margin="0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Seek visibility" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
+                                       Text="Sets the minimum track duration at which the seek buttons appear. Enter a value and toggle between seconds and minutes." />
+                        </Grid>
+
+                        <Grid Margin="0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Time format" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
+                                       Text="Switch the position label between elapsed time and time remaining. Also toggleable by clicking the label directly." />
+                        </Grid>
+
+                        <Grid Margin="0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Layout" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
+                                       Text="Switch settings location swaps which side the app settings and player settings panels open on." />
+                        </Grid>
+
+                        <Grid Margin="0,8,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Next / Prev song" Style="{StaticResource ItemLabel}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ItemBody}"
+                                       Text="Shows a panel with the previous and next track based on a local library scan. May not always be 100% accurate. Requires a library scan; use the Rescan button after adding new music." />
+                        </Grid>
                     </StackPanel>
                 </Border>
 

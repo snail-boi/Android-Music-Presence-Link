@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace musicpresense
 {
@@ -372,6 +373,34 @@ namespace musicpresense
                 return (c.R * 299 + c.G * 587 + c.B * 114) / 1000 < 128;
             }
             return true;
+        }
+
+        private void Expander_Expanded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Expander expander)
+                return;
+
+            if (expander.Content is not FrameworkElement content)
+                return;
+
+            content.RenderTransformOrigin = new Point(0.5, 0);
+            if (content.RenderTransform is not ScaleTransform scaleTransform)
+            {
+                scaleTransform = new ScaleTransform(1, 0.9);
+                content.RenderTransform = scaleTransform;
+            }
+
+            content.Opacity = 0;
+            scaleTransform.ScaleY = 0.9;
+
+            var duration = TimeSpan.FromMilliseconds(200);
+            var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+            var scaleAnimation = new DoubleAnimation(0.9, 1, duration) { EasingFunction = easing };
+            var opacityAnimation = new DoubleAnimation(0, 1, duration) { EasingFunction = easing };
+
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation);
+            content.BeginAnimation(OpacityProperty, opacityAnimation);
         }
     }
 }
