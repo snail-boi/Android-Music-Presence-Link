@@ -226,7 +226,7 @@ namespace musicpresense
             _config.ShowMediaPlayerWindow = true;
             MusicConfigManager.Save(_config);
             _savedConfig.ShowMediaPlayerWindow = true;
-            app.ShowMediaPlayerWindowNow();
+            app.ShowMediaPlayerWindowNow(maximizeForModeSwitch: true);
         }
 
         internal void UpdateMediaPlayerModeButton(bool isMediaPlayerModeActive)

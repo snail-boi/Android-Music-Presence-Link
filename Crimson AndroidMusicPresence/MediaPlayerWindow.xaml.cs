@@ -200,7 +200,6 @@ namespace musicpresense
             Height = config.MediaPlayerWindowHeight;
             Top = config.MediaPlayerWindowTop;
             Left = config.MediaPlayerWindowLeft;
-            WindowState = config.MediaPlayerWindowState;
         }
 
         private void MediaPlayerWindow_SizeChanged(object sender, SizeChangedEventArgs e)

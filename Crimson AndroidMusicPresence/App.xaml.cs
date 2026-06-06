@@ -584,7 +584,7 @@ namespace musicpresense
             return _mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible;
         }
 
-        internal void ShowMediaPlayerWindowNow()
+        internal void ShowMediaPlayerWindowNow(bool maximizeForModeSwitch = false)
         {
             Debugger.show("[MEDIAPLAYER] Opening media player window.");
 
@@ -616,11 +616,18 @@ namespace musicpresense
             }
 
             var config = Config;
-            _mediaPlayerWindow.Width = config.MediaPlayerWindowWidth;
-            _mediaPlayerWindow.Height = config.MediaPlayerWindowHeight;
-            _mediaPlayerWindow.Top = config.MediaPlayerWindowTop;
-            _mediaPlayerWindow.Left = config.MediaPlayerWindowLeft;
-            _mediaPlayerWindow.WindowState = config.MediaPlayerWindowState;
+            bool isOpening = !_mediaPlayerWindow.IsVisible;
+            if (isOpening)
+            {
+                _mediaPlayerWindow.Width = config.MediaPlayerWindowWidth;
+                _mediaPlayerWindow.Height = config.MediaPlayerWindowHeight;
+                _mediaPlayerWindow.Top = config.MediaPlayerWindowTop;
+                _mediaPlayerWindow.Left = config.MediaPlayerWindowLeft;
+
+                // A mode switch into the player opens it maximized as a deliberate
+                // "go big" gesture. Plain startup or reopen restores the saved size.
+                _mediaPlayerWindow.WindowState = maximizeForModeSwitch ? WindowState.Maximized : WindowState.Normal;
+            }
 
             if (_settingsWindow != null)
             {
