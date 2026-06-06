@@ -42,13 +42,11 @@ namespace musicpresense
         {
             base.OnSourceInitialized(e);
 
-            Config.Load();
-
-            Width = Config.Current.WindowWidth;
-            Height = Config.Current.WindowHeight;
-            Top = Config.Current.WindowTop;
-            Left = Config.Current.WindowLeft;
-            WindowState = Config.Current.WindowState;
+            Width = App.Config.WindowWidth;
+            Height = App.Config.WindowHeight;
+            Top = App.Config.WindowTop;
+            Left = App.Config.WindowLeft;
+            WindowState = App.Config.WindowState;
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -58,13 +56,13 @@ namespace musicpresense
             if (WindowState == WindowState.Minimized)
                 WindowState = WindowState.Normal;
 
-            Config.Current.WindowState = WindowState;
-            Config.Current.WindowWidth = RestoreBounds.Width;
-            Config.Current.WindowHeight = RestoreBounds.Height;
-            Config.Current.WindowTop = RestoreBounds.Top;
-            Config.Current.WindowLeft = RestoreBounds.Left;
+            App.Config.WindowState = WindowState;
+            App.Config.WindowWidth = RestoreBounds.Width;
+            App.Config.WindowHeight = RestoreBounds.Height;
+            App.Config.WindowTop = RestoreBounds.Top;
+            App.Config.WindowLeft = RestoreBounds.Left;
 
-            Config.Save();
+            MusicConfigManager.Save(App.Config);
         }
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)

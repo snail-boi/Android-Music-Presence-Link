@@ -161,6 +161,13 @@ namespace musicpresense
         // When true the main settings pane moves to the right and player settings to the left.
         public bool SwapSettingsLocation { get; set; } = false;
 
+        // Main window geometry (migrated from the legacy config.json)
+        public double WindowWidth { get; set; } = 900;
+        public double WindowHeight { get; set; } = 600;
+        public double WindowTop { get; set; } = 100;
+        public double WindowLeft { get; set; } = 100;
+        public System.Windows.WindowState WindowState { get; set; } = System.Windows.WindowState.Normal;
+
         public double MediaPlayerWindowWidth { get; set; } = 1080;
         public double MediaPlayerWindowHeight { get; set; } = 760;
         public double MediaPlayerWindowTop { get; set; } = 100;
@@ -249,6 +256,11 @@ namespace musicpresense
                 PlayerCoverRoundedCorners = source.PlayerCoverRoundedCorners,
                 PlayerGradientSamplePoints = source.PlayerGradientSamplePoints,
                 SwapSettingsLocation = source.SwapSettingsLocation,
+                WindowWidth = source.WindowWidth,
+                WindowHeight = source.WindowHeight,
+                WindowTop = source.WindowTop,
+                WindowLeft = source.WindowLeft,
+                WindowState = source.WindowState,
                 MediaPlayerWindowWidth = source.MediaPlayerWindowWidth,
                 MediaPlayerWindowHeight = source.MediaPlayerWindowHeight,
                 MediaPlayerWindowTop = source.MediaPlayerWindowTop,
@@ -317,15 +329,15 @@ namespace musicpresense
                     var json = File.ReadAllText(ConfigPath);
                     var loaded = JsonSerializer.Deserialize<MusicConfig>(json);
                     if (loaded != null)
-                        return NormalizeConfig(loaded);
+                        return Finalize(loaded);
                 }
 
                 var fresh = new MusicConfig();
-                return NormalizeConfig(fresh);
+                return Finalize(fresh);
             }
             catch
             {
-                return NormalizeConfig(new MusicConfig());
+                return Finalize(new MusicConfig());
             }
         }
 
@@ -481,6 +493,68 @@ namespace musicpresense
             // The presence service handles that gracefully.
 
             return config;
+        }
+
+        private static MusicConfig Finalize(MusicConfig config)
+        {
+            config = NormalizeConfig(config);
+            MigrateLegacyWindowConfig(config);
+            return config;
+        }
+
+        // One-time migration of the old config.json (which only ever stored the main
+        // window geometry) into the unified musicconfig.json. The legacy file is removed
+        // afterwards so this never runs twice. Losing it is harmless: it is window
+        // position data only.
+        private static void MigrateLegacyWindowConfig(MusicConfig config)
+        {
+            try
+            {
+                var folder = Path.GetDirectoryName(ConfigPath);
+                if (string.IsNullOrEmpty(folder))
+                    return;
+
+                var legacyPath = Path.Combine(folder, "config.json");
+                if (!File.Exists(legacyPath))
+                    return;
+
+                try
+                {
+                    var json = File.ReadAllText(legacyPath);
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("WindowWidth", out var w) && w.TryGetDouble(out var wd) && wd > 0)
+                        config.WindowWidth = wd;
+                    if (root.TryGetProperty("WindowHeight", out var h) && h.TryGetDouble(out var hd) && hd > 0)
+                        config.WindowHeight = hd;
+                    if (root.TryGetProperty("WindowTop", out var tp) && tp.TryGetDouble(out var tpd))
+                        config.WindowTop = tpd;
+                    if (root.TryGetProperty("WindowLeft", out var lf) && lf.TryGetDouble(out var lfd))
+                        config.WindowLeft = lfd;
+                    if (root.TryGetProperty("WindowState", out var st))
+                    {
+                        if (st.ValueKind == JsonValueKind.Number && st.TryGetInt32(out var si)
+                            && Enum.IsDefined(typeof(System.Windows.WindowState), si))
+                            config.WindowState = (System.Windows.WindowState)si;
+                        else if (st.ValueKind == JsonValueKind.String
+                            && Enum.TryParse<System.Windows.WindowState>(st.GetString(), out var se))
+                            config.WindowState = se;
+                    }
+
+                    Save(config);
+                }
+                catch
+                {
+                    // Corrupt legacy file: ignore its contents, still remove it below.
+                }
+
+                try { File.Delete(legacyPath); } catch { }
+            }
+            catch
+            {
+                // Migration must never break startup.
+            }
         }
     }
 }
