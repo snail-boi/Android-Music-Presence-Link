@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -44,7 +44,7 @@ namespace musicpresense
 				// Ignore disconnect failures and continue with USB detection.
 			}
 
-			var usbSerial = await GetConnectedUsbDeviceAsync();
+			var usbSerial = await DeviceQuery.GetConnectedUsbDeviceAsync();
 			if (string.IsNullOrWhiteSpace(usbSerial))
 			{
 				MessageBox.Show("Please connect your device via USB first.", "USB Required", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -62,8 +62,8 @@ namespace musicpresense
 			else
 			{
 				_config.IsWifiEnabled = true;
-				port = await GetWifiPortAsync(usbSerial);
-				ip = await GetDeviceWifiIpAsync(usbSerial);
+				port = await DeviceQuery.GetWifiPortAsync(usbSerial);
+				ip = await DeviceQuery.GetDeviceWifiIpAsync(usbSerial);
 
 			}
 
@@ -104,99 +104,5 @@ namespace musicpresense
 			SaveConfigFromUi(false);
 		}
 
-		private static async Task<string> GetConnectedUsbDeviceAsync()
-		{
-			for (var attempt = 0; attempt < 8; attempt++)
-			{
-				var devices = await AdbHelper.RunAdbCaptureAsync("devices");
-				var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-				foreach (var entry in deviceList)
-				{
-					if (!entry.EndsWith("device", StringComparison.OrdinalIgnoreCase))
-						continue;
-
-					var serial = entry.Split('\t', ' ').FirstOrDefault();
-					if (string.IsNullOrWhiteSpace(serial))
-						continue;
-
-					if (!serial.Contains(':'))
-						return serial;
-				}
-
-				if (attempt < 7)
-				{
-					await Task.Delay(500);
-				}
-			}
-
-			return string.Empty;
-		}
-
-		private static async Task<int> GetWifiPortAsync(string usbSerial)
-		{
-			var output = await AdbHelper.RunAdbCaptureAsync($"-s {usbSerial} shell getprop service.adb.tcp.port");
-			if (int.TryParse(output.Trim(), out var port) && port > 0)
-				return port;
-
-			return 5555;
-		}
-
-		private static async Task<string> GetDeviceWifiIpAsync(string usbDevice)
-		{
-			var ipOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip -f inet addr show wlan0");
-			var match = Regex.Match(ipOutput, @"inet\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
-			if (match.Success)
-				return match.Groups["ip"].Value;
-
-			var routeOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip route");
-			match = Regex.Match(routeOutput, @"src\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
-			return match.Success ? match.Groups["ip"].Value : string.Empty;
-		}
-
-		private static async Task<string> GetDeviceSerialAsync(string device)
-		{
-			if (string.IsNullOrWhiteSpace(device))
-				return string.Empty;
-
-			var serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.serialno");
-			serial = serial.Trim();
-			if (!string.IsNullOrWhiteSpace(serial))
-				return serial;
-
-			serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.boot.serialno");
-			return serial.Trim();
-		}
-
-		private async Task<string> GetCurrentDeviceForAppsAsync()
-		{
-			string device = string.Empty;
-
-			var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
-			var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-			bool IsDeviceConnected(string id) => deviceList.Any(l => l.StartsWith(id) && l.EndsWith("device"));
-
-			if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB) && IsDeviceConnected(_config.SelectedDeviceUSB))
-			{
-				device = _config.SelectedDeviceUSB;
-			}
-			else if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None")
-			{
-				if (!IsDeviceConnected(_config.SelectedDeviceWiFi))
-				{
-					await AdbHelper.RunAdbCaptureAsync($"connect {_config.SelectedDeviceWiFi}").ConfigureAwait(false);
-					devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
-					deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-				}
-
-				if (IsDeviceConnected(_config.SelectedDeviceWiFi))
-				{
-					device = _config.SelectedDeviceWiFi;
-				}
-			}
-
-			return device;
-		}
 	}
 }

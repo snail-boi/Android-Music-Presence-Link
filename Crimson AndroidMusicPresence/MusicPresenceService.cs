@@ -520,7 +520,7 @@ namespace musicpresense
             // Last-ditch: read the phone's current wlan0 IP and try the
             // last-known port at that IP. If THAT also fails, the user
             // needs to re-pair, which we can't do silently.
-            var freshIp = await GetDeviceWifiIpAsync(usbDevice).ConfigureAwait(false);
+            var freshIp = await DeviceQuery.GetDeviceWifiIpAsync(usbDevice).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(freshIp) && !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi))
             {
                 var lastPort = ExtractWifiPort(_config.SelectedDeviceWiFi);
@@ -576,7 +576,7 @@ namespace musicpresense
         private async Task<string> SetupWirelessFromUsbAsync(string usbDevice)
         {
             int port = ExtractWifiPort(_config.SelectedDeviceWiFi);
-            var ip = await GetDeviceWifiIpAsync(usbDevice).ConfigureAwait(false);
+            var ip = await DeviceQuery.GetDeviceWifiIpAsync(usbDevice).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(ip))
                 return string.Empty;
 
@@ -609,18 +609,6 @@ namespace musicpresense
                 return port;
 
             return 5555;
-        }
-
-        private static async Task<string> GetDeviceWifiIpAsync(string usbDevice)
-        {
-            var ipOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip -f inet addr show wlan0").ConfigureAwait(false);
-            var match = Regex.Match(ipOutput, @"inet\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
-            if (match.Success)
-                return match.Groups["ip"].Value;
-
-            var routeOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip route").ConfigureAwait(false);
-            match = Regex.Match(routeOutput, @"src\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
-            return match.Success ? match.Groups["ip"].Value : string.Empty;
         }
 
         /// <summary>

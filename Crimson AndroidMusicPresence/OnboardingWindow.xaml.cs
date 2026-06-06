@@ -52,7 +52,7 @@ namespace musicpresense
         {
             InitializeComponent();
 
-            _workingConfig = CloneConfig(currentConfig);
+            _workingConfig = currentConfig.Clone();
 
             LstRemoteRoots.ItemsSource = _remoteRoots;
             LstAllowedApps.ItemsSource = _appPackages;
@@ -84,13 +84,13 @@ namespace musicpresense
                 RbViewSettings.IsChecked = true;
             }
 
-            TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyVolumeUpKey);
-            TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyVolumeDownKey);
-            TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyToggleScrcpyKey);
-            TxtHotkeyToggleLyricsOverlay.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyToggleLyricsOverlayKey);
-            TxtHotkeyCopyTrackInfo.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyCopyTrackInfoKey);
-            TxtHotkeyAudioQuality.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyAudioQualityKey);
-            TxtHotkeyAudioQuality.Text = VirtualKeyToDisplayName(_workingConfig.HotkeyAudioQualityKey);
+            TxtHotkeyVolumeUp.Text = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyVolumeUpKey);
+            TxtHotkeyVolumeDown.Text = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyVolumeDownKey);
+            TxtHotkeyToggleScrcpy.Text = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyToggleScrcpyKey);
+            TxtHotkeyToggleLyricsOverlay.Text = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyToggleLyricsOverlayKey);
+            TxtHotkeyCopyTrackInfo.Text = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyCopyTrackInfoKey);
+            TxtHotkeyAudioQuality.Text = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyAudioQualityKey);
+            TxtHotkeyAudioQuality.Text = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyAudioQualityKey);
 
             SelectModifier(_workingConfig.HotkeyModifier);
             _ = LoadInstalledAppsAsync();
@@ -247,12 +247,12 @@ namespace musicpresense
             // Default view choice: media player view if explicitly selected, otherwise settings.
             _workingConfig.ShowMediaPlayerWindow = RbViewMediaPlayer.IsChecked == true;
 
-            _workingConfig.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _workingConfig.HotkeyVolumeUpKey);
-            _workingConfig.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _workingConfig.HotkeyVolumeDownKey);
-            _workingConfig.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _workingConfig.HotkeyToggleScrcpyKey);
-            _workingConfig.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _workingConfig.HotkeyToggleLyricsOverlayKey);
-            _workingConfig.HotkeyCopyTrackInfoKey = ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _workingConfig.HotkeyCopyTrackInfoKey);
-            _workingConfig.HotkeyAudioQualityKey = ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _workingConfig.HotkeyAudioQualityKey);
+            _workingConfig.HotkeyVolumeUpKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _workingConfig.HotkeyVolumeUpKey);
+            _workingConfig.HotkeyVolumeDownKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _workingConfig.HotkeyVolumeDownKey);
+            _workingConfig.HotkeyToggleScrcpyKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _workingConfig.HotkeyToggleScrcpyKey);
+            _workingConfig.HotkeyToggleLyricsOverlayKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _workingConfig.HotkeyToggleLyricsOverlayKey);
+            _workingConfig.HotkeyCopyTrackInfoKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _workingConfig.HotkeyCopyTrackInfoKey);
+            _workingConfig.HotkeyAudioQualityKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _workingConfig.HotkeyAudioQualityKey);
 
             try
             {
@@ -543,7 +543,7 @@ namespace musicpresense
                 // Ignore disconnect failures and continue with USB detection.
             }
 
-            var usbSerial = await GetConnectedUsbDeviceAsync();
+            var usbSerial = await DeviceQuery.GetConnectedUsbDeviceAsync();
             if (string.IsNullOrWhiteSpace(usbSerial))
             {
                 MessageBox.Show("Please connect your device via USB first.", "USB Required", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -573,8 +573,8 @@ namespace musicpresense
             else
             {
                 _workingConfig.IsWifiEnabled = true;
-                port = await GetWifiPortAsync(usbSerial);
-                ip = await GetDeviceWifiIpAsync(usbSerial);
+                port = await DeviceQuery.GetWifiPortAsync(usbSerial);
+                ip = await DeviceQuery.GetDeviceWifiIpAsync(usbSerial);
             }
 
             if (_workingConfig.WifiMode != WirelessMode.WirelessDebugging)
@@ -606,7 +606,7 @@ namespace musicpresense
 
         private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)
         {
-            var device = await GetCurrentDeviceForAppsAsync();
+            var device = await DeviceQuery.ResolveActiveDeviceAsync(_workingConfig);
             if (string.IsNullOrWhiteSpace(device))
             {
                 MessageBox.Show("No device connected.", "Device Required", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -645,7 +645,7 @@ namespace musicpresense
 
         private async void BtnBrowseLyricsFolder_Click(object sender, RoutedEventArgs e)
         {
-            var device = await GetCurrentDeviceForAppsAsync();
+            var device = await DeviceQuery.ResolveActiveDeviceAsync(_workingConfig);
             if (string.IsNullOrWhiteSpace(device))
             {
                 MessageBox.Show("No device connected.", "Device Required", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -680,7 +680,7 @@ namespace musicpresense
 
             try
             {
-                var device = await GetCurrentDeviceForAppsAsync().ConfigureAwait(false);
+                var device = await DeviceQuery.ResolveActiveDeviceAsync(_workingConfig).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(device))
                 {
                     await Dispatcher.InvokeAsync(() => TxtAppsStatus.Text = "No device connected.");
@@ -750,121 +750,7 @@ namespace musicpresense
             }
         }
 
-        private async Task<string> GetCurrentDeviceForAppsAsync()
-        {
-            var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
-            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-            bool IsDeviceConnected(string id) => deviceList.Any(l => l.StartsWith(id) && l.EndsWith("device"));
-
-            bool IsWirelessSerial(string serial)
-            {
-                if (string.IsNullOrWhiteSpace(serial))
-                    return false;
-
-                return serial.Contains(':')
-                    || serial.StartsWith("adb-", StringComparison.OrdinalIgnoreCase)
-                    || serial.IndexOf("_adb-tls", StringComparison.OrdinalIgnoreCase) >= 0;
-            }
-
-            string FindConnectedWirelessSerial()
-            {
-                foreach (var entry in deviceList)
-                {
-                    if (!entry.EndsWith("device", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var serial = entry.Split('\t', ' ').FirstOrDefault();
-                    if (IsWirelessSerial(serial))
-                        return serial ?? string.Empty;
-                }
-
-                return string.Empty;
-            }
-
-            if (!string.IsNullOrWhiteSpace(_workingConfig.SelectedDeviceUSB) && IsDeviceConnected(_workingConfig.SelectedDeviceUSB))
-            {
-                return _workingConfig.SelectedDeviceUSB;
-            }
-
-            if (_workingConfig.WifiMode == WirelessMode.WirelessDebugging && !string.IsNullOrWhiteSpace(_workingConfig.WifiMdnsServiceName))
-            {
-                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_workingConfig.WifiMdnsServiceName).ConfigureAwait(false);
-                if (!string.IsNullOrWhiteSpace(ipPort))
-                {
-                    devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
-                    deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-                    var liveWireless = FindConnectedWirelessSerial();
-                    if (!string.IsNullOrWhiteSpace(liveWireless))
-                        return liveWireless;
-
-                    if (IsDeviceConnected(ipPort))
-                        return ipPort;
-                }
-
-                return string.Empty;
-            }
-
-            if (!string.IsNullOrWhiteSpace(_workingConfig.SelectedDeviceWiFi) && _workingConfig.SelectedDeviceWiFi != "None")
-            {
-                if (!IsDeviceConnected(_workingConfig.SelectedDeviceWiFi))
-                {
-                    await AdbHelper.RunAdbCaptureAsync($"connect {_workingConfig.SelectedDeviceWiFi}").ConfigureAwait(false);
-                    devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
-                    deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                }
-
-                if (IsDeviceConnected(_workingConfig.SelectedDeviceWiFi))
-                    return _workingConfig.SelectedDeviceWiFi;
-            }
-
-            return string.Empty;
-        }
-
-        private static async Task<int> GetWifiPortAsync(string usbSerial)
-        {
-            var output = await AdbHelper.RunAdbCaptureAsync($"-s {usbSerial} shell getprop service.adb.tcp.port");
-            if (int.TryParse(output.Trim(), out var port) && port > 0)
-                return port;
-
-            return 5555;
-        }
-
-
-
-        private static async Task<string> GetDeviceWifiIpAsync(string usbDevice)
-        {
-            var ipOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip -f inet addr show wlan0");
-            var match = Regex.Match(ipOutput, @"inet\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
-            if (match.Success)
-                return match.Groups["ip"].Value;
-
-            var routeOutput = await AdbHelper.RunAdbCaptureAsync($"-s {usbDevice} shell ip route");
-            match = Regex.Match(routeOutput, @"src\s+(?<ip>\d+\.\d+\.\d+\.\d+)");
-            return match.Success ? match.Groups["ip"].Value : string.Empty;
-        }
-
-        private static async Task<string> GetConnectedUsbDeviceAsync()
-        {
-            var devices = await AdbHelper.RunAdbCaptureAsync("devices");
-            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var entry in deviceList)
-            {
-                if (!entry.EndsWith("device", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var serial = entry.Split('\t', ' ').FirstOrDefault();
-                if (string.IsNullOrWhiteSpace(serial))
-                    continue;
-
-                if (!serial.Contains(':'))
-                    return serial;
-            }
-
-            return string.Empty;
-        }
 
         private static async Task<string> GetWirelessDebuggingSerialAsync(string serviceName, string ipPort)
         {
@@ -892,13 +778,13 @@ namespace musicpresense
 
                             if (serial.Contains(':') || serial.StartsWith("adb-", StringComparison.OrdinalIgnoreCase) || serial.IndexOf("_adb-tls", StringComparison.OrdinalIgnoreCase) >= 0)
                             {
-                                var liveSerial = await GetDeviceSerialAsync(serial).ConfigureAwait(false);
+                                var liveSerial = await DeviceQuery.GetDeviceSerialAsync(serial).ConfigureAwait(false);
                                 if (!string.IsNullOrWhiteSpace(liveSerial))
                                     return liveSerial;
                             }
                         }
 
-                        var serialFromIpPort = await GetDeviceSerialAsync(connectedIpPort).ConfigureAwait(false);
+                        var serialFromIpPort = await DeviceQuery.GetDeviceSerialAsync(connectedIpPort).ConfigureAwait(false);
                         if (!string.IsNullOrWhiteSpace(serialFromIpPort))
                             return serialFromIpPort;
                     }
@@ -906,7 +792,7 @@ namespace musicpresense
 
                 if (!string.IsNullOrWhiteSpace(ipPort))
                 {
-                    var serial = await GetDeviceSerialAsync(ipPort).ConfigureAwait(false);
+                    var serial = await DeviceQuery.GetDeviceSerialAsync(ipPort).ConfigureAwait(false);
                     if (!string.IsNullOrWhiteSpace(serial))
                         return serial;
                 }
@@ -917,20 +803,6 @@ namespace musicpresense
             return string.Empty;
         }
 
-        private static async Task<string> GetDeviceSerialAsync(string device)
-        {
-            if (string.IsNullOrWhiteSpace(device))
-                return string.Empty;
-
-            var serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.serialno");
-            serial = serial.Trim();
-            if (!string.IsNullOrWhiteSpace(serial))
-                return serial;
-
-            serial = await AdbHelper.RunAdbCaptureAsync($"-s {device} shell getprop ro.boot.serialno");
-            return serial.Trim();
-        }
-
         private static async Task<string> GetDeviceSerialWithRetryAsync(string device)
         {
             if (string.IsNullOrWhiteSpace(device))
@@ -938,7 +810,7 @@ namespace musicpresense
 
             for (int attempt = 0; attempt < 8; attempt++)
             {
-                var serial = await GetDeviceSerialAsync(device).ConfigureAwait(false);
+                var serial = await DeviceQuery.GetDeviceSerialAsync(device).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(serial))
                     return serial;
 
@@ -1003,32 +875,32 @@ namespace musicpresense
 
         private void BtnRecordHotkeyVolumeUp_Click(object sender, RoutedEventArgs e)
         {
-            StartRecordingHotkey(k => TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(k));
+            StartRecordingHotkey(k => TxtHotkeyVolumeUp.Text = HotkeyHelper.VirtualKeyToDisplayName(k));
         }
 
         private void BtnRecordHotkeyVolumeDown_Click(object sender, RoutedEventArgs e)
         {
-            StartRecordingHotkey(k => TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(k));
+            StartRecordingHotkey(k => TxtHotkeyVolumeDown.Text = HotkeyHelper.VirtualKeyToDisplayName(k));
         }
 
         private void BtnRecordHotkeyToggleScrcpy_Click(object sender, RoutedEventArgs e)
         {
-            StartRecordingHotkey(k => TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(k));
+            StartRecordingHotkey(k => TxtHotkeyToggleScrcpy.Text = HotkeyHelper.VirtualKeyToDisplayName(k));
         }
 
         private void BtnRecordHotkeyToggleLyricsOverlay_Click(object sender, RoutedEventArgs e)
         {
-            StartRecordingHotkey(k => TxtHotkeyToggleLyricsOverlay.Text = VirtualKeyToDisplayName(k));
+            StartRecordingHotkey(k => TxtHotkeyToggleLyricsOverlay.Text = HotkeyHelper.VirtualKeyToDisplayName(k));
         }
 
         private void BtnRecordHotkeyCopyTrackInfo_Click(object sender, RoutedEventArgs e)
         {
-            StartRecordingHotkey(k => TxtHotkeyCopyTrackInfo.Text = VirtualKeyToDisplayName(k));
+            StartRecordingHotkey(k => TxtHotkeyCopyTrackInfo.Text = HotkeyHelper.VirtualKeyToDisplayName(k));
         }
 
         private void BtnRecordHotkeyAudioQuality_Click(object sender, RoutedEventArgs e)
         {
-            StartRecordingHotkey(k => TxtHotkeyAudioQuality.Text = VirtualKeyToDisplayName(k));
+            StartRecordingHotkey(k => TxtHotkeyAudioQuality.Text = HotkeyHelper.VirtualKeyToDisplayName(k));
         }
 
         private void BtnPresenceMode_Click(object sender, RoutedEventArgs e)
@@ -1095,229 +967,6 @@ namespace musicpresense
             catch
             {
                 StopRecordingHotkey();
-            }
-        }
-
-        private static string VirtualKeyToDisplayName(int vk)
-        {
-            if (vk >= 0x41 && vk <= 0x5A)
-                return ((char)vk).ToString();
-
-            if (vk >= 0x30 && vk <= 0x39)
-                return ((char)vk).ToString();
-
-            if (vk >= 0x70 && vk <= 0x87)
-                return "F" + (vk - 0x6F).ToString();
-
-            var map = new Dictionary<int, string>
-            {
-                { 0xAF, "VOLUME_UP" },
-                { 0xAE, "VOLUME_DOWN" },
-                { 0xAD, "VOLUME_MUTE" },
-                { 0xB3, "MEDIA_PLAY_PAUSE" },
-                { 0x1B, "ESC" },
-                { 0x0D, "ENTER" },
-                { 0x20, "SPACE" }
-            };
-
-            if (map.TryGetValue(vk, out var name))
-                return name;
-
-            return $"VK_0x{vk:X2}";
-        }
-
-        private static int ParseVirtualKey(string input, int fallback)
-        {
-            if (string.IsNullOrWhiteSpace(input)) return fallback;
-            input = input.Trim();
-
-            if (input.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-            {
-                if (int.TryParse(input.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out var v))
-                    return v & 0xFF;
-                return fallback;
-            }
-
-            if (input.StartsWith("VK_0X", StringComparison.OrdinalIgnoreCase) || input.StartsWith("VK_0x", StringComparison.OrdinalIgnoreCase))
-            {
-                var part = input.Substring(5);
-                if (int.TryParse(part, System.Globalization.NumberStyles.HexNumber, null, out var v2))
-                    return v2 & 0xFF;
-                return fallback;
-            }
-
-            if (int.TryParse(input, out var d))
-                return d & 0xFF;
-
-            var up = input.ToUpperInvariant();
-            if (up.Length == 1)
-                return (int)up[0];
-
-            if (up.StartsWith("F") && int.TryParse(up.Substring(1), out var fn))
-            {
-                if (fn >= 1 && fn <= 24)
-                    return 0x6F + fn;
-            }
-
-            var normalized = up.Replace("VK_", "").Replace(" ", "_").Replace("-", "_");
-            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-            {
-                { "VOLUME_UP", 0xAF },
-                { "VOLUME_DOWN", 0xAE },
-                { "VOLUME_MUTE", 0xAD },
-                { "MEDIA_PLAY_PAUSE", 0xB3 },
-                { "ESC", 0x1B },
-                { "ENTER", 0x0D },
-                { "RETURN", 0x0D },
-                { "SPACE", 0x20 }
-            };
-
-            if (map.TryGetValue(normalized, out var mapped)) return mapped;
-            if (map.TryGetValue(up, out mapped)) return mapped;
-
-            return fallback;
-        }
-
-        private static MusicConfig CloneConfig(MusicConfig source)
-        {
-            var paths = source.Paths ?? new PathsConfig();
-            return new MusicConfig
-            {
-                Paths = new PathsConfig
-                {
-                    Adb = paths.Adb,
-                    FfmpegPath = paths.FfmpegPath,
-                    Scrcpy = paths.Scrcpy,
-                    CoverCachePath = paths.CoverCachePath
-                },
-                SelectedDeviceUSB = source.SelectedDeviceUSB,
-                SelectedDeviceWiFi = source.SelectedDeviceWiFi,
-                SelectedDeviceName = source.SelectedDeviceName,
-                WifiMode = source.WifiMode,
-                WifiMdnsServiceName = source.WifiMdnsServiceName,
-                MusicRemoteRoot = source.MusicRemoteRoot,
-                MusicRemoteRoots = source.MusicRemoteRoots?.ToList() ?? new List<string>(),
-                UpdateIntervalMode = source.UpdateIntervalMode,
-                IgnoredUpdateVersion = source.IgnoredUpdateVersion,
-                DebugMode = source.DebugMode,
-                UseDarkMode = source.UseDarkMode,
-                OpenInTaskbar = source.OpenInTaskbar,
-                StartWithWindows = source.StartWithWindows,
-                ShowMediaPlayerWindow = source.ShowMediaPlayerWindow,
-                MediaPlayerWindowWidth = source.MediaPlayerWindowWidth,
-                MediaPlayerWindowHeight = source.MediaPlayerWindowHeight,
-                MediaPlayerWindowTop = source.MediaPlayerWindowTop,
-                MediaPlayerWindowLeft = source.MediaPlayerWindowLeft,
-                MediaPlayerWindowState = source.MediaPlayerWindowState,
-                ScrcpyAudioCodec = source.ScrcpyAudioCodec,
-                ScrcpyAudioBitrate = source.ScrcpyAudioBitrate ?? string.Empty,
-                ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
-                ScrcpyFlacCompressionLevel = source.ScrcpyFlacCompressionLevel,
-                ScrcpyAvailableAudioCodecs = source.ScrcpyAvailableAudioCodecs?.ToList() ?? new List<string>(),
-                AudioQualityPresetName = source.AudioQualityPresetName ?? string.Empty,
-                SmtcPauseClearDelayMinutes = source.SmtcPauseClearDelayMinutes,
-                IsWifiEnabled = source.IsWifiEnabled,
-                OnboardingCompleted = source.OnboardingCompleted,
-                CachClearInMB = source.CachClearInMB,
-                AllowedApps = source.AllowedApps?.ToList() ?? new List<string>(),
-                EligibleApps = source.EligibleApps?.Select(a => new EligibleAppConfig
-                {
-                    PackageName = a.PackageName,
-                    IsEnabled = a.IsEnabled,
-                    EnableCoverSearch = a.EnableCoverSearch,
-                    PresenceMode = a.PresenceMode
-                }).ToList() ?? new List<EligibleAppConfig>(),
-                HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
-                HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
-                HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,
-                HotkeyToggleLyricsOverlayKey = source.HotkeyToggleLyricsOverlayKey,
-                HotkeyCopyTrackInfoKey = source.HotkeyCopyTrackInfoKey,
-                LyricsSearchFolderOverride = source.LyricsSearchFolderOverride ?? string.Empty,
-                CoverArtFileNamePatterns = source.CoverArtFileNamePatterns ?? string.Empty,
-                CopyTrackInfoTemplate = source.CopyTrackInfoTemplate ?? string.Empty,
-                HotkeyModifier = source.HotkeyModifier
-            };
-        }
-
-        private sealed class AppPackageItem : INotifyPropertyChanged
-        {
-            public event PropertyChangedEventHandler? PropertyChanged;
-
-            public string PackageName { get; }
-            public string DisplayName => MainWindow.FormatPackageName(PackageName);
-
-            private PresenceMode _presenceMode;
-            public PresenceMode PresenceMode
-            {
-                get => _presenceMode;
-                set
-                {
-                    if (_presenceMode == value) return;
-                    _presenceMode = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PresenceMode)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PresenceModeLabel)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PresenceModeColor)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PresenceModeBrush)));
-                }
-            }
-
-            private bool _enableCoverSearch;
-            public bool EnableCoverSearch
-            {
-                get => _enableCoverSearch;
-                set
-                {
-                    if (_enableCoverSearch == value) return;
-                    _enableCoverSearch = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EnableCoverSearch)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CoverLabel)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CoverColor)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CoverBrush)));
-                }
-            }
-
-            public string PresenceModeLabel => _presenceMode switch
-            {
-                PresenceMode.Full => "Full",
-                PresenceMode.Half => "Half",
-                _ => "Off"
-            };
-
-            public string PresenceModeColor => _presenceMode switch
-            {
-                PresenceMode.Full => "#34C954",
-                PresenceMode.Half => "#3E7BFF",
-                _ => "#FF3B30"
-            };
-
-            public System.Windows.Media.Brush PresenceModeBrush => new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(PresenceModeColor));
-
-            public string CoverLabel => _enableCoverSearch ? "On" : "Off";
-            public string CoverColor => _enableCoverSearch ? "#34C954" : "#FF3B30";
-            public System.Windows.Media.Brush CoverBrush => new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(CoverColor));
-
-            public AppPackageItem(string packageName, PresenceMode presenceMode, bool enableCoverSearch)
-            {
-                PackageName = packageName;
-                _presenceMode = presenceMode;
-                _enableCoverSearch = enableCoverSearch;
-            }
-
-            public void CyclePresenceMode()
-            {
-                PresenceMode = PresenceMode switch
-                {
-                    PresenceMode.Full => PresenceMode.Half,
-                    PresenceMode.Half => PresenceMode.Off,
-                    _ => PresenceMode.Full
-                };
-            }
-
-            public void ToggleCover()
-            {
-                EnableCoverSearch = !EnableCoverSearch;
             }
         }
 

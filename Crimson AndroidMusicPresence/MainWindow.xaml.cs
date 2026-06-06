@@ -110,7 +110,7 @@ namespace musicpresense
             InitializeComponent();
 
             _config = App.Config;
-            _savedConfig = CloneConfig(_config);
+            _savedConfig = _config.Clone();
             InitializeCmbBoxes();
             InitializeAudioCodecUI();
             ApplyConfigToUI();

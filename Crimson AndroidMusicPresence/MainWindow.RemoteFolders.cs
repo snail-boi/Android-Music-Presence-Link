@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,7 +14,7 @@ namespace musicpresense
         {
             try
             {
-                var device = await GetCurrentDeviceForAppsAsync();
+                var device = await DeviceQuery.ResolveActiveDeviceAsync(_config);
                 if (string.IsNullOrWhiteSpace(device))
                 {
                     MessageBox.Show("No device connected.", "Device Required", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -56,7 +56,7 @@ namespace musicpresense
 
         private async void BtnPickRemoteRoot_Click(object sender, RoutedEventArgs e)
         {
-            var device = await GetCurrentDeviceForAppsAsync();
+            var device = await DeviceQuery.ResolveActiveDeviceAsync(_config);
             if (string.IsNullOrWhiteSpace(device))
             {
                 MessageBox.Show("No device connected.", "Device Required", MessageBoxButton.OK, MessageBoxImage.Warning);

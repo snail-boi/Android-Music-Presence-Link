@@ -12,7 +12,7 @@ namespace musicpresense
     {
         private readonly MusicConfig _config;
         private readonly Action<MusicConfig> _onSaved;
-        private readonly ObservableCollection<MainWindow.AppPackageItem> _items = new();
+        private readonly ObservableCollection<AppPackageItem> _items = new();
 
         public AppsManagerWindow(MusicConfig config, Action<MusicConfig> onSaved)
         {
@@ -66,9 +66,9 @@ namespace musicpresense
                 foreach (var pkg in allPackages)
                 {
                     if (savedApps.TryGetValue(pkg, out var saved))
-                        _items.Add(new MainWindow.AppPackageItem(pkg, saved.PresenceMode, saved.EnableCoverSearch));
+                        _items.Add(new AppPackageItem(pkg, saved.PresenceMode, saved.EnableCoverSearch));
                     else
-                        _items.Add(new MainWindow.AppPackageItem(pkg, PresenceMode.Off, false));
+                        _items.Add(new AppPackageItem(pkg, PresenceMode.Off, false));
                 }
 
                 TxtLoadStatus.Text = $"{_items.Count} apps";
@@ -82,13 +82,13 @@ namespace musicpresense
 
         private void BtnPresenceMode_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as Button)?.Tag is MainWindow.AppPackageItem item)
+            if ((sender as Button)?.Tag is AppPackageItem item)
                 item.CyclePresenceMode();
         }
 
         private void BtnCover_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as Button)?.Tag is MainWindow.AppPackageItem item)
+            if ((sender as Button)?.Tag is AppPackageItem item)
                 item.ToggleCover();
         }
 

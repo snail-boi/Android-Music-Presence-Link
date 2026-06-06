@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -152,13 +152,13 @@ namespace musicpresense
             string usbSerial = string.Empty;
             if (!string.IsNullOrWhiteSpace(ipPort))
             {
-                usbSerial = await GetDeviceSerialAsync(ipPort);
+                usbSerial = await DeviceQuery.GetDeviceSerialAsync(ipPort);
             }
             if (string.IsNullOrWhiteSpace(usbSerial))
             {
-                var adbSerial = await GetConnectedUsbDeviceAsync();
+                var adbSerial = await DeviceQuery.GetConnectedUsbDeviceAsync();
                 if (!string.IsNullOrWhiteSpace(adbSerial))
-                    usbSerial = await GetDeviceSerialAsync(adbSerial);
+                    usbSerial = await DeviceQuery.GetDeviceSerialAsync(adbSerial);
             }
             if (!string.IsNullOrWhiteSpace(usbSerial))
             {

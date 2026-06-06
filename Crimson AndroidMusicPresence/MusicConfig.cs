@@ -195,6 +195,97 @@ namespace musicpresense
         public int HotkeyCopyTrackInfoKey { get; set; } = 0x43;
         public int HotkeyAudioQualityKey { get; set; } = 0x51;   // Q
         public int HotkeyModifier { get; set; } = 0x0001;
+
+        public MusicConfig Clone()
+        {
+            var source = this;
+            var paths = source.Paths ?? new PathsConfig();
+            return new MusicConfig
+            {
+                Paths = new PathsConfig
+                {
+                    Adb = paths.Adb,
+                    FfmpegPath = paths.FfmpegPath,
+                    Scrcpy = paths.Scrcpy,
+                    CoverCachePath = paths.CoverCachePath
+                },
+                SelectedDeviceUSB = source.SelectedDeviceUSB,
+                SelectedDeviceWiFi = source.SelectedDeviceWiFi,
+                SelectedDeviceName = source.SelectedDeviceName,
+                WifiMode = source.WifiMode,
+                WifiMdnsServiceName = source.WifiMdnsServiceName ?? string.Empty,
+                MusicRemoteRoot = source.MusicRemoteRoot,
+                MusicRemoteRoots = source.MusicRemoteRoots?.ToList() ?? new List<string>(),
+                UpdateIntervalMode = source.UpdateIntervalMode,
+                IgnoredUpdateVersion = source.IgnoredUpdateVersion,
+                DebugMode = source.DebugMode,
+                UseDarkMode = source.UseDarkMode,
+                OpenInTaskbar = source.OpenInTaskbar,
+                StartWithWindows = source.StartWithWindows,
+                ShowMediaPlayerWindow = source.ShowMediaPlayerWindow,
+                MediaPlayerSettingsPaneOpen = source.MediaPlayerSettingsPaneOpen,
+                MediaPlayerInlineLyricsViewActive = source.MediaPlayerInlineLyricsViewActive,
+                MediaPlayerFullscreenActive = source.MediaPlayerFullscreenActive,
+                MediaPlayerPlayerSettingsPaneOpen = source.MediaPlayerPlayerSettingsPaneOpen,
+                PillModeConnection = source.PillModeConnection,
+                PillModeAudioLink = source.PillModeAudioLink,
+                PillModeQuality = source.PillModeQuality,
+                PillModeAlwaysOnTop = source.PillModeAlwaysOnTop,
+                PlayerShowTitle = source.PlayerShowTitle,
+                PlayerShowArtist = source.PlayerShowArtist,
+                PlayerShowAlbum = source.PlayerShowAlbum,
+                PlayerShowCover = source.PlayerShowCover,
+                PlayerShowVolumeButton = source.PlayerShowVolumeButton,
+                PlayerShowLyricsButton = source.PlayerShowLyricsButton,
+                PlayerShowBattery = source.PlayerShowBattery,
+                PlayerShowHelpButton = source.PlayerShowHelpButton,
+                PlayerShowFullscreenButton = source.PlayerShowFullscreenButton,
+                PlayerShowSeekButtons = source.PlayerShowSeekButtons,
+                PlayerSeekButtonThresholdSeconds = source.PlayerSeekButtonThresholdSeconds,
+                PlayerShowTimeLeft = source.PlayerShowTimeLeft,
+                PlayerCoverShadow = source.PlayerCoverShadow,
+                PlayerTextShadow = source.PlayerTextShadow,
+                PlayerSwapArtistAlbum = source.PlayerSwapArtistAlbum,
+                PlayerCoverRoundedCorners = source.PlayerCoverRoundedCorners,
+                PlayerGradientSamplePoints = source.PlayerGradientSamplePoints,
+                SwapSettingsLocation = source.SwapSettingsLocation,
+                MediaPlayerWindowWidth = source.MediaPlayerWindowWidth,
+                MediaPlayerWindowHeight = source.MediaPlayerWindowHeight,
+                MediaPlayerWindowTop = source.MediaPlayerWindowTop,
+                MediaPlayerWindowLeft = source.MediaPlayerWindowLeft,
+                MediaPlayerWindowState = source.MediaPlayerWindowState,
+                ScrcpyAudioCodec = source.ScrcpyAudioCodec,
+                ScrcpyAudioBitrate = source.ScrcpyAudioBitrate ?? string.Empty,
+                ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
+                ScrcpyFlacCompressionLevel = source.ScrcpyFlacCompressionLevel,
+                ScrcpyAvailableAudioCodecs = source.ScrcpyAvailableAudioCodecs?.ToList() ?? new List<string>(),
+                AudioQualityPresetName = source.AudioQualityPresetName ?? string.Empty,
+                SmtcPauseClearDelayMinutes = source.SmtcPauseClearDelayMinutes,
+                IsWifiEnabled = source.IsWifiEnabled,
+                OnboardingCompleted = source.OnboardingCompleted,
+                CachClearInMB = source.CachClearInMB,
+                LyricsSearchFolderOverride = source.LyricsSearchFolderOverride ?? string.Empty,
+                CoverArtFileNamePatterns = source.CoverArtFileNamePatterns ?? string.Empty,
+                CopyTrackInfoTemplate = source.CopyTrackInfoTemplate ?? string.Empty,
+                NextSongMode = source.NextSongMode,
+                NextSongSortMode = source.NextSongSortMode,
+                AllowedApps = source.AllowedApps?.ToList() ?? new List<string>(),
+                EligibleApps = source.EligibleApps?.Select(a => new EligibleAppConfig
+                {
+                    PackageName = a.PackageName,
+                    IsEnabled = a.IsEnabled,
+                    EnableCoverSearch = a.EnableCoverSearch,
+                    PresenceMode = a.PresenceMode
+                }).ToList() ?? new List<EligibleAppConfig>(),
+                HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
+                HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
+                HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,
+                HotkeyToggleLyricsOverlayKey = source.HotkeyToggleLyricsOverlayKey,
+                HotkeyCopyTrackInfoKey = source.HotkeyCopyTrackInfoKey,
+                HotkeyAudioQualityKey = source.HotkeyAudioQualityKey,
+                HotkeyModifier = source.HotkeyModifier
+            };
+        }
     }
 
     public class PathsConfig

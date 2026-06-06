@@ -1,4 +1,4 @@
-﻿using Microsoft.VisualBasic.Devices;
+using Microsoft.VisualBasic.Devices;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,12 +48,12 @@ namespace musicpresense
             SelectCodecFromConfig();
             UpdateCodecDependentFields();
 
-            try { TxtHotkeyVolumeUp.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
-            try { TxtHotkeyVolumeDown.Text = VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
-            try { TxtHotkeyToggleScrcpy.Text = VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
-            try { TxtHotkeyToggleLyricsOverlay.Text = VirtualKeyToDisplayName(_config.HotkeyToggleLyricsOverlayKey); } catch { TxtHotkeyToggleLyricsOverlay.Text = string.Empty; }
-            try { TxtHotkeyCopyTrackInfo.Text = VirtualKeyToDisplayName(_config.HotkeyCopyTrackInfoKey); } catch { TxtHotkeyCopyTrackInfo.Text = string.Empty; }
-            try { TxtHotkeyAudioQuality.Text = VirtualKeyToDisplayName(_config.HotkeyAudioQualityKey); } catch { TxtHotkeyAudioQuality.Text = string.Empty; }
+            try { TxtHotkeyVolumeUp.Text = HotkeyHelper.VirtualKeyToDisplayName(_config.HotkeyVolumeUpKey); } catch { TxtHotkeyVolumeUp.Text = string.Empty; }
+            try { TxtHotkeyVolumeDown.Text = HotkeyHelper.VirtualKeyToDisplayName(_config.HotkeyVolumeDownKey); } catch { TxtHotkeyVolumeDown.Text = string.Empty; }
+            try { TxtHotkeyToggleScrcpy.Text = HotkeyHelper.VirtualKeyToDisplayName(_config.HotkeyToggleScrcpyKey); } catch { TxtHotkeyToggleScrcpy.Text = string.Empty; }
+            try { TxtHotkeyToggleLyricsOverlay.Text = HotkeyHelper.VirtualKeyToDisplayName(_config.HotkeyToggleLyricsOverlayKey); } catch { TxtHotkeyToggleLyricsOverlay.Text = string.Empty; }
+            try { TxtHotkeyCopyTrackInfo.Text = HotkeyHelper.VirtualKeyToDisplayName(_config.HotkeyCopyTrackInfoKey); } catch { TxtHotkeyCopyTrackInfo.Text = string.Empty; }
+            try { TxtHotkeyAudioQuality.Text = HotkeyHelper.VirtualKeyToDisplayName(_config.HotkeyAudioQualityKey); } catch { TxtHotkeyAudioQuality.Text = string.Empty; }
             TxtLyricsFolderOverride.Text = _config.LyricsSearchFolderOverride ?? string.Empty;
             TxtCoverPatterns.Text = _config.CoverArtFileNamePatterns ?? string.Empty;
             TxtCopyTrackTemplate.Text = _config.CopyTrackInfoTemplate ?? string.Empty;
@@ -281,12 +281,12 @@ namespace musicpresense
             }
 
             // Parse and store hotkey settings (allows hex 0x.., decimal, single letters or common names)
-            _config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
-            _config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
-            _config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
-            _config.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
-            _config.HotkeyCopyTrackInfoKey = ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _config.HotkeyCopyTrackInfoKey);
-            _config.HotkeyAudioQualityKey = ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _config.HotkeyAudioQualityKey);
+            _config.HotkeyVolumeUpKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
+            _config.HotkeyVolumeDownKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
+            _config.HotkeyToggleScrcpyKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
+            _config.HotkeyToggleLyricsOverlayKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
+            _config.HotkeyCopyTrackInfoKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _config.HotkeyCopyTrackInfoKey);
+            _config.HotkeyAudioQualityKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _config.HotkeyAudioQualityKey);
             _config.LyricsSearchFolderOverride = TxtLyricsFolderOverride.Text.Trim();
             _config.CoverArtFileNamePatterns = TxtCoverPatterns.Text.Trim();
             _config.CopyTrackInfoTemplate = TxtCopyTrackTemplate.Text.Trim();
@@ -311,7 +311,7 @@ namespace musicpresense
 
             MusicConfigManager.Save(_config);
             (Application.Current as App)?.UpdateConfig(_config);
-            _savedConfig = CloneConfig(_config);
+            _savedConfig = _config.Clone();
 
             Debugger.show("[SETTINGS] Settings saved.");
 
@@ -322,7 +322,7 @@ namespace musicpresense
         }
         private MusicConfig BuildConfigFromUi()
         {
-            var config = CloneConfig(_config);
+            var config = _config.Clone();
 
             config.SelectedDeviceUSB = TxtUsbSerial.Text.Trim();
             config.SelectedDeviceWiFi = TxtWifi.Text.Trim();
@@ -464,12 +464,12 @@ namespace musicpresense
                 config.SmtcPauseClearDelayMinutes = 3;
             }
 
-            config.HotkeyVolumeUpKey = ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
-            config.HotkeyVolumeDownKey = ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
-            config.HotkeyToggleScrcpyKey = ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
-            config.HotkeyToggleLyricsOverlayKey = ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
-            config.HotkeyCopyTrackInfoKey = ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _config.HotkeyCopyTrackInfoKey);
-            config.HotkeyAudioQualityKey = ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _config.HotkeyAudioQualityKey);
+            config.HotkeyVolumeUpKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyVolumeUp.Text.Trim(), _config.HotkeyVolumeUpKey);
+            config.HotkeyVolumeDownKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyVolumeDown.Text.Trim(), _config.HotkeyVolumeDownKey);
+            config.HotkeyToggleScrcpyKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyToggleScrcpy.Text.Trim(), _config.HotkeyToggleScrcpyKey);
+            config.HotkeyToggleLyricsOverlayKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyToggleLyricsOverlay.Text.Trim(), _config.HotkeyToggleLyricsOverlayKey);
+            config.HotkeyCopyTrackInfoKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyCopyTrackInfo.Text.Trim(), _config.HotkeyCopyTrackInfoKey);
+            config.HotkeyAudioQualityKey = HotkeyHelper.ParseVirtualKey(TxtHotkeyAudioQuality.Text.Trim(), _config.HotkeyAudioQualityKey);
             config.LyricsSearchFolderOverride = TxtLyricsFolderOverride.Text.Trim();
             config.CoverArtFileNamePatterns = TxtCoverPatterns.Text.Trim();
             config.CopyTrackInfoTemplate = TxtCopyTrackTemplate.Text.Trim();
@@ -603,70 +603,13 @@ namespace musicpresense
 
             return true;
         }
-        private static MusicConfig CloneConfig(MusicConfig source)
-        {
-            var paths = source.Paths ?? new PathsConfig();
-            return new MusicConfig
-            {
-                Paths = new PathsConfig
-                {
-                    Adb = paths.Adb,
-                    FfmpegPath = paths.FfmpegPath,
-                    Scrcpy = paths.Scrcpy,
-                    CoverCachePath = paths.CoverCachePath
-                },
-                SelectedDeviceUSB = source.SelectedDeviceUSB,
-                SelectedDeviceWiFi = source.SelectedDeviceWiFi,
-                SelectedDeviceName = source.SelectedDeviceName,
-                WifiMode = source.WifiMode,
-                WifiMdnsServiceName = source.WifiMdnsServiceName ?? string.Empty,
-                MusicRemoteRoot = source.MusicRemoteRoot,
-                MusicRemoteRoots = source.MusicRemoteRoots?.ToList() ?? new List<string>(),
-                CachClearInMB = source.CachClearInMB,
-                AllowedApps = source.AllowedApps?.ToList() ?? new List<string>(),
-                EligibleApps = source.EligibleApps?.Select(a => new EligibleAppConfig
-                {
-                    PackageName = a.PackageName,
-                    PresenceMode = a.PresenceMode,
-                    EnableCoverSearch = a.EnableCoverSearch
-                }).ToList() ?? new List<EligibleAppConfig>(),
-                UpdateIntervalMode = source.UpdateIntervalMode,
-                DebugMode = source.DebugMode,
-                UseDarkMode = source.UseDarkMode,
-                OpenInTaskbar = source.OpenInTaskbar,
-                StartWithWindows = source.StartWithWindows,
-                ShowMediaPlayerWindow = source.ShowMediaPlayerWindow,
-                MediaPlayerSettingsPaneOpen = source.MediaPlayerSettingsPaneOpen,
-                MediaPlayerInlineLyricsViewActive = source.MediaPlayerInlineLyricsViewActive,
-                MediaPlayerFullscreenActive = source.MediaPlayerFullscreenActive,
-                ScrcpyAudioCodec = source.ScrcpyAudioCodec,
-                ScrcpyAudioBitrate = source.ScrcpyAudioBitrate ?? string.Empty,
-                ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
-                ScrcpyFlacCompressionLevel = source.ScrcpyFlacCompressionLevel,
-                ScrcpyAvailableAudioCodecs = source.ScrcpyAvailableAudioCodecs?.ToList() ?? new List<string>(),
-                AudioQualityPresetName = source.AudioQualityPresetName ?? string.Empty,
-                SmtcPauseClearDelayMinutes = source.SmtcPauseClearDelayMinutes,
-                HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
-                HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
-                HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,
-                HotkeyToggleLyricsOverlayKey = source.HotkeyToggleLyricsOverlayKey,
-                HotkeyCopyTrackInfoKey = source.HotkeyCopyTrackInfoKey,
-                HotkeyAudioQualityKey = source.HotkeyAudioQualityKey,
-                LyricsSearchFolderOverride = source.LyricsSearchFolderOverride ?? string.Empty,
-                CoverArtFileNamePatterns = source.CoverArtFileNamePatterns ?? string.Empty,
-                CopyTrackInfoTemplate = source.CopyTrackInfoTemplate ?? string.Empty,
-                IsWifiEnabled = source.IsWifiEnabled,
-                OnboardingCompleted = source.OnboardingCompleted,
-                HotkeyModifier = source.HotkeyModifier
-            };
-        }
         private void UpdateSavedSnapshot()
         {
-            _savedConfig = CloneConfig(_config);
+            _savedConfig = _config.Clone();
         }
         private void RevertUnsavedChanges()
         {
-            _config = CloneConfig(_savedConfig);
+            _config = _savedConfig.Clone();
             (Application.Current as App)?.UpdateConfig(_config);
             InitializeAudioCodecUI();
             ApplyConfigToUI();
@@ -679,7 +622,7 @@ namespace musicpresense
         internal void SyncRuntimeConfig(MusicConfig config)
         {
             _config = config;
-            _savedConfig = CloneConfig(config);
+            _savedConfig = config.Clone();
             ApplyConfigToUI();
             UpdateMediaPlayerModeButton((Application.Current as App)?.IsMediaPlayerModeActive() == true);
         }

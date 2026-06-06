@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -117,7 +117,7 @@ namespace musicpresense
                     return;
                 }
 
-                var device = await GetCurrentDeviceForAppsAsync().ConfigureAwait(false);
+                var device = await DeviceQuery.ResolveActiveDeviceAsync(_config).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(device))
                 {
                     await Dispatcher.InvokeAsync(() => TxtCodecStatus.Text = "No device connected.");
