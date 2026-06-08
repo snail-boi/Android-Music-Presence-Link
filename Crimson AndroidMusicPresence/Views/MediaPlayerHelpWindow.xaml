@@ -333,8 +333,7 @@
                     Style="{StaticResource PrimaryButton}"
                     HorizontalAlignment="Right"
                     IsDefault="True"
-                    IsCancel="True"
-                    Click="BtnClose_Click" />
+                    IsCancel="True" />
         </Grid>
     </Grid>
 </Window>
