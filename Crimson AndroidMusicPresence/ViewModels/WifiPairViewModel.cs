@@ -7,42 +7,185 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using QRCoder;
 
 namespace musicpresense
 {
-    public partial class WifiPairDialog : Window
+    /// <summary>
+    /// ViewModel for WifiPairDialog. Owns both pairing paths:
+    ///
+    ///   QR mode: generates a QR code carrying random service-name/password credentials,
+    ///   then listens on the mDNS multicast socket for the phone announcing its pairing
+    ///   service and runs adb pair automatically.
+    ///
+    ///   Manual mode: the user types an ip:port and the 6-digit code and pairs directly.
+    ///
+    /// Status text, status colour, the QR image, and which panel is shown are all bindable
+    /// properties. When pairing succeeds the VM records ServiceName/PairAddress and asks the
+    /// view to close. The mDNS loop runs on a background thread; WPF marshals simple property
+    /// changes to the UI thread for us, and the view marshals the close request.
+    ///
+    /// References to ImageSource and Brush are presentation types used purely for binding,
+    /// not knowledge of any window or control.
+    /// </summary>
+    public sealed class WifiPairViewModel : ViewModelBase
     {
-        /// <summary>The mDNS service name returned by adb after a successful pair.</summary>
-        public string ServiceName { get; private set; } = string.Empty;
+        private static readonly Brush AmberBrush = CreateFrozen(255, 179, 71);
 
-        /// <summary>The ip:pair_port used, kept for diagnostic logging.</summary>
+        // Raised when the dialog should close. The bool becomes DialogResult.
+        public event Action<bool>? RequestClose;
+
+        // Results read back by the caller after the dialog closes.
+        public string ServiceName { get; private set; } = string.Empty;
         public string PairAddress { get; private set; } = string.Empty;
 
         private CancellationTokenSource? _cts;
-        private bool _qrMode = true;
 
-        // Credentials embedded in the QR code, generated once per dialog open (or mode switch back to QR).
+        // Credentials embedded in the QR code, regenerated each time QR mode starts.
         private string _qrServiceName = string.Empty;
         private string _qrPassword = string.Empty;
 
-        public WifiPairDialog()
+        public RelayCommand ToggleModeCommand { get; }
+        public RelayCommand PairCommand { get; }
+        public RelayCommand CancelCommand { get; }
+
+        public WifiPairViewModel()
         {
-            InitializeComponent();
-            Loaded += OnLoaded;
+            ToggleModeCommand = new RelayCommand(ToggleMode);
+            PairCommand = new RelayCommand(async () => await PairManualAsync());
+            CancelCommand = new RelayCommand(() => RequestClose?.Invoke(false));
         }
 
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        // ── Bound state ───────────────────────────────────────────────────────
+
+        private bool _isQrMode = true;
+        public bool IsQrMode
+        {
+            get => _isQrMode;
+            set
+            {
+                if (Set(ref _isQrMode, value))
+                    RaisePropertyChanged(nameof(IsManualMode));
+            }
+        }
+
+        public bool IsManualMode => !_isQrMode;
+
+        private double _windowHeight = 460;
+        public double WindowHeight
+        {
+            get => _windowHeight;
+            set => Set(ref _windowHeight, value);
+        }
+
+        private string _modeToggleText = "Use IP/port and code instead";
+        public string ModeToggleText
+        {
+            get => _modeToggleText;
+            set => Set(ref _modeToggleText, value);
+        }
+
+        private ImageSource? _qrImage;
+        public ImageSource? QrImage
+        {
+            get => _qrImage;
+            set => Set(ref _qrImage, value);
+        }
+
+        private string _qrStatus = "Waiting for phone to scan...";
+        public string QrStatus
+        {
+            get => _qrStatus;
+            set => Set(ref _qrStatus, value);
+        }
+
+        private Brush _qrStatusBrush = AmberBrush;
+        public Brush QrStatusBrush
+        {
+            get => _qrStatusBrush;
+            set => Set(ref _qrStatusBrush, value);
+        }
+
+        private string _pairAddressInput = string.Empty;
+        public string PairAddressInput
+        {
+            get => _pairAddressInput;
+            set => Set(ref _pairAddressInput, value);
+        }
+
+        private string _pairCodeInput = string.Empty;
+        public string PairCodeInput
+        {
+            get => _pairCodeInput;
+            set => Set(ref _pairCodeInput, value);
+        }
+
+        private string _manualStatus = string.Empty;
+        public string ManualStatus
+        {
+            get => _manualStatus;
+            set => Set(ref _manualStatus, value);
+        }
+
+        private Brush _manualStatusBrush = AmberBrush;
+        public Brush ManualStatusBrush
+        {
+            get => _manualStatusBrush;
+            set => Set(ref _manualStatusBrush, value);
+        }
+
+        private bool _isPairing;
+        public bool IsPairing
+        {
+            get => _isPairing;
+            set
+            {
+                if (Set(ref _isPairing, value))
+                    RaisePropertyChanged(nameof(CanPair));
+            }
+        }
+
+        public bool CanPair => !_isPairing;
+
+        // ── Lifecycle (called by the view) ──────────────────────────────────────
+
+        public void Start()
         {
             GenerateQrCode();
             StartQrPairingLoop();
         }
 
-        // -------------------------------------------------------------------------
-        // QR mode
-        // -------------------------------------------------------------------------
+        public void Cancel()
+        {
+            _cts?.Cancel();
+        }
+
+        // ── Mode toggle ─────────────────────────────────────────────────────────
+
+        private void ToggleMode()
+        {
+            IsQrMode = !IsQrMode;
+
+            if (IsQrMode)
+            {
+                ModeToggleText = "Use IP/port and code instead";
+                WindowHeight = 460;
+
+                _cts?.Cancel();
+                GenerateQrCode();
+                StartQrPairingLoop();
+            }
+            else
+            {
+                _cts?.Cancel();
+                ModeToggleText = "Use QR code instead";
+                WindowHeight = 360;
+            }
+        }
+
+        // ── QR mode ───────────────────────────────────────────────────────────
 
         private void GenerateQrCode()
         {
@@ -64,7 +207,7 @@ namespace musicpresense
             image.EndInit();
             image.Freeze();
 
-            ImgQrCode.Source = image;
+            QrImage = image;
         }
 
         private void StartQrPairingLoop()
@@ -75,11 +218,9 @@ namespace musicpresense
         }
 
         /// <summary>
-        /// Listens on the mDNS multicast socket (UDP 5353) for the pairing service
-        /// the phone broadcasts after scanning the QR code, then calls adb pair.
-        ///
-        /// Joins the multicast group on every active IPv4 network interface so the
-        /// socket receives packets regardless of which adapter the phone is reachable on.
+        /// Listens on the mDNS multicast socket (UDP 5353) for the pairing service the phone
+        /// broadcasts after scanning the QR code, then calls adb pair. Joins the multicast
+        /// group on every active IPv4 interface so it receives regardless of adapter.
         /// </summary>
         private async Task QrPairingLoopAsync(CancellationToken token)
         {
@@ -93,8 +234,6 @@ namespace musicpresense
                 sock.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 sock.Bind(new IPEndPoint(IPAddress.Any, 5353));
 
-                // Join on every active IPv4 interface so we receive regardless of
-                // which adapter the phone is on (Wi-Fi, USB tethering, etc.).
                 foreach (var iface in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if (iface.OperationalStatus != OperationalStatus.Up) continue;
@@ -120,7 +259,6 @@ namespace musicpresense
 
                 sock.ReceiveTimeout = 1500;
 
-                // Active query so we don't wait for the phone to spontaneously announce.
                 SendMdnsQuery(sock, mdns);
 
                 var buffer = new byte[4096];
@@ -137,7 +275,6 @@ namespace musicpresense
                     }
                     catch (SocketException)
                     {
-                        // Receive timeout � resend query and keep waiting.
                         if (!token.IsCancellationRequested)
                             SendMdnsQuery(sock, mdns);
                         continue;
@@ -162,8 +299,7 @@ namespace musicpresense
 
                         string ipPort = $"{senderIp}:{svc.Port}";
 
-                        await Dispatcher.InvokeAsync(() =>
-                            TxtQrStatus.Text = "Phone detected, pairing...");
+                        QrStatus = "Phone detected, pairing...";
 
                         Debugger.show($"[QR] Detected '{svc.Name}' at {ipPort}. Pairing...");
 
@@ -174,22 +310,15 @@ namespace musicpresense
 
                         if (result.Success)
                         {
-                            await Dispatcher.InvokeAsync(() =>
-                            {
-                                ServiceName = result.ServiceName;
-                                PairAddress = ipPort;
-                                DialogResult = true;
-                                Close();
-                            });
+                            ServiceName = result.ServiceName;
+                            PairAddress = ipPort;
+                            RequestClose?.Invoke(true);
                             return;
                         }
 
-                        await Dispatcher.InvokeAsync(() =>
-                        {
-                            TxtQrStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
-                            TxtQrStatus.Text = "Pairing failed. Try scanning again or use IP/port instead."
-                                + (string.IsNullOrWhiteSpace(result.Output) ? "" : " (" + result.Output.Trim() + ")");
-                        });
+                        QrStatusBrush = Brushes.OrangeRed;
+                        QrStatus = "Pairing failed. Try scanning again or use IP/port instead."
+                            + (string.IsNullOrWhiteSpace(result.Output) ? "" : " (" + result.Output.Trim() + ")");
                         return;
                     }
                 }
@@ -205,9 +334,48 @@ namespace musicpresense
             }
         }
 
-        // -------------------------------------------------------------------------
-        // mDNS helpers (raw UDP)
-        // -------------------------------------------------------------------------
+        // ── Manual IP/port mode ───────────────────────────────────────────────
+
+        private async Task PairManualAsync()
+        {
+            if (_isPairing) return;
+
+            var addr = PairAddressInput.Trim();
+            var code = PairCodeInput.Trim();
+
+            if (string.IsNullOrWhiteSpace(addr) || !addr.Contains(':'))
+            {
+                ManualStatus = "Pairing address must be in format ip:port.";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                ManualStatus = "Enter the 6-digit pairing code from your phone.";
+                return;
+            }
+
+            IsPairing = true;
+            ManualStatusBrush = Brushes.Gray;
+            ManualStatus = "Pairing...";
+
+            var result = await WirelessDebuggingHelper.PairAsync(addr, code).ConfigureAwait(true);
+
+            if (!result.Success)
+            {
+                IsPairing = false;
+                ManualStatusBrush = Brushes.OrangeRed;
+                ManualStatus = "Pairing failed. Make sure the phone screen is still showing the code, "
+                    + "the IP/port match exactly, and your PC is on the same Wi-Fi network. "
+                    + (string.IsNullOrWhiteSpace(result.Output) ? "" : "Details: " + result.Output.Trim());
+                return;
+            }
+
+            ServiceName = result.ServiceName;
+            PairAddress = addr;
+            RequestClose?.Invoke(true);
+        }
+
+        // ── mDNS helpers (raw UDP) ────────────────────────────────────────────
 
         private static void SendMdnsQuery(Socket sock, IPAddress mdns)
         {
@@ -352,98 +520,7 @@ namespace musicpresense
             return v;
         }
 
-        // -------------------------------------------------------------------------
-        // Manual IP/port mode
-        // -------------------------------------------------------------------------
-
-        private async void BtnPair_Click(object sender, RoutedEventArgs e)
-        {
-            var addr = TxtPairAddress.Text.Trim();
-            var code = TxtPairCode.Text.Trim();
-
-            if (string.IsNullOrWhiteSpace(addr) || !addr.Contains(':'))
-            {
-                TxtManualStatus.Text = "Pairing address must be in format ip:port.";
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(code))
-            {
-                TxtManualStatus.Text = "Enter the 6-digit pairing code from your phone.";
-                return;
-            }
-
-            BtnPair.IsEnabled = false;
-            TxtManualStatus.Foreground = System.Windows.Media.Brushes.Gray;
-            TxtManualStatus.Text = "Pairing...";
-
-            var result = await WirelessDebuggingHelper.PairAsync(addr, code).ConfigureAwait(true);
-
-            if (!result.Success)
-            {
-                BtnPair.IsEnabled = true;
-                TxtManualStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
-                TxtManualStatus.Text = "Pairing failed. Make sure the phone screen is still showing the code, "
-                    + "the IP/port match exactly, and your PC is on the same Wi-Fi network. "
-                    + (string.IsNullOrWhiteSpace(result.Output) ? "" : "Details: " + result.Output.Trim());
-                return;
-            }
-
-            ServiceName = result.ServiceName;
-            PairAddress = addr;
-            DialogResult = true;
-            Close();
-        }
-
-        // -------------------------------------------------------------------------
-        // Mode toggle
-        // -------------------------------------------------------------------------
-
-        private void TxtModeToggle_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            _qrMode = !_qrMode;
-
-            if (_qrMode)
-            {
-                PanelQr.Visibility = Visibility.Visible;
-                PanelManual.Visibility = Visibility.Collapsed;
-                BtnPair.Visibility = Visibility.Collapsed;
-                TxtModeToggle.Text = "Use IP/port and code instead";
-                Height = 460;
-
-                _cts?.Cancel();
-                GenerateQrCode();
-                StartQrPairingLoop();
-            }
-            else
-            {
-                _cts?.Cancel();
-                PanelQr.Visibility = Visibility.Collapsed;
-                PanelManual.Visibility = Visibility.Visible;
-                BtnPair.Visibility = Visibility.Visible;
-                TxtModeToggle.Text = "Use QR code instead";
-                Height = 360;
-                TxtPairAddress.Focus();
-            }
-        }
-
-        // -------------------------------------------------------------------------
-        // Cleanup
-        // -------------------------------------------------------------------------
-
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            _cts?.Cancel();
-        }
-
-        private void BtnCancel_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-            Close();
-        }
-
-        // -------------------------------------------------------------------------
-        // Helpers
-        // -------------------------------------------------------------------------
+        // ── Misc helpers ──────────────────────────────────────────────────────
 
         private static string GenerateRandomString(int length)
         {
@@ -452,6 +529,13 @@ namespace musicpresense
             for (int i = 0; i < length; i++)
                 sb.Append(chars[Random.Shared.Next(chars.Length)]);
             return sb.ToString();
+        }
+
+        private static Brush CreateFrozen(byte r, byte g, byte b)
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+            brush.Freeze();
+            return brush;
         }
     }
 }
