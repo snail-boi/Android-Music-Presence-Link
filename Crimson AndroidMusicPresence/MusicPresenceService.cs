@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -613,10 +612,10 @@ namespace musicpresense
 
         /// <summary>
         /// Parses title, artist and album from the scrambled media_session metadata string by
-        /// reading the exact field lengths from `dumpsys notification --noredact` for the active
-        /// package. Mapping: title = android.title, artist = android.text, album = android.subText.
-        /// Field separator in scrambled string is assumed to be ", " (comma + space, 2 chars).
-        /// Returns success=false if the notification cannot be located or lengths cannot be read,
+        /// reading the exact field lengths from `dumpsys notification` for the active package via awk.
+        /// The awk script runs on the phone and emits three key=value lines (title_len, artist_len,
+        /// album_len). C# then does the substring extraction using those lengths. No sensitive
+        /// notification content crosses the wire. Returns success=false if lengths cannot be read
         /// so the caller can fall back to a simple split.
         /// </summary>
         private async Task<(string? title, string? artist, string? album, bool success)> TryParseMediaMetadataAsync(
@@ -624,15 +623,23 @@ namespace musicpresense
         {
             try
             {
-                Debugger.show($"[NOTIFPARSER] Fetching notification data for package: {packageName}");
-                // Server-side filtering: same rationale as media_session, cuts the notification
-                // dump (often the largest ADB payload we fetch) down to just the lines the
-                // parser consumes. We keep NotificationRecord( as the block delimiter, pkg= to
-                // match the active record, and the three android.* length lines the parser
-                // reads via ExtractStringLength. grep -E is portable toybox on Android 6+.
+                Debugger.show($"[NOTIFPARSER] Fetching notification lengths for package: {packageName}");
+                // Server-side awk: scans dumpsys notification for the NotificationRecord block
+                // belonging to the target package, extracts only the [length=N] values for
+                // android.title, android.text (artist), and android.subText (album), and exits
+                // immediately after the first match. No string values are read or transmitted.
+                var awkNotif =
+                    "/NotificationRecord\\(/ { in_block=0; title_len=0; text_len=0; sub_len=0 } " +
+                    "/pkg=/ && $0 ~ pkg { in_block=1 } " +
+                    "in_block && /android\\.title=String/ { line=$0; sub(/.*\\[length=/, \"\", line); sub(/\\].*/,  \"\", line); title_len=line+0 } " +
+                    "in_block && /android\\.text=String/ { line=$0; sub(/.*\\[length=/, \"\", line); sub(/\\].*/,   \"\", line); text_len=line+0 } " +
+                    "in_block && /android\\.subText=String/ { line=$0; sub(/.*\\[length=/, \"\", line); sub(/\\].*/, \"\", line); sub_len=line+0 } " +
+                    "in_block && title_len && text_len { " +
+                    "print \"title_len=\" title_len; print \"artist_len=\" text_len; print \"album_len=\" sub_len; exit }";
+
                 string notifOutput = await AdbHelper.RunAdbCaptureAsync(
-                    $"-s {_currentDevice} shell dumpsys notification | grep -E 'NotificationRecord\\(|pkg=|android\\.title=String|android\\.text=String|android\\.subText=String'")
-                    .ConfigureAwait(false);
+                    $"-s {_currentDevice} shell dumpsys notification | awk -v pkg='{packageName}' '{awkNotif}'"
+                ).ConfigureAwait(false);
 
                 if (string.IsNullOrWhiteSpace(notifOutput))
                 {
@@ -640,30 +647,21 @@ namespace musicpresense
                     return (null, null, null, false);
                 }
 
-                // Find the NotificationRecord block for our package and isolate it from the next record.
-                // We grab everything from "pkg=<package>" up to the next "NotificationRecord(" or end of dump.
-                var pkgPattern = Regex.Escape(packageName);
-                var blockMatch = Regex.Match(notifOutput,
-                    $@"pkg={pkgPattern}\b.*?(?=NotificationRecord\(|\Z)",
-                    RegexOptions.Singleline);
+                int titleLen = 0;
+                int artistLen = 0;
+                int albumLen = 0;
 
-                if (!blockMatch.Success)
+                foreach (var rawLine in notifOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    Debugger.show($"[NOTIFPARSER] No notification record found for {packageName}");
-                    return (null, null, null, false);
+                    if (rawLine.StartsWith("title_len=", StringComparison.Ordinal))
+                        int.TryParse(rawLine.Substring("title_len=".Length).Trim(), out titleLen);
+                    else if (rawLine.StartsWith("artist_len=", StringComparison.Ordinal))
+                        int.TryParse(rawLine.Substring("artist_len=".Length).Trim(), out artistLen);
+                    else if (rawLine.StartsWith("album_len=", StringComparison.Ordinal))
+                        int.TryParse(rawLine.Substring("album_len=".Length).Trim(), out albumLen);
                 }
 
-                string notifBlock = blockMatch.Value;
-
-                // Extract lengths from the extras block. Format example:
-                //   android.title=String [length=52]
-                //   android.text=String [length=24]
-                //   android.subText=String [length=44]
-                int? titleLen = ExtractStringLength(notifBlock, "android.title");
-                int? artistLen = ExtractStringLength(notifBlock, "android.text");
-                int? albumLen = ExtractStringLength(notifBlock, "android.subText");
-
-                if (!titleLen.HasValue || !artistLen.HasValue)
+                if (titleLen == 0 || artistLen == 0)
                 {
                     Debugger.show($"[NOTIFPARSER] Missing required lengths (title={titleLen}, text={artistLen}, subText={albumLen})");
                     return (null, null, null, false);
@@ -671,8 +669,8 @@ namespace musicpresense
 
                 // Separator between fields in the scrambled string is ", " (2 chars).
                 const int sep = 2;
-                int needed = titleLen.Value + sep + artistLen.Value;
-                if (albumLen.HasValue) needed += sep + albumLen.Value;
+                int needed = titleLen + sep + artistLen;
+                if (albumLen > 0) needed += sep + albumLen;
 
                 if (scrambledMetadata.Length < needed)
                 {
@@ -680,34 +678,21 @@ namespace musicpresense
                     return (null, null, null, false);
                 }
 
-                string title = scrambledMetadata.Substring(0, titleLen.Value);
-                string artist = scrambledMetadata.Substring(titleLen.Value + sep, artistLen.Value);
-                string album = albumLen.HasValue
-                    ? scrambledMetadata.Substring(titleLen.Value + sep + artistLen.Value + sep, albumLen.Value)
+                string title = scrambledMetadata.Substring(0, titleLen);
+                string artist = scrambledMetadata.Substring(titleLen + sep, artistLen);
+                string album = albumLen > 0
+                    ? scrambledMetadata.Substring(titleLen + sep + artistLen + sep, albumLen)
                     : string.Empty;
 
-                Debugger.show($"[NOTIFPARSER] ✓ Parsed via lengths (T={titleLen}, A={artistLen}, Al={albumLen}): Title='{title}', Artist='{artist}', Album='{album}'");
+                Debugger.show($"[NOTIFPARSER] \u2713 Parsed via lengths (T={titleLen}, A={artistLen}, Al={albumLen}): Title='{title}', Artist='{artist}', Album='{album}'");
                 return (title, artist, album, true);
             }
             catch (Exception ex)
             {
-                Debugger.show($"[NOTIFPARSER] ✗ Exception: {ex.Message}");
+                Debugger.show($"[NOTIFPARSER] \u2717 Exception: {ex.Message}");
                 return (null, null, null, false);
             }
         }
-
-        /// <summary>
-        /// Extracts the [length=N] value for a given extras key from a notification dump block.
-        /// Returns null if the key is missing or the length cannot be parsed.
-        /// </summary>
-        private static int? ExtractStringLength(string notifBlock, string extrasKey)
-        {
-            var pattern = Regex.Escape(extrasKey) + @"=String\s*\[length=(\d+)\]";
-            var m = Regex.Match(notifBlock, pattern);
-            if (!m.Success) return null;
-            return int.TryParse(m.Groups[1].Value, out var len) ? len : (int?)null;
-        }
-
         /// <summary>
         /// Simple comma-split fallback used when notification data is unavailable.
         /// </summary>
@@ -727,18 +712,69 @@ namespace musicpresense
             {
                 if (string.IsNullOrEmpty(_currentDevice)) return false;
 
-                // Server-side filtering: pipe dumpsys output through grep on the device so only
-                // the lines we actually parse cross the wire. This cuts payload by ~90% and is
-                // the single biggest CPU/bandwidth win on the polling path. toybox grep ships
-                // with Android 6+, guaranteed on Android 13+. -A 2 keeps the two lines after any
-                // match so the multi-line state=PlaybackState{...} block stays intact even if
-                // position= ends up on its own line. Pipe exit code reflects grep's (may be 1
-                // when nothing matches); we already treat empty output as "no session" so that
-                // is harmless.
+                // Server-side awk script: runs entirely on the phone and emits only the four
+                // fields we need for the first active, eligible session. This replaces the old
+                // grep -A 2 approach which still sent several lines per session block across
+                // the wire and left all parsing to C#. The awk script handles both Android 13
+                // bare-number state format (state=3) and Android 16+ named format (state=PLAYING(3)).
+                // Output format:
+                //   package=<pkg>
+                //   description=<scrambled>
+                //   state=<number>
+                //   position=<ms>
+                // Empty output means no active eligible session.
+                var pkgList = string.Join("|", (_config.EligibleApps ?? new List<EligibleAppConfig>())
+                    .Where(a => !string.IsNullOrWhiteSpace(a.PackageName) && a.PresenceMode != PresenceMode.Off)
+                    .Select(a => a.PackageName.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase));
+
+                if (string.IsNullOrWhiteSpace(pkgList)) return false;
+
+                var awkMediaSession =
+                    "/queueTitle=/ { in_block=1; pkg=\"\"; active=0; desc=\"\"; state=\"\"; pos=\"\" } " +
+                    "in_block && /package=/ { line=$0; sub(/.*package=/, \"\", line); sub(/ .*/, \"\", line); pkg=line } " +
+                    "in_block && /active=true/ { active=1 } " +
+                    "in_block && /description=/ { line=$0; sub(/.*description=/, \"\", line); desc=line } " +
+                    "in_block && /state=PlaybackState/ { line=$0; " +
+                    "if (line ~ /state=[A-Z]+\\([0-9]/) { sub(/.*state=[A-Z]*\\(/, \"\", line); sub(/\\).*/, \"\", line) } " +
+                    "else { sub(/.*state=/, \"\", line); sub(/,.*/, \"\", line) }; " +
+                    "if (line ~ /^[0-9]/) state=line; line=$0; sub(/.*, position=/, \"\", line); sub(/,.*/, \"\", line); pos=line } " +
+                    "in_block && active && pkg && desc && state && (pkg ~ pkgs) { " +
+                    "print \"package=\" pkg; print \"description=\" desc; print \"state=\" state; print \"position=\" pos; in_block=0 }";
+
                 string output = await AdbHelper.RunAdbCaptureAsync(
-                    $"-s {_currentDevice} shell dumpsys media_session | grep -E -A 2 'queueTitle=|active=|package=|description=|state=PlaybackState'");
+                    $"-s {_currentDevice} shell dumpsys media_session | awk -v pkgs='{pkgList}' '{awkMediaSession}'"
+                );
                 if (string.IsNullOrWhiteSpace(output)) return false;
 
+                // Parse the flat awk output: four key=value lines.
+                string pkg = string.Empty;
+                string scrambledData = string.Empty;
+                int awkState = 0;
+                long awkPosition = 0;
+
+                foreach (var rawLine in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (rawLine.StartsWith("package=", StringComparison.Ordinal))
+                        pkg = rawLine.Substring("package=".Length).Trim();
+                    else if (rawLine.StartsWith("description=", StringComparison.Ordinal))
+                        scrambledData = rawLine.Substring("description=".Length).Trim();
+                    else if (rawLine.StartsWith("state=", StringComparison.Ordinal))
+                        int.TryParse(rawLine.Substring("state=".Length).Trim(), out awkState);
+                    else if (rawLine.StartsWith("position=", StringComparison.Ordinal))
+                        long.TryParse(rawLine.Substring("position=".Length).Trim(), out awkPosition);
+                }
+
+                if (string.IsNullOrEmpty(pkg) || string.IsNullOrEmpty(scrambledData))
+                {
+                    _mediaController.ClearDisplay();
+                    NotifyNowPlaying(null, null, null);
+                    NotifyLyricsPlayback(null, null, null, false, 0);
+                    NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
+                    return false;
+                }
+
+                // Look up cover search and SMTC flags for the matched package.
                 var eligibleApps = (_config.EligibleApps ?? new List<EligibleAppConfig>())
                     .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
                     .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
@@ -757,172 +793,133 @@ namespace musicpresense
                         },
                         StringComparer.OrdinalIgnoreCase);
 
-                var sessionBlocks = output.Split(new[] { "queueTitle=" }, StringSplitOptions.RemoveEmptyEntries);
-
-                foreach (var block in sessionBlocks)
+                bool enableCoverSearchForApp = false;
+                bool enableSmtcForApp = false;
+                if (eligibleApps.TryGetValue(pkg, out var matchedApp))
                 {
-                    if (!block.Contains("active=true"))
-                        continue;
+                    enableCoverSearchForApp = matchedApp.EnableCoverSearch;
+                    enableSmtcForApp = matchedApp.PresenceMode == PresenceMode.Full;
+                }
 
-                    bool enableCoverSearchForApp = false;
-                    bool enableSmtcForApp = false;
-                    string pkg = string.Empty;
+                // Parse title/artist/album. If the scrambled string is identical to last tick
+                // we reuse the cached parse result so we don't re-run the notification parser
+                // (which would fire another adb call). We must NOT skip the rest of the method:
+                // the position-ticking logic in MediaController.UpdateMediaControlsAsync needs
+                // to run every tick because Android reports a static position that we have to
+                // increment ourselves.
+                //
+                // Timing quirk: when a track changes, `dumpsys media_session` sometimes reflects
+                // the new scrambled metadata before `dumpsys notification` has caught up with the
+                // matching length fields. That yields a bad first parse. To correct for it we
+                // force a re-parse for 2 further ticks after any scrambled change, so the cache
+                // ends up populated with the result from a tick where both surfaces agree.
+                //
+                // We always cache the scrambled string after the parse attempt, even when the
+                // parse failed. Otherwise an unchanging-but-unparsable string (e.g. when no song
+                // is playing) would re-fire two adb calls every tick forever.
+                bool scrambledChanged = !string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal);
+                if (scrambledChanged)
+                {
+                    _reparseTicksRemaining = 1;
+                }
 
-                    var pkgMatch = Regex.Match(block, @"package=([^\s]+)");
-                    if (pkgMatch.Success)
+                bool mustReparse = scrambledChanged || _reparseTicksRemaining > 0;
+
+                (string? title, string? artist, string? album, bool success) parseResult;
+                if (!mustReparse)
+                {
+                    parseResult = (_lastParsedTitle, _lastParsedArtist, _lastParsedAlbum, _lastParseSuccess);
+                }
+                else
+                {
+                    // Always try notification-based parsing first (uses exact field lengths).
+                    // Fall back to a naive comma split only when notification data isn't available.
+                    parseResult = await TryParseMediaMetadataAsync(scrambledData, pkg).ConfigureAwait(false);
+                    if (!parseResult.success)
                     {
-                        pkg = pkgMatch.Groups[1].Value.Trim();
-                        if (!eligibleApps.TryGetValue(pkg, out var appSettings) || appSettings.PresenceMode == PresenceMode.Off)
-                            continue;
-
-                        enableCoverSearchForApp = appSettings.EnableCoverSearch;
-                        enableSmtcForApp = appSettings.PresenceMode == PresenceMode.Full;
-                    }
-                    else
-                    {
-                        continue;
-                    }
-
-                    // Pull the full metadata line (everything after "description=" up to end-of-line).
-                    // Earlier versions used a non-greedy comma regex here which silently truncated
-                    // titles/artists/albums that contained commas; we now hand the FULL scrambled
-                    // string to the notification-length parser so it can split it correctly.
-                    var metaMatch = Regex.Match(block,
-                        @"description=(?<desc>[^\r\n]+)",
-                        RegexOptions.Singleline);
-
-                    if (!metaMatch.Success)
-                        continue;
-
-                    string scrambledData = metaMatch.Groups["desc"].Value.Trim();
-
-                    // Parse title/artist/album. If the scrambled string is identical to last tick
-                    // we reuse the cached parse result so we don't re-run the notification parser
-                    // (which would fire another adb call). We must NOT skip the rest of the loop:
-                    // the position-ticking logic in MediaController.UpdateMediaControlsAsync needs
-                    // to run every tick because Android reports a static position that we have to
-                    // increment ourselves.
-                    //
-                    // Timing quirk: when a track changes, `dumpsys media_session` sometimes reflects
-                    // the new scrambled metadata before `dumpsys notification` has caught up with the
-                    // matching length fields. That yields a bad first parse. To correct for it we
-                    // force a re-parse for 2 further ticks after any scrambled change, so the cache
-                    // ends up populated with the result from a tick where both surfaces agree.
-                    //
-                    // We always cache the scrambled string after the parse attempt, even when the
-                    // parse failed. Otherwise an unchanging-but-unparsable string (e.g. when no song
-                    // is playing) would re-fire two adb calls every tick forever.
-                    bool scrambledChanged = !string.Equals(_lastScrambledMetadata, scrambledData, StringComparison.Ordinal);
-                    if (scrambledChanged)
-                    {
-                        _reparseTicksRemaining = 1;
+                        Debugger.show($"[NOTIFPARSER] Falling back to simple split for package: {pkg}");
+                        parseResult = SimpleSplitFallback(scrambledData);
+                        if (parseResult.success)
+                            Debugger.show($"[NOTIFPARSER] Fallback parsed - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
                     }
 
-                    bool mustReparse = scrambledChanged || _reparseTicksRemaining > 0;
+                    _lastScrambledMetadata = scrambledData;
+                    _lastParsedTitle = parseResult.title;
+                    _lastParsedArtist = parseResult.artist;
+                    _lastParsedAlbum = parseResult.album;
+                    _lastParseSuccess = parseResult.success;
 
-                    (string? title, string? artist, string? album, bool success) parseResult;
-                    if (!mustReparse)
+                    // Only decrement AFTER we actually did a reparse this tick.
+                    if (!scrambledChanged && _reparseTicksRemaining > 0)
+                        _reparseTicksRemaining--;
+                }
+
+                string? title = parseResult.title;
+                string? artist = parseResult.artist;
+                string? album = parseResult.album;
+                bool parseSuccess = parseResult.success;
+
+                if (!parseSuccess)
+                {
+                    _mediaController.ClearDisplay();
+                    NotifyNowPlaying(null, null, null);
+                    NotifyLyricsPlayback(null, null, null, false, 0);
+                    NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
+                    return false;
+                }
+
+                // State and position come directly from the awk output; no further regex needed.
+                bool isPlaying = awkState == 3;
+                long adbPositionMs = awkPosition;
+
+                if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
+                {
+                    NotifyNowPlaying(artist, title, album);
+                    NotifyLyricsPlayback(artist, title, album, isPlaying, Math.Max(0, adbPositionMs));
+
+                    if (!isPlaying)
                     {
-                        parseResult = (_lastParsedTitle, _lastParsedArtist, _lastParsedAlbum, _lastParseSuccess);
-                    }
-                    else
-                    {
-                        // Always try notification-based parsing first (uses exact field lengths).
-                        // Fall back to a naive comma split only when notification data isn't available.
-                        parseResult = await TryParseMediaMetadataAsync(scrambledData, pkg).ConfigureAwait(false);
-                        if (!parseResult.success)
+                        var signature = $"{title}\n{artist}\n{album}";
+                        if (_pausedSince == null || !string.Equals(_pausedSignature, signature, StringComparison.Ordinal))
                         {
-                            Debugger.show($"[NOTIFPARSER] Falling back to simple split for package: {pkg}");
-                            parseResult = SimpleSplitFallback(scrambledData);
-                            if (parseResult.success)
-                                Debugger.show($"[NOTIFPARSER] Fallback parsed - Title: '{parseResult.title}', Artist: '{parseResult.artist}', Album: '{parseResult.album}'");
+                            _pausedSince = DateTimeOffset.UtcNow;
+                            _pausedSignature = signature;
                         }
 
-                        _lastScrambledMetadata = scrambledData;
-                        _lastParsedTitle = parseResult.title;
-                        _lastParsedArtist = parseResult.artist;
-                        _lastParsedAlbum = parseResult.album;
-                        _lastParseSuccess = parseResult.success;
-
-                        // Only decrement AFTER we actually did a reparse this tick.
-                        if (!scrambledChanged && _reparseTicksRemaining > 0)
-                            _reparseTicksRemaining--;
-                    }
-
-                    string? title = parseResult.title;
-                    string? artist = parseResult.artist;
-                    string? album = parseResult.album;
-                    bool parseSuccess = parseResult.success;
-
-                    if (!parseSuccess)
-                        continue;
-
-                    var stateMatch = Regex.Match(block, @"state=PlaybackState\s*\{[^}]*state=(?:(\w+)\((\d+)\)|(\d+)),\s*position=(-?\d+)", RegexOptions.Singleline);
-                    bool isPlaying = false;
-                    long adbPositionMs = 0;
-
-                    if (stateMatch.Success)
-                    {
-                        string stateText = stateMatch.Groups[1].Value.Trim().ToUpper();
-                        string stateNumStr = string.IsNullOrEmpty(stateMatch.Groups[2].Value)
-                            ? stateMatch.Groups[3].Value
-                            : stateMatch.Groups[2].Value;
-                        if (!string.IsNullOrEmpty(stateText))
-                            isPlaying = stateText == "PLAYING";
-                        else if (int.TryParse(stateNumStr, out int stateNum))
-                            isPlaying = stateNum == 3;
-                        _ = long.TryParse(stateMatch.Groups[4].Value, out adbPositionMs);
-                    }
-
-                    if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
-                    {
-                        NotifyNowPlaying(artist, title, album);
-                        NotifyLyricsPlayback(artist, title, album, isPlaying, Math.Max(0, adbPositionMs));
-
-                        if (!isPlaying)
+                        if (_config.SmtcPauseClearDelayMinutes > 0 && _pausedSince.HasValue)
                         {
-                            var signature = $"{title}\n{artist}\n{album}";
-                            if (_pausedSince == null || !string.Equals(_pausedSignature, signature, StringComparison.Ordinal))
+                            var elapsed = DateTimeOffset.UtcNow - _pausedSince.Value;
+                            if (elapsed.TotalMinutes >= _config.SmtcPauseClearDelayMinutes)
                             {
-                                _pausedSince = DateTimeOffset.UtcNow;
-                                _pausedSignature = signature;
-                            }
-
-                            if (_config.SmtcPauseClearDelayMinutes > 0 && _pausedSince.HasValue)
-                            {
-                                var elapsed = DateTimeOffset.UtcNow - _pausedSince.Value;
-                                if (elapsed.TotalMinutes >= _config.SmtcPauseClearDelayMinutes)
+                                if (!_smtcPausedCleared)
                                 {
-                                    if (!_smtcPausedCleared)
-                                    {
-                                        _mediaController.Clear();
-                                        NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
-                                        _smtcPausedCleared = true;
-                                    }
-
-                                    return false;
+                                    _mediaController.Clear();
+                                    NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
+                                    _smtcPausedCleared = true;
                                 }
-                            }
-                            else if (_config.SmtcPauseClearDelayMinutes == 0)
-                            {
-                                // legacy logging, this probably won't be changed and if it is then just uncomment
-                                //Debugger.show("not clearing value 0 is no timeout");
-                            }
 
-                            if (_smtcPausedCleared)
                                 return false;
+                            }
                         }
-                        else
+                        else if (_config.SmtcPauseClearDelayMinutes == 0)
                         {
-                            _pausedSince = null;
-                            _pausedSignature = null;
-                            _smtcPausedCleared = false;
+                            // legacy logging, this probably won't be changed and if it is then just uncomment
+                            //Debugger.show("not clearing value 0 is no timeout");
                         }
 
-                        await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp, enableSmtcForApp, adbPositionMs, _timer.Interval).ConfigureAwait(false);
-                        NotifyMediaPlayerState(_mediaController.CurrentTitle, _mediaController.CurrentArtist, _mediaController.CurrentAlbum, _mediaController.CurrentCoverPath, isPlaying, _mediaController.CurrentPositionMs, _mediaController.CurrentDurationMs);
-                        return isPlaying;
+                        if (_smtcPausedCleared)
+                            return false;
                     }
+                    else
+                    {
+                        _pausedSince = null;
+                        _pausedSignature = null;
+                        _smtcPausedCleared = false;
+                    }
+
+                    await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp, enableSmtcForApp, adbPositionMs, _timer.Interval).ConfigureAwait(false);
+                    NotifyMediaPlayerState(_mediaController.CurrentTitle, _mediaController.CurrentArtist, _mediaController.CurrentAlbum, _mediaController.CurrentCoverPath, isPlaying, _mediaController.CurrentPositionMs, _mediaController.CurrentDurationMs);
+                    return isPlaying;
                 }
 
                 _mediaController.ClearDisplay();
@@ -937,7 +934,6 @@ namespace musicpresense
                 return false;
             }
         }
-
         private void NotifyMediaPlayerState(string? title, string? artist, string? album, string? coverPath, bool isPlaying, long positionMs, long durationMs)
         {
             try
