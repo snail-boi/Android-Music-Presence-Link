@@ -12,6 +12,8 @@
         Background="{DynamicResource ThemeBackgroundBrush}"
         Foreground="{DynamicResource ThemeForegroundBrush}">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
             <Setter Property="Foreground" Value="White" />
@@ -75,23 +77,24 @@
             </Grid.RowDefinitions>
 
             <TextBlock Text="Update available" FontSize="22" FontWeight="SemiBold" />
-            <TextBlock x:Name="TxtSummary" Grid.Row="1" Margin="0,6,0,0" Opacity="0.8" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="1" Margin="0,6,0,0" Opacity="0.8" TextWrapping="Wrap" Text="{Binding Summary}" />
 
             <Border Grid.Row="2" Margin="0,14,0,0" Padding="12" Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8">
                 <StackPanel>
                     <TextBlock Text="What's included" FontWeight="SemiBold" Margin="0,0,0,6" />
                     <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                        <TextBlock x:Name="TxtNotes" TextWrapping="Wrap" />
+                        <TextBlock TextWrapping="Wrap" Text="{Binding Notes}" />
                     </ScrollViewer>
                 </StackPanel>
             </Border>
 
-            <TextBlock Grid.Row="3" x:Name="TxtPrompt" Margin="0,14,0,0" TextWrapping="Wrap" Opacity="0.8" />
+            <TextBlock Grid.Row="3" Margin="0,14,0,0" TextWrapping="Wrap" Opacity="0.8" Text="{Binding Prompt}" />
 
             <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
-                <Button x:Name="BtnYes" Content="Yes" Style="{StaticResource PrimaryButton}" Width="100" Margin="0,0,8,0" Click="BtnYes_Click" />
-                <Button x:Name="BtnLater" Content="Remind me later" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="BtnLater_Click" Visibility="Visible" />
-                <Button x:Name="BtnNo" Content="No" Style="{StaticResource SecondaryButton}" Width="100" Click="BtnNo_Click" />
+                <Button Content="Yes" Style="{StaticResource PrimaryButton}" Width="100" Margin="0,0,8,0" Command="{Binding InstallCommand}" />
+                <Button Content="Remind me later" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Command="{Binding RemindLaterCommand}"
+                        Visibility="{Binding AllowRemindLater, Converter={StaticResource BoolToVis}}" />
+                <Button Content="No" Style="{StaticResource SecondaryButton}" Width="100" Command="{Binding IgnoreCommand}" />
             </StackPanel>
         </Grid>
     </Border>
