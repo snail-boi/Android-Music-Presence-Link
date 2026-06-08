@@ -42,11 +42,13 @@ namespace musicpresense
         {
             base.OnSourceInitialized(e);
 
-            Width = App.Config.WindowWidth;
-            Height = App.Config.WindowHeight;
-            Top = App.Config.WindowTop;
-            Left = App.Config.WindowLeft;
-            WindowState = App.Config.WindowState;
+            Config.Load();
+
+            Width = Config.Current.WindowWidth;
+            Height = Config.Current.WindowHeight;
+            Top = Config.Current.WindowTop;
+            Left = Config.Current.WindowLeft;
+            WindowState = Config.Current.WindowState;
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -56,13 +58,13 @@ namespace musicpresense
             if (WindowState == WindowState.Minimized)
                 WindowState = WindowState.Normal;
 
-            App.Config.WindowState = WindowState;
-            App.Config.WindowWidth = RestoreBounds.Width;
-            App.Config.WindowHeight = RestoreBounds.Height;
-            App.Config.WindowTop = RestoreBounds.Top;
-            App.Config.WindowLeft = RestoreBounds.Left;
+            Config.Current.WindowState = WindowState;
+            Config.Current.WindowWidth = double.IsFinite(RestoreBounds.Width) ? RestoreBounds.Width : 900;
+            Config.Current.WindowHeight = double.IsFinite(RestoreBounds.Height) ? RestoreBounds.Height : 600;
+            Config.Current.WindowTop = double.IsFinite(RestoreBounds.Top) ? RestoreBounds.Top : 100;
+            Config.Current.WindowLeft = double.IsFinite(RestoreBounds.Left) ? RestoreBounds.Left : 100;
 
-            MusicConfigManager.Save(App.Config);
+            Config.Save();
         }
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -226,7 +228,7 @@ namespace musicpresense
             _config.ShowMediaPlayerWindow = true;
             MusicConfigManager.Save(_config);
             _savedConfig.ShowMediaPlayerWindow = true;
-            app.ShowMediaPlayerWindowNow(maximizeForModeSwitch: true);
+            app.ShowMediaPlayerWindowNow();
         }
 
         internal void UpdateMediaPlayerModeButton(bool isMediaPlayerModeActive)

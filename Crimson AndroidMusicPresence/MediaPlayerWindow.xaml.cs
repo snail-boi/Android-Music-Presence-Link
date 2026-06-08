@@ -200,6 +200,7 @@ namespace musicpresense
             Height = config.MediaPlayerWindowHeight;
             Top = config.MediaPlayerWindowTop;
             Left = config.MediaPlayerWindowLeft;
+            WindowState = config.MediaPlayerWindowState;
         }
 
         private void MediaPlayerWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -252,13 +253,16 @@ namespace musicpresense
             config.MediaPlayerInlineLyricsViewActive = _lyricsViewActive;
             config.MediaPlayerFullscreenActive = _isFullscreen;
             config.MediaPlayerWindowState = WindowState;
-            config.MediaPlayerWindowWidth = RestoreBounds.Width;
-            config.MediaPlayerWindowHeight = RestoreBounds.Height;
-            config.MediaPlayerWindowTop = RestoreBounds.Top;
-            config.MediaPlayerWindowLeft = RestoreBounds.Left;
+            config.MediaPlayerWindowWidth = SanitizeBound(RestoreBounds.Width, 1080);
+            config.MediaPlayerWindowHeight = SanitizeBound(RestoreBounds.Height, 760);
+            config.MediaPlayerWindowTop = SanitizeBound(RestoreBounds.Top, 100);
+            config.MediaPlayerWindowLeft = SanitizeBound(RestoreBounds.Left, 100);
 
             MusicConfigManager.Save(config);
         }
+
+        private static double SanitizeBound(double value, double fallback)
+            => double.IsFinite(value) ? value : fallback;
 
         protected override void OnClosed(EventArgs e)
         {
