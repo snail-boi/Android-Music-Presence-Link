@@ -402,11 +402,14 @@ namespace musicpresense
                 {
                     if (!lastAdbPositionMs.HasValue || adbPositionMs != lastAdbPositionMs.Value)
                     {
-                        realPositionMs = adbPositionMs + cycleMs;
+                        // Position changed (new track or seek): snap to the reported value with
+                        // no offset. The next tick's dead reckon will advance it naturally.
+                        realPositionMs = adbPositionMs;
                         lastAdbPositionMs = adbPositionMs;
                     }
                     else if (isPlaying)
                     {
+                        // Same position as last tick: dead reckon forward by the poll interval.
                         realPositionMs += cycleMs;
                     }
                 }
