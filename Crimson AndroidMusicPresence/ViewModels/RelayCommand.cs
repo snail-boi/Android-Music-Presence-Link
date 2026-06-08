@@ -34,4 +34,32 @@ namespace musicpresense
             remove => CommandManager.RequerySuggested -= value;
         }
     }
+
+    /// <summary>
+    /// Same as RelayCommand, but the command receives a parameter. This is what you use
+    /// for a button inside a list row, where each row needs to act on its own item: the
+    /// XAML passes CommandParameter="{Binding}" (the row item) and it arrives here as the
+    /// typed argument.
+    /// </summary>
+    public class RelayCommand<T> : ICommand
+    {
+        private readonly Action<T?> _execute;
+        private readonly Func<T?, bool>? _canExecute;
+
+        public RelayCommand(Action<T?> execute, Func<T?, bool>? canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object? parameter) => _canExecute?.Invoke((T?)parameter) ?? true;
+
+        public void Execute(object? parameter) => _execute((T?)parameter);
+
+        public event EventHandler? CanExecuteChanged
+        {
+            add => CommandManager.RequerySuggested += value;
+            remove => CommandManager.RequerySuggested -= value;
+        }
+    }
 }

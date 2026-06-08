@@ -181,10 +181,10 @@
 
         <!-- Status row -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBlock x:Name="TxtLoadStatus"
-                       VerticalAlignment="Center"
+            <TextBlock VerticalAlignment="Center"
                        Opacity="0.7"
-                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+                       Foreground="{DynamicResource ThemeForegroundBrush}"
+                       Text="{Binding LoadStatus}" />
         </StackPanel>
 
         <!-- Column headers + list -->
@@ -211,7 +211,7 @@
             </Grid>
 
             <ListBox Grid.Row="1"
-                     x:Name="LstApps"
+                     ItemsSource="{Binding Items}"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      HorizontalContentAlignment="Stretch"
@@ -245,8 +245,8 @@
                                     Style="{StaticResource CycleButton}"
                                     Width="58"
                                     HorizontalAlignment="Center"
-                                    Tag="{Binding}"
-                                    Click="BtnPresenceMode_Click" />
+                                    Command="{Binding DataContext.CyclePresenceModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}" />
 
                             <Button Grid.Column="2"
                                     Content="{Binding CoverLabel}"
@@ -254,8 +254,8 @@
                                     Style="{StaticResource CycleButton}"
                                     Width="40"
                                     HorizontalAlignment="Center"
-                                    Tag="{Binding}"
-                                    Click="BtnCover_Click" />
+                                    Command="{Binding DataContext.ToggleCoverCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}" />
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
@@ -273,12 +273,11 @@
             <Button Grid.Column="1"
                     Content="Save"
                     Style="{StaticResource PrimaryButton}"
-                    Click="BtnSave_Click" />
+                    Command="{Binding SaveCommand}" />
             <Button Grid.Column="3"
                     Content="Cancel"
                     Style="{StaticResource SecondaryButton}"
-                    IsCancel="True"
-                    Click="BtnCancel_Click" />
+                    IsCancel="True" />
         </Grid>
     </Grid>
 </Window>

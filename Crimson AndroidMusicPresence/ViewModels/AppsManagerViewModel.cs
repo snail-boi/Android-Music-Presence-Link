@@ -3,39 +3,61 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
 
 namespace musicpresense
 {
-    public partial class AppsManagerWindow : Window
+    /// <summary>
+    /// ViewModel for AppsManagerWindow. It owns the list of app rows, loads installed
+    /// packages from the device (merged with whatever is already saved in config), and
+    /// builds the updated config on Save.
+    ///
+    /// It is internal because it exposes AppPackageItem, which is internal and shared with
+    /// the other windows. The View (code-behind) hands it a delegate for "which device is
+    /// connected" so the VM does not have to reach into App itself.
+    /// </summary>
+    internal sealed class AppsManagerViewModel : ViewModelBase
     {
         private readonly MusicConfig _config;
         private readonly Action<MusicConfig> _onSaved;
-        private readonly ObservableCollection<AppPackageItem> _items = new();
+        private readonly Func<string> _getCurrentDevice;
 
-        public AppsManagerWindow(MusicConfig config, Action<MusicConfig> onSaved)
+        // Raised when the dialog should close. The bool becomes DialogResult.
+        public event Action<bool>? RequestClose;
+
+        // The rows shown in the ListBox. ObservableCollection tells the bound ListBox to
+        // add/remove items on its own as we change this list, with no code-behind.
+        public ObservableCollection<AppPackageItem> Items { get; } = new();
+
+        private string _loadStatus = string.Empty;
+        public string LoadStatus
         {
-            InitializeComponent();
+            get => _loadStatus;
+            set => Set(ref _loadStatus, value);
+        }
+
+        // Per-row buttons. The clicked row is passed in as the command parameter.
+        public RelayCommand<AppPackageItem> CyclePresenceModeCommand { get; }
+        public RelayCommand<AppPackageItem> ToggleCoverCommand { get; }
+        public RelayCommand SaveCommand { get; }
+
+        public AppsManagerViewModel(MusicConfig config, Action<MusicConfig> onSaved, Func<string> getCurrentDevice)
+        {
             _config = config;
             _onSaved = onSaved;
+            _getCurrentDevice = getCurrentDevice;
 
-            LstApps.ItemsSource = _items;
-            Loaded += OnLoaded;
+            CyclePresenceModeCommand = new RelayCommand<AppPackageItem>(item => item?.CyclePresenceMode());
+            ToggleCoverCommand = new RelayCommand<AppPackageItem>(item => item?.ToggleCover());
+            SaveCommand = new RelayCommand(Save);
         }
 
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        public async Task LoadAppsAsync()
         {
-            _ = LoadAppsAsync();
-        }
-
-        private async Task LoadAppsAsync()
-        {
-            TxtLoadStatus.Text = "Loading installed apps...";
+            LoadStatus = "Loading installed apps...";
 
             try
             {
-                var device = (Application.Current as App)?.GetCurrentDevice() ?? string.Empty;
+                var device = _getCurrentDevice();
 
                 List<string> installedPackages = new();
 
@@ -62,41 +84,29 @@ namespace musicpresense
                     .OrderBy(p => p)
                     .ToList();
 
-                _items.Clear();
+                Items.Clear();
                 foreach (var pkg in allPackages)
                 {
                     if (savedApps.TryGetValue(pkg, out var saved))
-                        _items.Add(new AppPackageItem(pkg, saved.PresenceMode, saved.EnableCoverSearch));
+                        Items.Add(new AppPackageItem(pkg, saved.PresenceMode, saved.EnableCoverSearch));
                     else
-                        _items.Add(new AppPackageItem(pkg, PresenceMode.Off, false));
+                        Items.Add(new AppPackageItem(pkg, PresenceMode.Off, false));
                 }
 
-                TxtLoadStatus.Text = $"{_items.Count} apps";
+                LoadStatus = $"{Items.Count} apps";
             }
             catch (Exception ex)
             {
-                TxtLoadStatus.Text = "Failed to load apps.";
+                LoadStatus = "Failed to load apps.";
                 Debugger.show($"AppsManagerWindow load failed: {ex.Message}");
             }
         }
 
-        private void BtnPresenceMode_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is AppPackageItem item)
-                item.CyclePresenceMode();
-        }
-
-        private void BtnCover_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as Button)?.Tag is AppPackageItem item)
-                item.ToggleCover();
-        }
-
-        private void BtnSave_Click(object sender, RoutedEventArgs e)
+        private void Save()
         {
             var updatedConfig = new MusicConfig
             {
-                EligibleApps = _items
+                EligibleApps = Items
                     .Where(i => i.PresenceMode != PresenceMode.Off || i.EnableCoverSearch)
                     .Select(i => new EligibleAppConfig
                     {
@@ -105,7 +115,7 @@ namespace musicpresense
                         EnableCoverSearch = i.EnableCoverSearch
                     })
                     .ToList(),
-                AllowedApps = _items
+                AllowedApps = Items
                     .Where(i => i.PresenceMode != PresenceMode.Off)
                     .Select(i => i.PackageName)
                     .ToList()
@@ -122,14 +132,7 @@ namespace musicpresense
             }
 
             _onSaved(updatedConfig);
-            DialogResult = true;
-            Close();
-        }
-
-        private void BtnCancel_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-            Close();
+            RequestClose?.Invoke(true);
         }
     }
 }
