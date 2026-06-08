@@ -25,6 +25,7 @@ namespace musicpresense
         private bool _smtcClearedForHalf = true;
         private long? lastAdbPositionMs;
         private long realPositionMs;
+        private DateTime? _snapTime;
         private TimeSpan? lastTrackDuration;
         private readonly string _defaultImagePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -323,6 +324,7 @@ namespace musicpresense
                     lastAdbPositionMs = null;
                     realPositionMs = 0;
                     lastTrackDuration = null;
+                    _snapTime = null;
                 }
 
                 // metadataChanged drives cover art search — uses lastSMTCTitle (never nulled by Half clear).
@@ -402,15 +404,23 @@ namespace musicpresense
                 {
                     if (!lastAdbPositionMs.HasValue || adbPositionMs != lastAdbPositionMs.Value)
                     {
-                        // Position changed (new track or seek): snap to the reported value with
-                        // no offset. The next tick's dead reckon will advance it naturally.
                         realPositionMs = adbPositionMs;
                         lastAdbPositionMs = adbPositionMs;
+                        _snapTime = DateTime.UtcNow;
                     }
                     else if (isPlaying)
                     {
-                        // Same position as last tick: dead reckon forward by the poll interval.
-                        realPositionMs += cycleMs;
+                        if (_snapTime.HasValue)
+                        {
+                            // First dead reckon after a snap: advance only by actual elapsed
+                            // time since the snap, not a full cycleMs, to avoid overshooting.
+                            realPositionMs += (long)(DateTime.UtcNow - _snapTime.Value).TotalMilliseconds;
+                            _snapTime = null;
+                        }
+                        else
+                        {
+                            realPositionMs += cycleMs;
+                        }
                     }
                 }
 
