@@ -123,6 +123,7 @@ namespace musicpresense
             _presenceService = new MusicPresenceService(Dispatcher, Config);
             _lyricsOverlayManager = new LyricsOverlayManager(Dispatcher, Config, () => _presenceService?.CurrentDevice ?? string.Empty);
             _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication, Config.UseDarkMode);
+            SessionEnding += OnSessionEnding;
             _presenceService.TrayStateChanged += OnTrayStateChanged;
             _presenceService.NowPlayingChanged += OnNowPlayingChanged;
             _presenceService.LyricsPlaybackChanged += OnLyricsPlaybackChanged;
@@ -584,7 +585,7 @@ namespace musicpresense
             return _mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible;
         }
 
-        internal void ShowMediaPlayerWindowNow(bool maximizeForModeSwitch = false)
+        internal void ShowMediaPlayerWindowNow()
         {
             Debugger.show("[MEDIAPLAYER] Opening media player window.");
 
@@ -616,18 +617,11 @@ namespace musicpresense
             }
 
             var config = Config;
-            bool isOpening = !_mediaPlayerWindow.IsVisible;
-            if (isOpening)
-            {
-                _mediaPlayerWindow.Width = config.MediaPlayerWindowWidth;
-                _mediaPlayerWindow.Height = config.MediaPlayerWindowHeight;
-                _mediaPlayerWindow.Top = config.MediaPlayerWindowTop;
-                _mediaPlayerWindow.Left = config.MediaPlayerWindowLeft;
-
-                // A mode switch into the player opens it maximized as a deliberate
-                // "go big" gesture. Plain startup or reopen restores the saved size.
-                _mediaPlayerWindow.WindowState = maximizeForModeSwitch ? WindowState.Maximized : WindowState.Normal;
-            }
+            _mediaPlayerWindow.Width = config.MediaPlayerWindowWidth;
+            _mediaPlayerWindow.Height = config.MediaPlayerWindowHeight;
+            _mediaPlayerWindow.Top = config.MediaPlayerWindowTop;
+            _mediaPlayerWindow.Left = config.MediaPlayerWindowLeft;
+            _mediaPlayerWindow.WindowState = config.MediaPlayerWindowState;
 
             if (_settingsWindow != null)
             {
@@ -1010,6 +1004,9 @@ namespace musicpresense
         /// </summary>
         private Process? LaunchScrcpyProcess(string device)
         {
+            if (_isExiting || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+                return null;
+
             if (string.IsNullOrWhiteSpace(Config.Paths.Scrcpy) || !File.Exists(Config.Paths.Scrcpy))
             {
                 Debugger.show("LaunchScrcpyProcess: scrcpy.exe not found at " + (Config.Paths.Scrcpy ?? "<null>"));
@@ -1184,6 +1181,7 @@ namespace musicpresense
                 {
                     if (token.IsCancellationRequested) return;
                     if (_isExiting) return;
+                    if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
                     if (!_audioLinkDesired) return;
                     // Someone else (e.g. user, switch path) already restarted scrcpy.
                     if (_scrcpyProcess != null && !_scrcpyProcess.HasExited) return;
@@ -1259,9 +1257,20 @@ namespace musicpresense
             }
         }
 
+        private void OnSessionEnding(object sender, SessionEndingCancelEventArgs e)
+        {
+            // Windows is shutting down or the user is logging off.
+            // Set the exit flag immediately so no new scrcpy processes are launched
+            // while Windows is tearing down the session.
+            _isExiting = true;
+            CancelAudioLinkRecovery();
+            StopScrcpyOnExit();
+        }
+
         protected override void OnExit(ExitEventArgs e)
         {
             _isExiting = true;
+            CancelAudioLinkRecovery();
             StopScrcpyOnExit();
             CloseMediaPlayerWindow();
             _trayIconManager?.Dispose();
