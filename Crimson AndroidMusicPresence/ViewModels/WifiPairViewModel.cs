@@ -73,13 +73,6 @@ namespace musicpresense
 
         public bool IsManualMode => !_isQrMode;
 
-        private double _windowHeight = 460;
-        public double WindowHeight
-        {
-            get => _windowHeight;
-            set => Set(ref _windowHeight, value);
-        }
-
         private string _modeToggleText = "Use IP/port and code instead";
         public string ModeToggleText
         {
@@ -171,7 +164,6 @@ namespace musicpresense
             if (IsQrMode)
             {
                 ModeToggleText = "Use IP/port and code instead";
-                WindowHeight = 460;
 
                 _cts?.Cancel();
                 GenerateQrCode();
@@ -181,7 +173,6 @@ namespace musicpresense
             {
                 _cts?.Cancel();
                 ModeToggleText = "Use QR code instead";
-                WindowHeight = 360;
             }
         }
 
