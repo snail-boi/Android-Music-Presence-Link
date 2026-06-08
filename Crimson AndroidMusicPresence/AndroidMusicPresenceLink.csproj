@@ -115,6 +115,10 @@
 		</None>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Models\" />
+	</ItemGroup>
+
 	<Target Name="CreateInstaller" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
 		<PropertyGroup>
 			<InnoSetupCompiler>C:\Program Files (x86)\Inno Setup 6\ISCC.exe</InnoSetupCompiler>

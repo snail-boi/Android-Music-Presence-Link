@@ -11,6 +11,10 @@
         UseLayoutRounding="True">
     <Window.Resources>
 
+        <!-- Turns the VM's bool properties (ShowPresetPicker, ShowBitrate, ShowFlac)
+             into Visibility.Visible / Visibility.Collapsed for the bindings below. -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -271,76 +275,72 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Preset picker: visible in hotkey mode only -->
-            <TextBlock x:Name="LblPreset"
-                       Grid.Row="0" Grid.Column="0"
+            <!-- Preset picker: visible in hotkey mode only (ShowPresetPicker) -->
+            <TextBlock Grid.Row="0" Grid.Column="0"
                        Text="Preset"
                        Style="{StaticResource FieldLabel}"
-                       Visibility="Collapsed" />
-            <ComboBox x:Name="CmbPreset"
-                      Grid.Row="0" Grid.Column="1"
+                       Visibility="{Binding ShowPresetPicker, Converter={StaticResource BoolToVis}}" />
+            <ComboBox Grid.Row="0" Grid.Column="1"
                       Margin="0,0,0,8"
-                      Visibility="Collapsed"
-                      SelectionChanged="CmbPreset_SelectionChanged" />
+                      Visibility="{Binding ShowPresetPicker, Converter={StaticResource BoolToVis}}"
+                      ItemsSource="{Binding Presets}"
+                      DisplayMemberPath="Name"
+                      SelectedItem="{Binding SelectedPreset, Mode=TwoWay}" />
 
             <!-- Divider: visible in hotkey mode only -->
-            <Border x:Name="BrdDivider"
-                    Grid.Row="1" Grid.ColumnSpan="2"
+            <Border Grid.Row="1" Grid.ColumnSpan="2"
                     Height="1"
                     Background="{DynamicResource ThemeControlBorderBrush}"
                     Opacity="0.4"
                     Margin="0,0,0,8"
-                    Visibility="Collapsed" />
+                    Visibility="{Binding ShowPresetPicker, Converter={StaticResource BoolToVis}}" />
 
             <!-- Codec -->
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Codec" Style="{StaticResource FieldLabel}" />
-            <ComboBox x:Name="CmbCodec"
-                      Grid.Row="2" Grid.Column="1"
+            <ComboBox Grid.Row="2" Grid.Column="1"
                       Margin="0,0,0,8"
-                      SelectionChanged="CmbCodec_SelectionChanged">
-                <ComboBoxItem Content="opus" Tag="opus" />
-                <ComboBoxItem Content="flac" Tag="flac" />
-                <ComboBoxItem Content="raw" Tag="raw" />
-            </ComboBox>
+                      ItemsSource="{Binding Codecs}"
+                      SelectedItem="{Binding SelectedCodec, Mode=TwoWay}" />
 
-            <!-- Bitrate: hidden for flac and raw -->
-            <TextBlock x:Name="LblBitrate"
-                       Grid.Row="3" Grid.Column="0"
+            <!-- Bitrate: opus only (ShowBitrate) -->
+            <TextBlock Grid.Row="3" Grid.Column="0"
                        Text="Bitrate (kbps)"
-                       Style="{StaticResource FieldLabel}" />
+                       Style="{StaticResource FieldLabel}"
+                       Visibility="{Binding ShowBitrate, Converter={StaticResource BoolToVis}}" />
             <TextBox x:Name="TxtBitrate"
                      Grid.Row="3" Grid.Column="1"
-                     Margin="0,0,0,8" />
+                     Margin="0,0,0,8"
+                     Visibility="{Binding ShowBitrate, Converter={StaticResource BoolToVis}}"
+                     Text="{Binding Bitrate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
             <!-- Buffer -->
             <TextBlock Grid.Row="4" Grid.Column="0" Text="Buffer (ms)" Style="{StaticResource FieldLabel}" />
             <TextBox x:Name="TxtBuffer"
                      Grid.Row="4" Grid.Column="1"
-                     Margin="0,0,0,8" />
+                     Margin="0,0,0,8"
+                     Text="{Binding Buffer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-            <!-- FLAC compression level: flac only -->
-            <TextBlock x:Name="LblFlac"
-                       Grid.Row="5" Grid.Column="0"
+            <!-- FLAC compression level: flac only (ShowFlac) -->
+            <TextBlock Grid.Row="5" Grid.Column="0"
                        Text="FLAC compression"
                        Style="{StaticResource FieldLabel}"
-                       Visibility="Collapsed" />
+                       Visibility="{Binding ShowFlac, Converter={StaticResource BoolToVis}}" />
             <TextBox x:Name="TxtFlacLevel"
                      Grid.Row="5" Grid.Column="1"
                      Margin="0,0,0,8"
-                     Visibility="Collapsed" />
+                     Visibility="{Binding ShowFlac, Converter={StaticResource BoolToVis}}"
+                     Text="{Binding FlacLevel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
         </Grid>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button x:Name="BtnCancel"
-                    Content="Cancel"
+            <Button Content="Cancel"
                     Width="80"
                     Style="{StaticResource SecondaryButtonStyle}"
                     Margin="0,0,8,0"
-                    Click="BtnCancel_Click" />
-            <Button x:Name="BtnApply"
-                    Content="Apply"
+                    Command="{Binding CancelCommand}" />
+            <Button Content="Apply"
                     Width="80"
-                    Click="BtnApply_Click" />
+                    Command="{Binding ApplyCommand}" />
         </StackPanel>
 
     </StackPanel>
