@@ -10,9 +10,13 @@
         ResizeMode="CanResizeWithGrip"
         Background="{DynamicResource ThemeBackgroundBrush}"
         Foreground="{DynamicResource ThemeForegroundBrush}"
-        FontFamily="Segoe UI">
+        FontFamily="Segoe UI"
+        xmlns:local="clr-namespace:musicpresense">
 
     <Window.Resources>
+        <local:IndexToVisibilityConverter x:Key="StepVis" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
         <!-- Card style for content sections -->
         <Style x:Key="CardBorder" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}" />
@@ -259,7 +263,8 @@
                                Margin="0,2,0,0" />
                 </StackPanel>
 
-                <ItemsControl x:Name="LstSidebarSteps" Grid.Row="1" Margin="16,0,16,16"
+                <ItemsControl Grid.Row="1" Margin="16,0,16,16"
+                              ItemsSource="{Binding SidebarSteps}"
                               Background="Transparent"
                               BorderThickness="0">
                     <ItemsControl.ItemTemplate>
@@ -317,8 +322,8 @@
 
             <!-- Header -->
             <StackPanel Grid.Row="0" Margin="0,0,0,16">
-                <TextBlock x:Name="TxtStepTitle" FontSize="26" FontWeight="Bold" />
-                <TextBlock x:Name="TxtStepSubtitle" Margin="0,6,0,0" Opacity="0.75" TextWrapping="Wrap" FontSize="14" />
+                <TextBlock Text="{Binding StepTitle}" FontSize="26" FontWeight="Bold" />
+                <TextBlock Text="{Binding StepSubtitle}" Margin="0,6,0,0" Opacity="0.75" TextWrapping="Wrap" FontSize="14" />
             </StackPanel>
 
             <!-- Content card -->
@@ -328,7 +333,7 @@
                     <!-- =================================================== -->
                     <!-- STEP 0: WELCOME                                       -->
                     <!-- =================================================== -->
-                    <Grid x:Name="PanelWelcome" Visibility="Collapsed">
+                    <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVis}, ConverterParameter=0}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="👋 Hi there!"
@@ -420,7 +425,7 @@
                     <!-- =================================================== -->
                     <!-- STEP 1: USB DEBUGGING INSTRUCTIONS                    -->
                     <!-- =================================================== -->
-                    <Grid x:Name="PanelUsbDebugging" Visibility="Collapsed">
+                    <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVis}, ConverterParameter=1}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource InstructionText}"
@@ -539,7 +544,7 @@
                     <!-- =================================================== -->
                     <!-- STEP 2: DEVICE SELECTION                              -->
                     <!-- =================================================== -->
-                    <Grid x:Name="PanelDevice" Visibility="Collapsed">
+                    <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVis}, ConverterParameter=2}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -559,21 +564,20 @@
                         </TextBlock>
 
                         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
-                            <Button x:Name="BtnAutoGather"
-                                    Content="Auto Detect USB"
+                            <Button Content="{Binding AutoOrPairButtonText}"
                                     Style="{StaticResource PrimaryButton}"
                                     HorizontalAlignment="Left"
                                     Padding="22,10"
                                     FontSize="14"
-                                    Click="BtnAutoGatherOrPair_Click" />
-                            <Button x:Name="BtnWifiModeToggle"
-                                    Content="mode: adb tcpip"
+                                    IsEnabled="{Binding IsNotBusy}"
+                                    Command="{Binding AutoGatherOrPairCommand}" />
+                            <Button Content="{Binding WifiModeButtonText}"
                                     Style="{StaticResource SecondaryButton}"
                                     HorizontalAlignment="Left"
                                     Margin="8,0,0,0"
                                     Padding="18,10"
                                     FontSize="13"
-                                    Click="BtnWifiModeToggle_Click" />
+                                    Command="{Binding WifiModeToggleCommand}" />
                         </StackPanel>
 
                         <Grid Grid.Row="2" Margin="0,0,0,12">
@@ -585,7 +589,7 @@
                                 <TextBlock Text="USB Serial" Style="{StaticResource FieldLabel}" />
                                 <TextBlock Text="Identifier of the cable connection." Style="{StaticResource HelperText}" Margin="0,2,8,0" />
                             </StackPanel>
-                            <TextBox Grid.Column="1" x:Name="TxtUsbSerial" />
+                            <TextBox Grid.Column="1" Text="{Binding UsbSerial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
 
                         <Grid Grid.Row="3" Margin="0,0,0,12">
@@ -594,10 +598,10 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock x:Name="LblWifiAddress" Text="Wi-Fi Address" Style="{StaticResource FieldLabel}" />
-                                <TextBlock x:Name="LblWifiAddressHelp" Text="Optional, format ip:port." Style="{StaticResource HelperText}" Margin="0,2,8,0" />
+                                <TextBlock Text="{Binding WifiAddressLabel}" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="{Binding WifiAddressHelp}" Style="{StaticResource HelperText}" Margin="0,2,8,0" />
                             </StackPanel>
-                            <TextBox Grid.Column="1" x:Name="TxtWifi" />
+                            <TextBox Grid.Column="1" Text="{Binding WifiAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
 
                         <Grid Grid.Row="4" Margin="0,0,0,12">
@@ -609,14 +613,14 @@
                                 <TextBlock Text="Device Name" Style="{StaticResource FieldLabel}" />
                                 <TextBlock Text="Anything you like, e.g. 'My Pixel'." Style="{StaticResource HelperText}" Margin="0,2,8,0" />
                             </StackPanel>
-                            <TextBox Grid.Column="1" x:Name="TxtDeviceName" />
+                            <TextBox Grid.Column="1" Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
                     </Grid>
 
                     <!-- =================================================== -->
                     <!-- STEP 3: FOLDERS                                       -->
                     <!-- =================================================== -->
-                    <Grid x:Name="PanelFolders" Visibility="Collapsed">
+                    <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVis}, ConverterParameter=3}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -636,7 +640,7 @@
                                    FontWeight="SemiBold"
                                    Margin="0,8,0,6" />
 
-                        <ListBox x:Name="LstRemoteRoots"
+                        <ListBox ItemsSource="{Binding RemoteRoots}"
                                  Grid.Row="2"
                                  Margin="0,0,0,8"
                                  MinHeight="120"
@@ -663,19 +667,19 @@
                                                 Style="{StaticResource SecondaryButton}"
                                                 MinWidth="80" Padding="10,4"
                                                 Margin="8,0,0,0"
-                                                Tag="{Binding}"
-                                                Click="BtnRemoveRemoteRoot_Click" />
+                                                Command="{Binding DataContext.RemoveRemoteRootCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
 
-                        <Button Grid.Row="3" x:Name="BtnPickRemoteRoot"
+                        <Button Grid.Row="3"
                                 Content="➕  Add Music Folder"
                                 Style="{StaticResource PrimaryButton}"
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,16"
-                                Click="BtnPickRemoteRoot_Click" />
+                                Command="{Binding PickRemoteRootCommand}" />
 
                         <Grid Grid.Row="4">
                             <Grid.ColumnDefinitions>
@@ -687,20 +691,19 @@
                                 <TextBlock Text="Lyrics folder" Style="{StaticResource FieldLabel}" />
                                 <TextBlock Text="Optional override." Style="{StaticResource HelperText}" Margin="0,2,8,0" />
                             </StackPanel>
-                            <TextBox Grid.Column="1" x:Name="TxtLyricsFolderOverride" />
+                            <TextBox Grid.Column="1" Text="{Binding LyricsFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <Button Grid.Column="2"
-                                    x:Name="BtnBrowseLyricsFolder"
                                     Content="Browse"
                                     Style="{StaticResource SecondaryButton}"
                                     Margin="8,0,0,0"
-                                    Click="BtnBrowseLyricsFolder_Click" />
+                                    Command="{Binding BrowseLyricsCommand}" />
                         </Grid>
                     </Grid>
 
                     <!-- =================================================== -->
                     <!-- STEP 4: APPS                                          -->
                     <!-- =================================================== -->
-                    <Grid x:Name="PanelApps" Visibility="Collapsed">
+                    <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVis}, ConverterParameter=4}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -722,12 +725,11 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0"
-                                    x:Name="BtnRefreshApps"
                                     Content="🔄  Refresh App List"
                                     Style="{StaticResource SecondaryButton}"
-                                    Click="BtnRefreshApps_Click" />
+                                    Command="{Binding RefreshAppsCommand}" />
                             <TextBlock Grid.Column="1"
-                                       x:Name="TxtAppsStatus"
+                                       Text="{Binding AppsStatus}"
                                        Margin="14,0,0,0"
                                        VerticalAlignment="Center"
                                        Opacity="0.7" />
@@ -744,7 +746,7 @@
                             <TextBlock Grid.Column="2" Text="Cover" FontWeight="SemiBold" Opacity="0.8" HorizontalAlignment="Center" />
                         </Grid>
 
-                        <ListBox x:Name="LstAllowedApps"
+                        <ListBox ItemsSource="{Binding AppPackages}"
                                  Grid.Row="3"
                                  BorderBrush="{DynamicResource ThemeControlBorderBrush}"
                                  Background="{DynamicResource ThemeBackgroundBrush}"
@@ -778,8 +780,8 @@
                                                 Style="{StaticResource CycleButton}"
                                                 Width="58"
                                                 HorizontalAlignment="Center"
-                                                Tag="{Binding}"
-                                                Click="BtnPresenceMode_Click" />
+                                                Command="{Binding DataContext.CyclePresenceModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}" />
 
                                         <Button Grid.Column="2"
                                                 Content="{Binding CoverLabel}"
@@ -787,8 +789,8 @@
                                                 Style="{StaticResource CycleButton}"
                                                 Width="40"
                                                 HorizontalAlignment="Center"
-                                                Tag="{Binding}"
-                                                Click="BtnCover_Click" />
+                                                Command="{Binding DataContext.ToggleCoverCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -798,7 +800,7 @@
                     <!-- =================================================== -->
                     <!-- STEP 5: HOTKEYS                                       -->
                     <!-- =================================================== -->
-                    <Grid x:Name="PanelHotkeys" Visibility="Collapsed">
+                    <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVis}, ConverterParameter=5}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -824,41 +826,41 @@
                         </TextBlock>
 
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Modifier key" Style="{StaticResource FieldLabel}" />
-                        <ComboBox x:Name="CmbHotkeyModifier" Grid.Row="1" Grid.Column="1" Margin="0,0,0,12">
-                            <ComboBoxItem Tag="0x0001">Alt</ComboBoxItem>
-                            <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
-                            <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
-                        </ComboBox>
+                        <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,12"
+                                  ItemsSource="{Binding ModifierOptions}"
+                                  DisplayMemberPath="Name"
+                                  SelectedValuePath="Value"
+                                  SelectedValue="{Binding SelectedModifierValue, Mode=TwoWay}" />
 
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Volume Up" Style="{StaticResource FieldLabel}" />
-                        <TextBox x:Name="TxtHotkeyVolumeUp" Grid.Row="2" Grid.Column="1" Margin="0,0,0,8" />
-                        <Button Grid.Row="2" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Click="BtnRecordHotkeyVolumeUp_Click" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,8" Text="{Binding HotkeyVolumeUpText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Row="2" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Command="{Binding RecordVolumeUpCommand}" />
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Volume Down" Style="{StaticResource FieldLabel}" />
-                        <TextBox x:Name="TxtHotkeyVolumeDown" Grid.Row="3" Grid.Column="1" Margin="0,0,0,8" />
-                        <Button Grid.Row="3" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Click="BtnRecordHotkeyVolumeDown_Click" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,0,8" Text="{Binding HotkeyVolumeDownText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Row="3" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Command="{Binding RecordVolumeDownCommand}" />
 
                         <TextBlock Grid.Row="4" Grid.Column="0" Text="Toggle Audio Link" Style="{StaticResource FieldLabel}" />
-                        <TextBox x:Name="TxtHotkeyToggleScrcpy" Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" />
-                        <Button Grid.Row="4" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Click="BtnRecordHotkeyToggleScrcpy_Click" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" Text="{Binding HotkeyToggleScrcpyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Row="4" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Command="{Binding RecordToggleScrcpyCommand}" />
 
                         <TextBlock Grid.Row="5" Grid.Column="0" Text="Toggle Lyrics" Style="{StaticResource FieldLabel}" />
-                        <TextBox x:Name="TxtHotkeyToggleLyricsOverlay" Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" />
-                        <Button Grid.Row="5" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Click="BtnRecordHotkeyToggleLyricsOverlay_Click" />
+                        <TextBox Grid.Row="5" Grid.Column="1" Margin="0,0,0,8" Text="{Binding HotkeyToggleLyricsOverlayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Row="5" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Command="{Binding RecordToggleLyricsOverlayCommand}" />
 
                         <TextBlock Grid.Row="6" Grid.Column="0" Text="Copy Track Info" Style="{StaticResource FieldLabel}" />
-                        <TextBox x:Name="TxtHotkeyCopyTrackInfo" Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" />
-                        <Button Grid.Row="6" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Click="BtnRecordHotkeyCopyTrackInfo_Click" />
+                        <TextBox Grid.Row="6" Grid.Column="1" Margin="0,0,0,8" Text="{Binding HotkeyCopyTrackInfoText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Row="6" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Command="{Binding RecordCopyTrackInfoCommand}" />
 
                         <TextBlock Grid.Row="7" Grid.Column="0" Text="Audio Quality" Style="{StaticResource FieldLabel}" />
-                        <TextBox x:Name="TxtHotkeyAudioQuality" Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" />
-                        <Button Grid.Row="7" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Click="BtnRecordHotkeyAudioQuality_Click" />
+                        <TextBox Grid.Row="7" Grid.Column="1" Margin="0,0,0,8" Text="{Binding HotkeyAudioQualityText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Row="7" Grid.Column="2" Content="Record" Style="{StaticResource SecondaryButton}" Margin="8,0,0,8" Command="{Binding RecordAudioQualityCommand}" />
                     </Grid>
 
                     <!-- =================================================== -->
                     <!-- STEP 6: STARTUP                                       -->
                     <!-- =================================================== -->
-                    <Grid x:Name="PanelStartup" Visibility="Collapsed">
+                    <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVis}, ConverterParameter=6}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource InstructionText}"
@@ -873,9 +875,9 @@
                                         Padding="16,12"
                                         Margin="0,0,0,10">
                                     <StackPanel>
-                                        <CheckBox x:Name="ChkOpenInTaskbar"
-                                                  Content="Show in taskbar"
-                                                  FontWeight="SemiBold" 
+                                        <CheckBox Content="Show in taskbar"
+                                                  FontWeight="SemiBold"
+                                                  IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}"
                                                   Style="{StaticResource ToggleSwitchStyle}"/>
                                         <TextBlock Style="{StaticResource HelperText}"
                                                    Margin="22,4,0,0">
@@ -889,9 +891,10 @@
                                         CornerRadius="6"
                                         Padding="16,12">
                                     <StackPanel>
-                                        <CheckBox x:Name="ChkStartWithWindows" Style="{StaticResource ToggleSwitchStyle}"
+                                        <CheckBox Style="{StaticResource ToggleSwitchStyle}"
                                                   Content="Start automatically when Windows starts"
-                                                  FontWeight="SemiBold" />
+                                                  FontWeight="SemiBold"
+                                                  IsChecked="{Binding StartWithWindows, Mode=TwoWay}" />
                                         <TextBlock Style="{StaticResource HelperText}"
                                                    Margin="22,4,0,0">
 											Convenient if you want music presence to be ready every time you sign in.
@@ -915,20 +918,19 @@
 											Choose what opens when you launch the app. You can switch any time from the tray menu or the toggle inside each view.
                                         </TextBlock>
 
-                                        <RadioButton x:Name="RbViewSettings"
-                                                     GroupName="OnboardingDefaultView"
+                                        <RadioButton GroupName="OnboardingDefaultView"
                                                      Content="Settings view"
                                                      FontWeight="SemiBold"
-                                                     IsChecked="True" />
+                                                     IsChecked="{Binding ShowSettingsView, Mode=TwoWay}" />
                                         <TextBlock Style="{StaticResource HelperText}"
                                                    Margin="22,2,0,8">
 											Classic full settings window with all options visible.
                                         </TextBlock>
 
-                                        <RadioButton x:Name="RbViewMediaPlayer"
-                                                     GroupName="OnboardingDefaultView"
+                                        <RadioButton GroupName="OnboardingDefaultView"
                                                      Content="Media Player view"
-                                                     FontWeight="SemiBold" />
+                                                     FontWeight="SemiBold"
+                                                     IsChecked="{Binding ShowMediaPlayerView, Mode=TwoWay}" />
                                         <TextBlock Style="{StaticResource HelperText}"
                                                    Margin="22,2,0,0">
 											Compact now-playing window with cover art, transport controls, and a foldable settings pane.
@@ -978,43 +980,41 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock x:Name="TxtStepCounter"
+                <TextBlock Text="{Binding StepCounter}"
                            Grid.Column="0"
                            VerticalAlignment="Center"
                            Opacity="0.6"
                            FontSize="13" />
 
-                <Button x:Name="BtnCancel"
-                        Grid.Column="2"
+                <Button Grid.Column="2"
                         Content="Cancel"
                         Style="{StaticResource SecondaryButton}"
                         Margin="8,0,0,0"
-                        Click="BtnCancel_Click" />
-                <Button x:Name="BtnBack"
-                        Grid.Column="3"
+                        Command="{Binding CancelCommand}" />
+                <Button Grid.Column="3"
                         Content="◀  Back"
                         Style="{StaticResource SecondaryButton}"
                         Margin="8,0,0,0"
-                        Click="BtnBack_Click" />
-                <Button x:Name="BtnSkip"
-                        Grid.Column="4"
-                        Content="Skip"
+                        IsEnabled="{Binding CanGoBack}"
+                        Command="{Binding BackCommand}" />
+                <Button Grid.Column="4"
+                        Content="{Binding SkipText}"
                         Style="{StaticResource SecondaryButton}"
                         Margin="8,0,0,0"
-                        Click="BtnSkip_Click" />
-                <Button x:Name="BtnNext"
-                        Grid.Column="5"
-                        Content="Next  ▶"
+                        Visibility="{Binding IsSkipVisible, Converter={StaticResource BoolToVis}}"
+                        Command="{Binding SkipCommand}" />
+                <Button Grid.Column="5"
+                        Content="{Binding NextText}"
                         Style="{StaticResource PrimaryButton}"
                         Margin="8,0,0,0"
-                        Click="BtnNext_Click" />
-                <Button x:Name="BtnFinish"
-                        Grid.Column="5"
+                        Visibility="{Binding IsNextVisible, Converter={StaticResource BoolToVis}}"
+                        Command="{Binding NextCommand}" />
+                <Button Grid.Column="5"
                         Content="✓  Finish"
                         Style="{StaticResource PrimaryButton}"
                         Margin="8,0,0,0"
-                        Visibility="Collapsed"
-                        Click="BtnFinish_Click" />
+                        Visibility="{Binding IsFinishVisible, Converter={StaticResource BoolToVis}}"
+                        Command="{Binding FinishCommand}" />
             </Grid>
         </Grid>
     </Grid>
