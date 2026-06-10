@@ -1,4 +1,4 @@
-﻿<Window x:Class="musicpresense.MainWindow"
+<Window x:Class="musicpresense.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -12,6 +12,8 @@
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True">
     <Window.Resources>
+
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
         <!-- ============ TYPOGRAPHY / TEXT ============ -->
         <Style TargetType="TextBlock">
@@ -436,7 +438,7 @@
 
     </Window.Resources>
 
-    <DockPanel>
+    <DockPanel x:Name="RootContent">
 
         <!-- ============ STICKY HEADER ============ -->
         <Border DockPanel.Dock="Top"
@@ -452,12 +454,12 @@
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Music Presence" Style="{StaticResource HeaderTitleStyle}" />
-                        <TextBlock x:Name="TxtVersionInfo"
+                        <TextBlock Text="{Binding VersionInfoText}"
                                    Margin="10,0,0,0"
                                    VerticalAlignment="Bottom"
                                    FontSize="11"
                                    Opacity="0.7" />
-                        <TextBlock x:Name="TxtUpdateStatus"
+                        <TextBlock Text="{Binding UpdateStatusText}"
                                    Margin="8,0,0,0"
                                    VerticalAlignment="Bottom"
                                    FontSize="11"
@@ -467,11 +469,20 @@
                                Style="{StaticResource HeaderSubtitleStyle}" />
                 </StackPanel>
                 <Button Grid.Column="1"
-                        x:Name="BtnToggleTheme"
-                        Content="Switch theme"
-                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding ToggleThemeCommand}"
                         Width="120"
-                        VerticalAlignment="Center" />
+                        VerticalAlignment="Center">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                            <Setter Property="Content" Value="Switch to Dark" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UseDarkMode}" Value="True">
+                                    <Setter Property="Content" Value="Switch to Light" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
             </Grid>
         </Border>
 
@@ -492,8 +503,8 @@
                            Margin="0"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
-                        x:Name="BtnSave"
                         Content="Save changes"
+                        Command="{Binding SaveCommand}"
                         Width="140"
                         Height="36" />
             </Grid>
@@ -508,12 +519,11 @@
                 <StackPanel Margin="20,18,20,18" Orientation="Vertical">
 
                     <Border Margin="0,0,0,12">
-                        <Button x:Name="BtnUpdate"
-                            Content="Update"
-                            Visibility="Collapsed"
+                        <Button Content="Update"
+                            Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVis}}"
                             HorizontalAlignment="Stretch"
                             Height="34"
-                            Click="BtnUpdate_Click" />
+                            Command="{Binding CheckUpdateCommand}" />
                     </Border>
 
                     <!-- ====== DEVICE CARD (open by default for new users) ====== -->
@@ -533,23 +543,20 @@
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                <Button x:Name="BtnAutoGather"
-                                        Content="Auto-detect USB"
+                                <Button Content="{Binding AutoOrPairButtonText}"
                                         Width="130"
-                                        Click="BtnDeviceAction_Click" />
-                                <Button x:Name="BtnWifiModeToggle"
-                                        Content="mode: adb tcpip"
+                                        IsEnabled="{Binding IsNotBusy}"
+                                        Command="{Binding AutoGatherOrPairCommand}" />
+                                <Button Content="{Binding WifiModeButtonText}"
                                         Style="{StaticResource SecondaryButtonStyle}"
                                         Width="189"
                                         Margin="8,0,0,0"
-                                        Click="BtnWifiModeToggle_Click" />
-                                <Button x:Name="BtnResetDevice"
-                                        Content="Reset"
+                                        Command="{Binding WifiModeToggleCommand}" />
+                                <Button Content="Reset"
                                         Style="{StaticResource SecondaryButtonStyle}"
                                         Width="90"
                                         Margin="8,0,0,0"
-                                        Click="BtnResetDevice_Click"
-                                        />
+                                        Command="{Binding ResetDeviceCommand}" />
                             </StackPanel>
 
                             <Grid>
@@ -570,33 +577,35 @@
                                 <TextBlock Text="USB serial"
                                        Grid.Row="0" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtUsbSerial"
+                                <TextBox Text="{Binding UsbSerial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="0" Grid.Column="1"
                                      Margin="0,0,0,8" />
 
                                 <!-- TcpIp row: label + ip:port textbox. Hidden in WD mode. -->
-                                <TextBlock x:Name="LblWifiAddress"
-                                       Text="Wi-Fi (ip:port)"
+                                <TextBlock Text="Wi-Fi (ip:port)"
                                        Grid.Row="1" Grid.Column="0"
+                                       Visibility="{Binding WifiAddressVisible, Converter={StaticResource BoolToVis}}"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtWifi"
+                                <TextBox Text="{Binding WifiAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="1" Grid.Column="1"
+                                     Visibility="{Binding WifiAddressVisible, Converter={StaticResource BoolToVis}}"
                                      Margin="0,0,0,8" />
 
                                 <!-- mDNS row: read-only display, only shown when paired in WD mode. -->
-                                <TextBlock x:Name="LblMdnsService"
-                                       Text="mDNS service"
+                                <TextBlock Text="mDNS service"
                                        Grid.Row="2" Grid.Column="0"
+                                       Visibility="{Binding MdnsVisible, Converter={StaticResource BoolToVis}}"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtMdnsService"
+                                <TextBox Text="{Binding MdnsService}"
                                      Grid.Row="2" Grid.Column="1"
+                                     Visibility="{Binding MdnsVisible, Converter={StaticResource BoolToVis}}"
                                      IsReadOnly="True"
                                      Margin="0,0,0,8" />
 
                                 <TextBlock Text="Device name"
                                        Grid.Row="3" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtDeviceName"
+                                <TextBox Text="{Binding DeviceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="3" Grid.Column="1" />
                             </Grid>
                         </StackPanel>
@@ -611,7 +620,7 @@
                             <TextBlock Text="Music remote folders"
                                    Style="{StaticResource SectionLabelStyle}"
                                    Margin="0,4,0,6" />
-                            <ListBox x:Name="LstRemoteRoots"
+                            <ListBox ItemsSource="{Binding RemoteRoots}"
                                  Height="130"
                                  Margin="0,0,0,8"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -639,14 +648,14 @@
                                                 Style="{StaticResource SecondaryButtonStyle}"
                                                 Width="90"
                                                 Margin="8,0,0,0"
-                                                Tag="{Binding}"
-                                                Click="BtnRemoveRemoteRoot_Click" />
+                                                Command="{Binding DataContext.RemoveRemoteRootCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                CommandParameter="{Binding}" />
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                <Button x:Name="BtnPickRemoteRoot" Content="Add folder" Width="120" />
+                                <Button Content="Add folder" Width="120" Command="{Binding PickRemoteRootCommand}" />
                             </StackPanel>
 
                             <Grid Margin="0,0,0,0">
@@ -658,15 +667,14 @@
                                 <TextBlock Text="Lyrics folder (phone)"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtLyricsFolderOverride"
+                                <TextBox Text="{Binding LyricsFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Column="1" />
-                                <Button x:Name="BtnBrowseLyricsFolder"
-                                    Grid.Column="2"
+                                <Button Grid.Column="2"
                                     Content="Browse"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,0"
-                                    Click="BtnBrowseLyricsFolder_Click" />
+                                    Command="{Binding BrowseLyricsCommand}" />
                             </Grid>
                         </StackPanel>
                     </Expander>
@@ -686,7 +694,7 @@
                                 <TextBlock Text="Clear cache after"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtCacheClear" Grid.Column="1" />
+                                <TextBox Text="{Binding CacheClearText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" />
                                 <TextBlock Text="MB"
                                        Grid.Column="2"
                                        Margin="8,0,0,0"
@@ -694,15 +702,15 @@
                             </Grid>
 
                             <StackPanel Orientation="Horizontal">
-                                <Button x:Name="BtnClearCoverCache"
-                                    Content="Clear cover cache"
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    Width="170" />
-                                <Button x:Name="BtnOpenCoverCache"
-                                    Content="Open cover cache"
+                                <Button Content="Clear cover cache"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="170"
-                                    Margin="8,0,0,0" />
+                                    Command="{Binding ClearCoverCacheCommand}" />
+                                <Button Content="Open cover cache"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="170"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding OpenCoverCacheCommand}" />
                             </StackPanel>
                         </StackPanel>
                     </Expander>
@@ -714,15 +722,15 @@
                                    Style="{StaticResource HintTextStyle}" />
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <Button x:Name="BtnManageApps"
-                                    Content="Manage apps"
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    Width="130" />
-                                <Button x:Name="BtnClearDisabledApps"
-                                    Content="Clear all disabled"
+                                <Button Content="Manage apps"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="130"
-                                    Margin="8,0,0,0" />
+                                    Command="{Binding ManageAppsCommand}" />
+                                <Button Content="Clear all disabled"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="130"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding ClearDisabledAppsCommand}" />
                             </StackPanel>
 
                             <Grid Margin="6,0,6,4">
@@ -735,7 +743,7 @@
                                 <TextBlock Grid.Column="1" Text="Presence" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
                                 <TextBlock Grid.Column="2" Text="Cover" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
                             </Grid>
-                            <ListBox x:Name="LstAllowedApps"
+                            <ListBox ItemsSource="{Binding AppPackages}"
                                  Height="200"
                                  Margin="0,0,0,0"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -786,8 +794,8 @@
                                                     Background="{Binding PresenceModeBrush}"
                                                     BorderThickness="0"
                                                     Cursor="Hand"
-                                                    Tag="{Binding}"
-                                                    Click="BtnPresenceMode_Click">
+                                                    Command="{Binding DataContext.CyclePresenceModeCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}">
                                                 <Button.Resources>
                                                     <Style TargetType="Border">
                                                         <Setter Property="CornerRadius" Value="4" />
@@ -805,8 +813,8 @@
                                                     Background="{Binding CoverBrush}"
                                                     BorderThickness="0"
                                                     Cursor="Hand"
-                                                    Tag="{Binding}"
-                                                    Click="BtnCover_Click">
+                                                    Command="{Binding DataContext.ToggleCoverCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}">
                                                 <Button.Resources>
                                                     <Style TargetType="Border">
                                                         <Setter Property="CornerRadius" Value="4" />
@@ -845,97 +853,89 @@
                                 <TextBlock Text="Modifier"
                                        Grid.Row="0" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <ComboBox x:Name="CmbHotkeyModifier"
-                                      Grid.Row="0" Grid.Column="1"
+                                <ComboBox Grid.Row="0" Grid.Column="1"
                                       Margin="0,0,0,8"
-                                      SelectionChanged="CmbHotkeyModifier_SelectionChanged">
-                                    <ComboBoxItem Tag="0x0004">Shift</ComboBoxItem>
-                                    <ComboBoxItem Tag="0x0002">Ctrl</ComboBoxItem>
-                                    <ComboBoxItem Tag="0x0001">Alt</ComboBoxItem>
-                                </ComboBox>
+                                      ItemsSource="{Binding ModifierOptions}"
+                                      DisplayMemberPath="Name"
+                                      SelectedValuePath="Value"
+                                      SelectedValue="{Binding SelectedModifierValue, Mode=TwoWay}" />
 
                                 <TextBlock Text="Volume up"
                                        Grid.Row="1" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtHotkeyVolumeUp"
+                                <TextBox Text="{Binding HotkeyVolumeUpText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="1" Grid.Column="1"
                                      Margin="0,0,0,6" />
-                                <Button x:Name="BtnRecordHotkeyVolumeUp"
-                                    Grid.Row="1" Grid.Column="2"
+                                <Button Grid.Row="1" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Click="BtnRecordHotkeyVolumeUp_Click" />
+                                    Command="{Binding RecordVolumeUpCommand}" />
 
                                 <TextBlock Text="Volume down"
                                        Grid.Row="2" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtHotkeyVolumeDown"
+                                <TextBox Text="{Binding HotkeyVolumeDownText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="2" Grid.Column="1"
                                      Margin="0,0,0,6" />
-                                <Button x:Name="BtnRecordHotkeyVolumeDown"
-                                    Grid.Row="2" Grid.Column="2"
+                                <Button Grid.Row="2" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Click="BtnRecordHotkeyVolumeDown_Click" />
+                                    Command="{Binding RecordVolumeDownCommand}" />
 
                                 <TextBlock Text="Toggle audio link"
                                        Grid.Row="3" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtHotkeyToggleScrcpy"
+                                <TextBox Text="{Binding HotkeyToggleScrcpyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="3" Grid.Column="1"
                                      Margin="0,0,0,6" />
-                                <Button x:Name="BtnRecordHotkeyToggleScrcpy"
-                                    Grid.Row="3" Grid.Column="2"
+                                <Button Grid.Row="3" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Click="BtnRecordHotkeyToggleScrcpy_Click" />
+                                    Command="{Binding RecordToggleScrcpyCommand}" />
 
                                 <TextBlock Text="Toggle lyrics"
                                        Grid.Row="4" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtHotkeyToggleLyricsOverlay"
+                                <TextBox Text="{Binding HotkeyToggleLyricsOverlayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="4" Grid.Column="1"
                                      Margin="0,0,0,6" />
-                                <Button x:Name="BtnRecordHotkeyToggleLyricsOverlay"
-                                    Grid.Row="4" Grid.Column="2"
+                                <Button Grid.Row="4" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Click="BtnRecordHotkeyToggleLyricsOverlay_Click" />
+                                    Command="{Binding RecordToggleLyricsOverlayCommand}" />
 
                                 <TextBlock Text="Copy track info"
                                        Grid.Row="5" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtHotkeyCopyTrackInfo"
+                                <TextBox Text="{Binding HotkeyCopyTrackInfoText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="5" Grid.Column="1"
                                      Margin="0,0,0,6" />
-                                <Button x:Name="BtnRecordHotkeyCopyTrackInfo"
-                                    Grid.Row="5" Grid.Column="2"
+                                <Button Grid.Row="5" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Click="BtnRecordHotkeyCopyTrackInfo_Click" />
+                                    Command="{Binding RecordCopyTrackInfoCommand}" />
 
                                 <TextBlock Text="Audio quality"
                                        Grid.Row="6" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtHotkeyAudioQuality"
+                                <TextBox Text="{Binding HotkeyAudioQualityText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="6" Grid.Column="1" />
-                                <Button x:Name="BtnRecordHotkeyAudioQuality"
-                                    Grid.Row="6" Grid.Column="2"
+                                <Button Grid.Row="6" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,0"
-                                    Click="BtnRecordHotkeyAudioQuality_Click" />
+                                    Command="{Binding RecordAudioQualityCommand}" />
                             </Grid>
                         </StackPanel>
                     </Expander>
@@ -954,27 +954,28 @@
                                 <TextBlock Text="Quality preset"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <ComboBox x:Name="CmbQualityPresets"
-                                      Grid.Column="1"
-                                      SelectionChanged="CmbQualityPresets_SelectionChanged" />
+                                <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding QualityPresets}"
+                                      SelectedItem="{Binding SelectedQualityPreset, Mode=TwoWay}" />
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <Button x:Name="BtnListCodecs"
-                                    Content="List codecs"
+                                <Button Content="List codecs"
                                     Style="{StaticResource SecondaryButtonStyle}"
-                                    Width="130" />
-                                <TextBlock x:Name="TxtCodecStatus"
+                                    Width="130"
+                                    Command="{Binding ListCodecsCommand}" />
+                                <TextBlock Text="{Binding CodecStatus}"
                                        Margin="12,0,0,0"
                                        VerticalAlignment="Center" />
                             </StackPanel>
 
-                            <ListBox x:Name="LstAudioCodecs"
+                            <ListBox ItemsSource="{Binding AudioCodecs}"
+                                 SelectedItem="{Binding SelectedCodec, Mode=TwoWay}"
                                  Height="120"
                                  Margin="0,0,0,12"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto" />
 
-                            <Grid x:Name="PanelAudioBitrate" Margin="0,0,0,8">
+                            <Grid Visibility="{Binding ShowBitratePanel, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="150" />
                                     <ColumnDefinition Width="220" />
@@ -983,7 +984,7 @@
                                 <TextBlock Text="Bitrate"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtAudioBitrate" Grid.Column="1" />
+                                <TextBox Text="{Binding AudioBitrate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" />
                                 <TextBlock Text="kbps"
                                        Grid.Column="2"
                                        Margin="8,0,0,0"
@@ -999,14 +1000,14 @@
                                 <TextBlock Text="Audio buffer"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtAudioBuffer" Grid.Column="1" />
+                                <TextBox Text="{Binding AudioBuffer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" />
                                 <TextBlock Text="ms"
                                        Grid.Column="2"
                                        Margin="8,0,0,0"
                                        Style="{StaticResource FieldLabelStyle}" />
                             </Grid>
 
-                            <Grid x:Name="PanelFlacCompression">
+                            <Grid Visibility="{Binding ShowFlacPanel, Converter={StaticResource BoolToVis}}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="150" />
                                     <ColumnDefinition Width="220" />
@@ -1014,7 +1015,7 @@
                                 <TextBlock Text="FLAC level"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtFlacCompressionLevel" Grid.Column="1" />
+                                <TextBox Text="{Binding FlacCompressionLevel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" />
                             </Grid>
                         </StackPanel>
                     </Expander>
@@ -1033,8 +1034,8 @@
                                 <TextBlock Text="Update interval"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <ComboBox x:Name="CmbUpdateInterval" Grid.Column="1"
-                                      SelectionChanged="CmbUpdateInterval_SelectionChanged">
+                                <ComboBox Grid.Column="1"
+                                      SelectedIndex="{Binding UpdateIntervalIndex, Mode=TwoWay}">
                                     <ComboBoxItem>1 sec</ComboBoxItem>
                                     <ComboBoxItem>3 sec</ComboBoxItem>
                                     <ComboBoxItem>5 sec</ComboBoxItem>
@@ -1042,9 +1043,8 @@
                                 </ComboBox>
                             </Grid>
 
-                            <TextBlock x:Name="TxtUpdateIntervalWarning"
-                                   Visibility="Collapsed"
-                                   Text="Intervals above 3 sec disable audio link hotswap recovery and intervals above 1 sec may cause timing issue's in the mediaplayer."
+                            <TextBlock Visibility="{Binding IntervalWarningVisible, Converter={StaticResource BoolToVis}}"
+                                   Text="{Binding IntervalWarningText}"
                                    Style="{StaticResource HintTextStyle}"
                                    Foreground="#E6A020"
                                    Margin="0,0,0,8" />
@@ -1058,7 +1058,7 @@
                                 <TextBlock Text="SMTC paused clear delay"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtPauseClearDelayMinutes" Grid.Column="1" />
+                                <TextBox Text="{Binding PauseClearDelayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" />
                                 <TextBlock Text="min (0 = off)"
                                        Grid.Column="2"
                                        Margin="8,0,0,0"
@@ -1073,7 +1073,7 @@
                                 <TextBlock Text="Cover filename patterns"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtCoverPatterns"
+                                <TextBox Text="{Binding CoverPatterns, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Column="1"
                                      ToolTip="Semicolon separated, e.g. cover.jpg;folder.jpg;front.png" />
                             </Grid>
@@ -1086,35 +1086,35 @@
                                 <TextBlock Text="Copy template"
                                        Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TxtCopyTrackTemplate"
+                                <TextBox Text="{Binding CopyTrackTemplate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Column="1"
                                      ToolTip="Use {artist}, {title}, {album}" />
                             </Grid>
 
-                            <CheckBox x:Name="ChkDebugMode" Content="Enable debug logging" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
-                            <Button x:Name="BtnOpenLogFolder"
-                                Content="Open log folder"
+                            <CheckBox Content="Enable debug logging" IsChecked="{Binding DebugMode, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
+                            <Button Content="Open log folder"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Width="160"
                                 HorizontalAlignment="Left"
-                                Margin="0,0,0,12" />
-                            <CheckBox x:Name="ChkOpenInTaskbar" Content="Start minimized to tray" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
-                            <CheckBox x:Name="ChkStartWithWindows" Content="Start when Windows starts" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
+                                Margin="0,0,0,12"
+                                Command="{Binding OpenLogFolderCommand}" />
+                            <CheckBox Content="Start minimized to tray" IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
+                            <CheckBox Content="Start when Windows starts" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
 
-                            <Button x:Name="BtnToggleMediaPlayerView"
-                                Content="Switch to media player view"
+                            <Button Content="{Binding MediaPlayerViewButtonText}"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Width="200"
                                 HorizontalAlignment="Left"
-                                Margin="0,0,0,12" />
+                                Margin="0,0,0,12"
+                                Command="{Binding ToggleMediaPlayerViewCommand}" />
 
-                            <CheckBox x:Name="ChkDarkMode" Content="Use dark mode" VerticalAlignment="Center" Visibility="Collapsed" />
+                            <CheckBox Content="Use dark mode" IsChecked="{Binding UseDarkMode, Mode=TwoWay}" VerticalAlignment="Center" Visibility="Collapsed" />
 
-                            <Button x:Name="BtnRedoOnboarding"
-                                Content="Run onboarding again"
+                            <Button Content="Run onboarding again"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Width="200"
-                                HorizontalAlignment="Left" />
+                                HorizontalAlignment="Left"
+                                Command="{Binding RedoOnboardingCommand}" />
                         </StackPanel>
                     </Expander>
 
