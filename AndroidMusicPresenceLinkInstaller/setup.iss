@@ -1,5 +1,5 @@
 #define MyAppExeName "AndroidMusicPresenceLink.exe"
-#define BinDir "..\Crimson AndroidMusicPresence\bin\Release\net10.0-windows10.0.19041.0"
+#define BinDir "..\AndroidMusicPresence\bin\Release\net10.0-windows10.0.19041.0"
 #define MyAppVersion GetVersionNumbersString(SourcePath + "\" + BinDir + "\" + MyAppExeName)
 #define MyAppName "AndroidMusicPresenceLink"
 #define MyAppPublisher "Snail"
@@ -44,41 +44,34 @@ Source: "{#BinDir}\Tray_Icons\Tray_Scrcpy_USB.ico";   DestDir: "{app}\Tray_Icons
 Source: "{#BinDir}\Tray_Icons\Tray_Scrcpy_TCP.ico";   DestDir: "{app}\Tray_Icons"; Flags: ignoreversion
 Source: "{#BinDir}\Tray_Icons\Tray_Scrcpy_WD.ico";    DestDir: "{app}\Tray_Icons"; Flags: ignoreversion
 
-; Resources -> %AppData%\Snail\Resources
-Source: "{#BinDir}\Resources\adb.exe";                  DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\AdbWinApi.dll";            DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\AdbWinUsbApi.dll";         DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\avcodec-62.dll";           DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\avformat-62.dll";          DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\avutil-60.dll";            DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\disconnected.png";         DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\ffmpeg.exe";               DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\libusb-1.0.dll";           DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\Musiclogo.png";            DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\open_a_terminal_here.bat"; DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\scrcpy-noconsole.vbs";     DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\scrcpy-server";            DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\scrcpy.exe";               DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\SDL3.dll";                 DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
-Source: "{#BinDir}\Resources\swresample-6.dll";         DestDir: "{userappdata}\Snail\Resources"; Flags: ignoreversion
+; Assets -> %AppData%\Snail\Assets
+Source: "{#BinDir}\Assets\adb.exe";                  DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\AdbWinApi.dll";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\AdbWinUsbApi.dll";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\avcodec-62.dll";           DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\avformat-62.dll";          DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\avutil-60.dll";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\disconnected.png";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\ffmpeg.exe";               DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\libusb-1.0.dll";           DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\AMPLLOGO.png";             DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\scrcpy-noconsole.vbs";     DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\scrcpy-server";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\scrcpy.exe";               DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\SDL3.dll";                 DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\swresample-6.dll";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}";         Filename: "{app}\{#MyAppExeName}"; Tasks: startmenuicon
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [InstallDelete]
-; Remove stale resource files left behind by older versions
-Type: files; Name: "{userappdata}\Snail\Resources\avcodec-61.dll"
-Type: files; Name: "{userappdata}\Snail\Resources\avformat-61.dll"
-Type: files; Name: "{userappdata}\Snail\Resources\avutil-59.dll"
-Type: files; Name: "{userappdata}\Snail\Resources\swresample-5.dll"
-Type: files; Name: "{userappdata}\Snail\Resources\SDL2.dll"
-Type: files; Name: "{userappdata}\Snail\Resources\scrcpy-console.bat"
-Type: files; Name: "{userappdata}\Snail\Resources\icon.png"
+; The resource folder was renamed from Resources to Assets; remove the old one wholesale on upgrade.
+Type: filesandordirs; Name: "{userappdata}\Snail\Resources"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\Snail\AndroidMusicPresenceLink"
-Type: filesandordirs; Name: "{userappdata}\Snail\Resources"
+Type: filesandordirs; Name: "{userappdata}\Snail\Assets"
 Type: dirifempty;     Name: "{userappdata}\Snail"
 
 [Registry]

@@ -1,0 +1,175 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+		<TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+		<Version>1.4.6.0</Version>
+		<AssemblyVersion>1.4.6.0</AssemblyVersion>
+		<FileVersion>1.4.6.0</FileVersion>
+		<RootNamespace>AndroidMusicPresence</RootNamespace>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWPF>true</UseWPF>
+		<PlatformTarget>AnyCPU</PlatformTarget>
+		<PackageIcon>AMPLLOGO.png</PackageIcon>
+		<ApplicationIcon>AMPLLOGO.ico</ApplicationIcon>
+		<ProduceReferenceAssembly>True</ProduceReferenceAssembly>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Remove="Assets\adb.exe" />
+		<None Remove="Tray_Icons\Tray_NoConnection.ico" />
+		<None Remove="Tray_Icons\Tray_Scrcpy_TCP.ico" />
+		<None Remove="Tray_Icons\Tray_Scrcpy_USB.ico" />
+		<None Remove="Tray_Icons\Tray_Scrcpy_WD.ico" />
+		<None Remove="Tray_Icons\Tray_TCP.ico" />
+		<None Remove="Tray_Icons\Tray_USB.ico" />
+		<None Remove="Tray_Icons\Tray_WD.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Include="AMPLLOGO.ico" />
+		<Content Include="Assets\adb.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\AMPLLOGO.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</Content>
+		<Content Include="Tray_Icons\Tray_NoConnection.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Tray_Icons\Tray_Scrcpy_TCP.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Tray_Icons\Tray_Scrcpy_USB.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Tray_Icons\Tray_Scrcpy_WD.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Tray_Icons\Tray_TCP.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Tray_Icons\Tray_USB.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Tray_Icons\Tray_WD.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="QRCoder" Version="1.8.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Update="Views\MediaPlayerWindow.AudioQuality.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Battery.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Cover.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Icons.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Lyrics.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.NextSong.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Transport.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.WindowChrome.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="Assets\AdbWinApi.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\AdbWinUsbApi.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\avcodec-62.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\avformat-62.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\avutil-60.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\disconnected.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\ffmpeg.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\libusb-1.0.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\scrcpy-noconsole.vbs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\scrcpy-server">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\scrcpy.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\SDL3.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\swresample-6.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<Target Name="CreateInstaller" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+		<PropertyGroup>
+			<InnoSetupCompiler>C:\Program Files (x86)\Inno Setup 6\ISCC.exe</InnoSetupCompiler>
+			<InnoSetupScript>$(MSBuildProjectDirectory)\..\AndroidMusicPresenceLinkInstaller\setup.iss</InnoSetupScript>
+		</PropertyGroup>
+		<Exec Command="&quot;$(InnoSetupCompiler)&quot; &quot;$(InnoSetupScript)&quot;" Condition="Exists('$(InnoSetupCompiler)')" />
+		<Warning Text="Inno Setup not found at '$(InnoSetupCompiler)' - installer was not built." Condition="!Exists('$(InnoSetupCompiler)')" />
+	</Target>
+
+	<Target Name="CreatePortablePackage" AfterTargets="CreateInstaller" Condition="'$(Configuration)' == 'Release'">
+		<PropertyGroup>
+			<PortableStageDir>$(TargetDir)portable-package\</PortableStageDir>
+			<PortableOutputDir>$(MSBuildProjectDirectory)\..\AndroidMusicPresenceLinkInstaller\Output\</PortableOutputDir>
+			<PortableZipPath>$(PortableOutputDir)Android.Music.Presence.Link.Portable.zip</PortableZipPath>
+		</PropertyGroup>
+
+		<MakeDir Directories="$(PortableOutputDir)" />
+
+		<ItemGroup>
+			<PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll;$(TargetDir)QRCoder.dll" />
+			<PortableResourceFiles Include="$(TargetDir)Assets\**\*" />
+			<PortableTrayFiles Include="$(TargetDir)Tray_Icons\**\*" />
+		</ItemGroup>
+
+		<RemoveDir Directories="$(PortableStageDir)" Condition="Exists('$(PortableStageDir)')" />
+		<MakeDir Directories="$(PortableStageDir)" />
+		<Copy SourceFiles="@(PortableRootFiles)" DestinationFolder="$(PortableStageDir)" />
+		<Copy SourceFiles="@(PortableResourceFiles)" DestinationFiles="@(PortableResourceFiles->'$(PortableStageDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')" />
+		<Copy SourceFiles="@(PortableTrayFiles)" DestinationFiles="@(PortableTrayFiles->'$(PortableStageDir)Tray_Icons\%(RecursiveDir)%(Filename)%(Extension)')" />
+		<WriteLinesToFile File="$(PortableStageDir)portable.mode" Lines="portable" Overwrite="true" />
+		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;if (Test-Path '$(PortableZipPath)') { Remove-Item '$(PortableZipPath)' -Force }; Compress-Archive -Path '$(PortableStageDir)*' -DestinationPath '$(PortableZipPath)' -Force&quot;" />
+		<RemoveDir Directories="$(PortableStageDir)" />
+	</Target>
+
+</Project>

@@ -1,0 +1,111 @@
+<Window x:Class="AndroidMusicPresenceLink.WifiPairDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pair Wireless Debugging" Width="460" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="#111111"
+        ResizeMode="NoResize">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#5539cc"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#222"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+            <Setter Property="Padding" Value="5"/>
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <StackPanel>
+            <TextBlock FontWeight="Bold" FontSize="14" Margin="0,0,0,8"
+                       Text="Pair this PC with your phone"/>
+
+            <!-- QR mode panel -->
+            <StackPanel Visibility="{Binding IsQrMode, Converter={StaticResource BoolToVis}}">
+                <TextBlock TextWrapping="Wrap" Opacity="0.85" FontSize="12" Margin="0,0,0,12">
+                    On your phone, open <Run FontWeight="SemiBold">Developer options</Run>,
+                    tap <Run FontWeight="SemiBold">Wireless debugging</Run>, then
+                    <Run FontWeight="SemiBold">Pair device with QR code</Run>.
+                    Scan the code below.
+                </TextBlock>
+
+                <Border Background="#1a1a1a" BorderBrush="#333" BorderThickness="1"
+                        CornerRadius="6" Padding="8" Margin="0,0,0,10"
+                        HorizontalAlignment="Center">
+                    <Image Width="160" Height="160"
+                           Source="{Binding QrImage}"
+                           RenderOptions.BitmapScalingMode="NearestNeighbor"
+                           Stretch="Uniform"/>
+                </Border>
+
+                <TextBlock TextWrapping="Wrap" Opacity="0.9"
+                           FontSize="12" Margin="0,0,0,8"
+                           HorizontalAlignment="Center"
+                           Text="{Binding QrStatus}"
+                           Foreground="{Binding QrStatusBrush}"/>
+            </StackPanel>
+
+            <!-- Manual IP/port mode panel -->
+            <StackPanel Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVis}}">
+                <TextBlock TextWrapping="Wrap" Opacity="0.85" FontSize="12" Margin="0,0,0,12">
+                    On your phone, open <Run FontWeight="SemiBold">Developer options</Run>,
+                    tap <Run FontWeight="SemiBold">Wireless debugging</Run>, then
+                    <Run FontWeight="SemiBold">Pair device with pairing code</Run>.
+                    Enter the IP:port (top line) and the 6-digit code shown there.
+                </TextBlock>
+
+                <TextBlock Text="Pairing address (ip:port):" Margin="0,0,0,4"/>
+                <TextBox x:Name="TxtPairAddress" Margin="0,0,0,12"
+                         Text="{Binding PairAddressInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock Text="Pairing code (6 digits):" Margin="0,0,0,4"/>
+                <TextBox Margin="0,0,0,12" MaxLength="10"
+                         Text="{Binding PairCodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <TextBlock TextWrapping="Wrap" Opacity="0.9"
+                           FontSize="12" Margin="0,4,0,8"
+                           Text="{Binding ManualStatus}"
+                           Foreground="{Binding ManualStatusBrush}"/>
+            </StackPanel>
+
+            <!-- Mode toggle link -->
+            <TextBlock FontSize="12" Foreground="#9988ee" Cursor="Hand"
+                       Margin="0,0,0,12" HorizontalAlignment="Center"
+                       Text="{Binding ModeToggleText}"
+                       TextDecorations="Underline">
+                <TextBlock.InputBindings>
+                    <MouseBinding MouseAction="LeftClick" Command="{Binding ToggleModeCommand}"/>
+                </TextBlock.InputBindings>
+            </TextBlock>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                <Button Content="Cancel" Command="{Binding CancelCommand}" Background="#444" Width="80"/>
+                <Button Content="Pair" Command="{Binding PairCommand}"
+                        IsEnabled="{Binding CanPair}"
+                        IsDefault="True" Width="80"
+                        Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVis}}"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>
