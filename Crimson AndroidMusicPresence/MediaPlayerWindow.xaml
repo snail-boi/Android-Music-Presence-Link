@@ -379,7 +379,7 @@
                            TextAlignment="Center"
                            HorizontalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
-                           Text="-" />
+                           Text="{Binding Title}" />
 
                     <!-- Artist (no opacity dim, like screenshot) -->
                     <TextBlock x:Name="TxtArtist"
@@ -390,7 +390,7 @@
                            HorizontalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
                            Opacity="0.85"
-                           Text="-" />
+                           Text="{Binding Artist}" />
 
                     <!-- Album, slightly smaller, dimmer, centered -->
                     <TextBlock x:Name="TxtAlbum"
@@ -401,7 +401,7 @@
                            TextAlignment="Center"
                            HorizontalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
-                           Text="-" />
+                           Text="{Binding Album}" />
 
                     <!-- Connection info + Audio link row -->
                     <StackPanel Grid.Row="4"
@@ -527,7 +527,7 @@
                                     Margin="0,0,12,0"
                                     Click="BtnPositionLabel_Click">
                                 <TextBlock x:Name="TxtPositionLabel"
-                                       Text="0:00"
+                                       Text="{Binding PositionLabel}"
                                        FontSize="12"
                                        Opacity="0.85"
                                        VerticalAlignment="Center" />
@@ -566,7 +566,7 @@
 
                             <TextBlock x:Name="TxtDurationLabel"
                                    Grid.Column="2"
-                                   Text="0:00"
+                                   Text="{Binding DurationLabel}"
                                    FontSize="12"
                                    Opacity="0.85"
                                    VerticalAlignment="Center"

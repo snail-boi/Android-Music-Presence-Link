@@ -93,6 +93,8 @@ namespace musicpresense
 
         private string _connectionStatusText = "Not connected";
         private string _connectionDetailText = "";
+
+        private readonly MediaPlayerViewModel _vm = new MediaPlayerViewModel();
         private Color _connectionColor = Color.FromRgb(0xFF, 0x3B, 0x30);
 
         private readonly Func<int, Task>? _seekRelativeSeconds;
@@ -131,6 +133,7 @@ namespace musicpresense
             Func<int, int, int, Task>? setPhoneVolume = null)
         {
             InitializeComponent();
+            PlayerPaneBorder.DataContext = _vm;
             _pauseAction = pauseAction;
             _nextAction = nextAction;
             _previousAction = previousAction;
@@ -473,9 +476,9 @@ namespace musicpresense
             _hasSong = hasSong;
             _isPlaying = isPlaying;
 
-            TxtTitle.Text = normalizedTitle;
-            TxtArtist.Text = normalizedArtist;
-            TxtAlbum.Text = normalizedAlbum;
+            _vm.Title = normalizedTitle;
+            _vm.Artist = normalizedArtist;
+            _vm.Album = normalizedAlbum;
             RenderTransportIcons(isPlaying);
 
             RenderAuxiliaryIcons();
@@ -598,8 +601,8 @@ namespace musicpresense
             {
                 ProgressSlider.Maximum = 1;
                 ProgressSlider.Value = 0;
-                TxtPositionLabel.Text = "0:00";
-                TxtDurationLabel.Text = "0:00";
+                _vm.PositionLabel = "0:00";
+                _vm.DurationLabel = "0:00";
                 BtnSeekBack.Visibility = Visibility.Collapsed;
                 BtnSeekFwd.Visibility = Visibility.Collapsed;
                 return;
@@ -609,7 +612,7 @@ namespace musicpresense
 
             RefreshSeekButtonVisibility();
 
-            TxtDurationLabel.Text = FormatMs(durationMs);
+            _vm.DurationLabel = FormatMs(durationMs);
         }
 
         private void SmoothTimer_Tick(object? sender, EventArgs e)

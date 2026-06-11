@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -211,11 +211,11 @@ namespace musicpresense
             if (_showTimeLeft && _lastDurationMs > 0)
             {
                 long left = _lastDurationMs - Math.Min(_lastPositionMs, _lastDurationMs);
-                TxtPositionLabel.Text = "-" + FormatMs(left);
+                _vm.PositionLabel = "-" + FormatMs(left);
             }
             else
             {
-                TxtPositionLabel.Text = FormatMs(_lastPositionMs);
+                _vm.PositionLabel = FormatMs(_lastPositionMs);
             }
         }
         private static string FormatMs(long ms)
