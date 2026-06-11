@@ -1,5 +1,5 @@
 #define MyAppExeName "AndroidMusicPresenceLink.exe"
-#define BinDir "..\Crimson AndroidMusicPresence\bin\Release\net10.0-windows10.0.19041.0"
+#define BinDir "..\AndroidMusicPresence\bin\Release\net10.0-windows10.0.19041.0"
 #define MyAppVersion GetVersionNumbersString(SourcePath + "\" + BinDir + "\" + MyAppExeName)
 #define MyAppName "AndroidMusicPresenceLink"
 #define MyAppPublisher "Snail"
