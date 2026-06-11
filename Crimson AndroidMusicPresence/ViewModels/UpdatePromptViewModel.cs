@@ -1,6 +1,6 @@
 using System;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     public enum UpdatePromptChoice
     {

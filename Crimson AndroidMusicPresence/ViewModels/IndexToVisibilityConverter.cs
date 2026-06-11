@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Returns Visible when the bound int equals the ConverterParameter, otherwise Collapsed.

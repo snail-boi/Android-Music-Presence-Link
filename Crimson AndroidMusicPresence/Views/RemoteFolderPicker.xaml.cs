@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Remote folder browser. The tree, the lazy loading, and the selection now live in

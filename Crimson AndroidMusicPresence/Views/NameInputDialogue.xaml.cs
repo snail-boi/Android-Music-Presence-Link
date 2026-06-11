@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Small text-input dialog. The title and prompt are passed in; the typed value comes

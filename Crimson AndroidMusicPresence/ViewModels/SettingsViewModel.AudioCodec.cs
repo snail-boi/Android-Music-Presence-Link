@@ -8,7 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Audio codec group: the available codec list, the quality-preset picker, the

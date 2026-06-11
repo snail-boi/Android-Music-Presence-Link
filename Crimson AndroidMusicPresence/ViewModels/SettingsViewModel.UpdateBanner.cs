@@ -1,4 +1,4 @@
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Update banner display state. The window subscribes to Updater.UpdateStatusChanged and

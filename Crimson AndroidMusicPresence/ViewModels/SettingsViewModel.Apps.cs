@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Apps group: the eligible-apps list with per-row presence and cover toggles, plus Manage

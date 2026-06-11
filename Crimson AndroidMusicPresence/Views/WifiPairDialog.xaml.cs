@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Wireless debugging pairing dialog. All the work (QR generation, the mDNS listening

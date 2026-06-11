@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Audio quality window with two modes:

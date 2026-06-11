@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Input;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Minimal ICommand. A button in XAML binds to a RelayCommand on the ViewModel

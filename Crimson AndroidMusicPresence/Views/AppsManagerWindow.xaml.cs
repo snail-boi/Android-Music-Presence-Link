@@ -1,7 +1,7 @@
 using System;
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Manage Apps window. All state and logic now live in

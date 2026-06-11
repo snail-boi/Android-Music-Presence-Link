@@ -1,4 +1,4 @@
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Thin display state for the media player's now-playing pane. The window keeps doing all of

@@ -12,14 +12,13 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
 		<PlatformTarget>AnyCPU</PlatformTarget>
-		<PackageIcon>logo.png</PackageIcon>
-		<ApplicationIcon>Android_logo_2019(1).ico</ApplicationIcon>
+		<PackageIcon>AMPLLOGO.png</PackageIcon>
+		<ApplicationIcon>AMPLLOGO.ico</ApplicationIcon>
 		<ProduceReferenceAssembly>True</ProduceReferenceAssembly>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Remove="Resources\adb.exe" />
-		<None Remove="Resources\Musiclogo.png" />
+		<None Remove="Assets\adb.exe" />
 		<None Remove="Tray_Icons\Tray_NoConnection.ico" />
 		<None Remove="Tray_Icons\Tray_Scrcpy_TCP.ico" />
 		<None Remove="Tray_Icons\Tray_Scrcpy_USB.ico" />
@@ -30,11 +29,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Content Include="Android_logo_2019(1).ico" />
-		<Content Include="Resources\adb.exe">
+		<Content Include="AMPLLOGO.ico" />
+		<Content Include="Assets\adb.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
-		<Content Include="Resources\Musiclogo.png">
+		<Content Include="Assets\AMPLLOGO.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Pack>True</Pack>
 			<PackagePath>\</PackagePath>
@@ -67,56 +66,76 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="QRCoder" Version="1.8.0" />
+		<PackageReference Include="QRCoder" Version="1.8.0" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Update="Resources\AdbWinApi.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\AdbWinUsbApi.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\avcodec-62.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\avformat-62.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\avutil-60.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\disconnected.png">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\ffmpeg.exe">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\libusb-1.0.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\open_a_terminal_here.bat">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\scrcpy-noconsole.vbs">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\scrcpy-server">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\scrcpy.exe">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\SDL3.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Resources\swresample-6.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
+		<Compile Update="Views\MediaPlayerWindow.AudioQuality.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Battery.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Cover.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Icons.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Lyrics.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.NextSong.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.Transport.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
+		<Compile Update="Views\MediaPlayerWindow.WindowChrome.cs">
+			<DependentUpon>MediaPlayerWindow.xaml</DependentUpon>
+		</Compile>
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Models\" />
+		<None Update="Assets\AdbWinApi.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\AdbWinUsbApi.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\avcodec-62.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\avformat-62.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\avutil-60.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\disconnected.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\ffmpeg.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\libusb-1.0.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\scrcpy-noconsole.vbs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\scrcpy-server">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\scrcpy.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\SDL3.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\swresample-6.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 	<Target Name="CreateInstaller" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
@@ -139,14 +158,14 @@
 
 		<ItemGroup>
 			<PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll;$(TargetDir)QRCoder.dll" />
-			<PortableResourceFiles Include="$(TargetDir)Resources\**\*" />
+			<PortableResourceFiles Include="$(TargetDir)Assets\**\*" />
 			<PortableTrayFiles Include="$(TargetDir)Tray_Icons\**\*" />
 		</ItemGroup>
 
 		<RemoveDir Directories="$(PortableStageDir)" Condition="Exists('$(PortableStageDir)')" />
 		<MakeDir Directories="$(PortableStageDir)" />
 		<Copy SourceFiles="@(PortableRootFiles)" DestinationFolder="$(PortableStageDir)" />
-		<Copy SourceFiles="@(PortableResourceFiles)" DestinationFiles="@(PortableResourceFiles->'$(PortableStageDir)Resources\%(RecursiveDir)%(Filename)%(Extension)')" />
+		<Copy SourceFiles="@(PortableResourceFiles)" DestinationFiles="@(PortableResourceFiles->'$(PortableStageDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')" />
 		<Copy SourceFiles="@(PortableTrayFiles)" DestinationFiles="@(PortableTrayFiles->'$(PortableStageDir)Tray_Icons\%(RecursiveDir)%(Filename)%(Extension)')" />
 		<WriteLinesToFile File="$(PortableStageDir)portable.mode" Lines="portable" Overwrite="true" />
 		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;if (Test-Path '$(PortableZipPath)') { Remove-Item '$(PortableZipPath)' -Force }; Compress-Archive -Path '$(PortableStageDir)*' -DestinationPath '$(PortableZipPath)' -Force&quot;" />

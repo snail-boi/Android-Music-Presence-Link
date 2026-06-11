@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// One option in the preset dropdown. Preset is null for the "Custom" entry, which

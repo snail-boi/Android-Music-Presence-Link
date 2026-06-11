@@ -1,7 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// ViewModel for the onboarding wizard, split into partial-class files by concern:

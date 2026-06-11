@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Update prompt. The text and the three actions live in

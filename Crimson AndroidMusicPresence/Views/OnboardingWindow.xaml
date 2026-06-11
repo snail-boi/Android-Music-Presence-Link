@@ -1,4 +1,4 @@
-<Window x:Class="musicpresense.OnboardingWindow"
+<Window x:Class="AndroidMusicPresenceLink.OnboardingWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Welcome to Android Music Presence"
@@ -11,7 +11,7 @@
         Background="{DynamicResource ThemeBackgroundBrush}"
         Foreground="{DynamicResource ThemeForegroundBrush}"
         FontFamily="Segoe UI"
-        xmlns:local="clr-namespace:musicpresense">
+        xmlns:local="clr-namespace:AndroidMusicPresenceLink">
 
     <Window.Resources>
         <local:IndexToVisibilityConverter x:Key="StepVis" />

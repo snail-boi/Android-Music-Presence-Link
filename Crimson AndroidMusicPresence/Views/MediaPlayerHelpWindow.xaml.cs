@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Themed help dialog. It is pure static content with a single Close button, so it does

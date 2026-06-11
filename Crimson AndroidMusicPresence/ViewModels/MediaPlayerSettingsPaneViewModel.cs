@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// ViewModel for the media player's right-side settings pane. Every change writes App.Config,

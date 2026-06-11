@@ -1,6 +1,6 @@
 using System;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// ViewModel for NameInputDialogue. Holds the window title, the prompt label, and the

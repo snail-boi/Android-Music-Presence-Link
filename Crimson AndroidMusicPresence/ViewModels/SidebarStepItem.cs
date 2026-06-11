@@ -1,4 +1,4 @@
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// One row in the onboarding sidebar. The sidebar list is rebuilt wholesale on every step

@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>Result of the Wi-Fi pairing dialog handed back to the ViewModel.</summary>
     public sealed record WifiPairResult(string ServiceName, string PairAddress);

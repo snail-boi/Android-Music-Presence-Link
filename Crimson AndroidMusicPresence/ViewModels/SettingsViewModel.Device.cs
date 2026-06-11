@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Device step: USB serial, Wi-Fi address (ip:port), mDNS service name, device name, and the

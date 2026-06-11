@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>One selectable hotkey modifier (Alt/Ctrl/Shift) with its Win32 modifier value.</summary>
     internal sealed class HotkeyModifierOption

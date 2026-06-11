@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace musicpresense
+namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Hotkeys group: six bound hotkey display strings and the modifier dropdown. Recording a key
