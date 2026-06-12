@@ -1442,6 +1442,7 @@ namespace AndroidMusicPresenceLink
                     case HotkeyIdToggleLyricsOverlay:
                         Debugger.show("[HOTKEY] Global hotkey used: toggle lyrics overlay.");
                         _lyricsOverlayManager?.ToggleVisibility();
+                        ShowToast(_lyricsOverlayManager?.IsOverlayVisible == true ? "Lyrics overlay on" : "Lyrics overlay off");
                         handled = true;
                         break;
                     case HotkeyIdCopyTrackInfo:

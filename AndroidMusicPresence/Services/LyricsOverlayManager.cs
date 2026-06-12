@@ -22,6 +22,7 @@ namespace AndroidMusicPresenceLink
         private LyricsOverlayWindow? _overlay;
 
         private bool _overlayVisible = false;
+        public bool IsOverlayVisible => _overlayVisible;
         private bool _isPlaying;
         private long _basePositionMs;
         private DateTime _positionAnchorUtc = DateTime.UtcNow;

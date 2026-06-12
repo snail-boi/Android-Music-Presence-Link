@@ -126,9 +126,9 @@ namespace AndroidMusicPresenceLink
         public string SelectedDeviceWiFi { get; set; } = string.Empty;
         public string SelectedDeviceName { get; set; } = string.Empty;
 
-        // Connection mode for the wireless link. Defaults to TcpIp so existing users are
-        // not surprised. Users opt in to WirelessDebugging via onboarding or settings.
-        public WirelessMode WifiMode { get; set; } = WirelessMode.TcpIp;
+        // Connection mode for the wireless link. Defaults to WirelessDebugging (Android 11+).
+        // Existing configs with a saved value are unaffected; only fresh installs see this default.
+        public WirelessMode WifiMode { get; set; } = WirelessMode.WirelessDebugging;
 
         // mDNS service name reported by `adb mdns services`, e.g. "adb-XXXXXXXX-XXXXXX".
         // Stable across reboots and IP changes once paired. Only used when WifiMode is

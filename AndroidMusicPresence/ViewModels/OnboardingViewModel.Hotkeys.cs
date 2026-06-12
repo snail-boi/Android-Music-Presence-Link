@@ -147,7 +147,8 @@ namespace AndroidMusicPresenceLink
         {
             _openInTaskbar = _workingConfig.OpenInTaskbar;
             _startWithWindows = _workingConfig.StartWithWindows;
-            _showMediaPlayerView = _workingConfig.ShowMediaPlayerWindow;
+            // Default to media player view for new installs; existing users keep their saved preference.
+            _showMediaPlayerView = _workingConfig.OnboardingCompleted ? _workingConfig.ShowMediaPlayerWindow : true;
         }
 
         private void CommitStartupToConfig()

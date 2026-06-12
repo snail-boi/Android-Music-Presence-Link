@@ -142,9 +142,9 @@ namespace AndroidMusicPresenceLink
         {
             WifiMode = WifiMode switch
             {
-                WirelessMode.TcpIp => WirelessMode.WirelessDebugging,
                 WirelessMode.WirelessDebugging => WirelessMode.UsbOnly,
-                _ => WirelessMode.TcpIp
+                WirelessMode.UsbOnly => WirelessMode.TcpIp,
+                _ => WirelessMode.WirelessDebugging
             };
         }
 
