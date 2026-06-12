@@ -1022,11 +1022,60 @@
                         </StackPanel>
                     </Expander>
 
+                    <!-- ====== POPUPS & TOASTS ====== -->
+                    <Expander Header="Popups/toasts" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="how and where popups may appear"
+                            Style="{StaticResource HintTextStyle}" />
+                            <!-- Notification toasts -->
+
+                            <CheckBox Content="Show headless popups"
+                                      IsChecked="{Binding HeadlessToastEnabled, Mode=TwoWay}"
+                                      Margin="0,0,0,8"
+                                      Style="{StaticResource ToggleSwitchStyle}" />
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Headless popup position"
+                                           Grid.Column="0"
+                                           Style="{StaticResource FieldLabelStyle}" />
+                                <Button Grid.Column="1"
+                                        Content="{Binding HeadlessToastPositionLabel}"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="140"
+                                        Command="{Binding CycleHeadlessPositionCommand}" />
+                            </Grid>
+
+
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Media player popups"
+                                           Grid.Column="0"
+                                           Style="{StaticResource FieldLabelStyle}" />
+                                <Button Grid.Column="1"
+                                        Content="{Binding MediaPlayerToastModeLabel}"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="140"
+                                        Opacity="{Binding MediaPlayerToastModeOpacity}"
+                                        Command="{Binding CycleMediaPlayerToastModeCommand}" />
+                            </Grid>
+
+
+                        </StackPanel>
+                    </Expander>
+                    
                     <!-- ====== OTHER ====== -->
                     <Expander Header="Other" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
-                            <TextBlock Text="Advanced behavior, startup, and miscellaneous options."
-                                   Style="{StaticResource HintTextStyle}" />
+                            <TextBlock Text="miscellaneous options."
+                                Style="{StaticResource HintTextStyle}" />
 
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -1054,22 +1103,6 @@
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="220" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="SMTC paused clear delay"
-                                       Grid.Column="0"
-                                       Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding PauseClearDelayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" />
-                                <TextBlock Text="min (0 = off)"
-                                       Grid.Column="2"
-                                       Margin="8,0,0,0"
-                                       Style="{StaticResource FieldLabelStyle}" />
-                            </Grid>
-
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Cover filename patterns"
@@ -1093,55 +1126,20 @@
                                      ToolTip="Use {artist}, {title}, {album}" />
                             </Grid>
 
-                            <CheckBox Content="Enable debug logging" IsChecked="{Binding DebugMode, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
-                            <Button Content="Open log folder"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Width="160"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,12"
-                                Command="{Binding OpenLogFolderCommand}" />
-                            <CheckBox Content="Start minimized to tray" IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
-                            <CheckBox Content="Start when Windows starts" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
-
-                            <!-- Notification toasts -->
-                            <TextBlock Text="Notifications"
-                                       Style="{StaticResource SectionLabelStyle}"
-                                       Margin="0,4,0,8" />
-
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="220" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Headless popup position"
-                                           Grid.Column="0"
-                                           Style="{StaticResource FieldLabelStyle}" />
-                                <Button Grid.Column="1"
-                                        Content="{Binding HeadlessToastPositionLabel}"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Width="140"
-                                        Command="{Binding CycleHeadlessPositionCommand}" />
-                            </Grid>
-
-                            <CheckBox Content="Show headless popups"
-                                      IsChecked="{Binding HeadlessToastEnabled, Mode=TwoWay}"
-                                      Margin="0,0,0,8"
-                                      Style="{StaticResource ToggleSwitchStyle}" />
-
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Media player popups"
-                                           Grid.Column="0"
-                                           Style="{StaticResource FieldLabelStyle}" />
-                                <Button Grid.Column="1"
-                                        Content="{Binding MediaPlayerToastModeLabel}"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Width="140"
-                                        Opacity="{Binding MediaPlayerToastModeOpacity}"
-                                        Command="{Binding CycleMediaPlayerToastModeCommand}" />
+                                <TextBlock Text="SMTC paused clear delay"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox Text="{Binding PauseClearDelayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" />
+                                <TextBlock Text="min (0 = off)"
+                                       Grid.Column="2"
+                                       Margin="8,0,0,0"
+                                       Style="{StaticResource FieldLabelStyle}" />
                             </Grid>
 
                             <Button Content="{Binding MediaPlayerViewButtonText}"
@@ -1150,6 +1148,25 @@
                                 HorizontalAlignment="Left"
                                 Margin="0,0,0,12"
                                 Command="{Binding ToggleMediaPlayerViewCommand}" />
+
+                            <CheckBox Content="Start minimized to tray" IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
+                            <CheckBox Content="Start when Windows starts" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- ====== DEBUG ====== -->
+                    <Expander Header="Debug/Advanced" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Advanced behavior, startup, and miscellaneous options."
+                                   Style="{StaticResource HintTextStyle}" />
+
+                            <CheckBox Content="Enable debug logging" IsChecked="{Binding DebugMode, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
+                            <Button Content="Open log folder"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Width="160"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,12"
+                                Command="{Binding OpenLogFolderCommand}" />
 
                             <CheckBox Content="Use dark mode" IsChecked="{Binding UseDarkMode, Mode=TwoWay}" VerticalAlignment="Center" Visibility="Collapsed" />
 
