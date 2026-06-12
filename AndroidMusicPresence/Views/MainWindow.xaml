@@ -1098,6 +1098,47 @@
                             <CheckBox Content="Start minimized to tray" IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
                             <CheckBox Content="Start when Windows starts" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
 
+                            <!-- Notification toasts -->
+                            <TextBlock Text="Notifications"
+                                       Style="{StaticResource SectionLabelStyle}"
+                                       Margin="0,4,0,8" />
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Headless popup position"
+                                           Grid.Column="0"
+                                           Style="{StaticResource FieldLabelStyle}" />
+                                <Button Grid.Column="1"
+                                        Content="{Binding HeadlessToastPositionLabel}"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="140"
+                                        Command="{Binding CycleHeadlessPositionCommand}" />
+                            </Grid>
+
+                            <CheckBox Content="Show headless popups"
+                                      IsChecked="{Binding HeadlessToastEnabled, Mode=TwoWay}"
+                                      Margin="0,0,0,8"
+                                      Style="{StaticResource ToggleSwitchStyle}" />
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Media player popups"
+                                           Grid.Column="0"
+                                           Style="{StaticResource FieldLabelStyle}" />
+                                <Button Grid.Column="1"
+                                        Content="{Binding MediaPlayerToastModeLabel}"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="140"
+                                        Opacity="{Binding MediaPlayerToastModeOpacity}"
+                                        Command="{Binding CycleMediaPlayerToastModeCommand}" />
+                            </Grid>
+
                             <Button Content="{Binding MediaPlayerViewButtonText}"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Width="200"

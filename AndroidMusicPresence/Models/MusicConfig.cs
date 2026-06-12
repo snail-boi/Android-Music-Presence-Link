@@ -84,6 +84,26 @@ namespace AndroidMusicPresenceLink
         DateModifiedOldest = 3
     }
 
+    public enum HeadlessToastPosition
+    {
+        TopLeft = 0,
+        TopCenter = 1,
+        TopRight = 2,
+        BottomLeft = 3,
+        BottomCenter = 4,
+        BottomRight = 5
+    }
+
+    // 0 = show inside media player window
+    // 1 = show as headless overlay (same as when media player is closed)
+    // 2 = off
+    public enum MediaPlayerToastMode
+    {
+        InMediaPlayer = 0,
+        Headless = 1,
+        Off = 2
+    }
+
     public sealed class EligibleAppConfig
     {
         public string PackageName { get; set; } = string.Empty;
@@ -188,6 +208,11 @@ namespace AndroidMusicPresenceLink
         public int SmtcPauseClearDelayMinutes { get; set; } = 0;
         public bool IsWifiEnabled { get; set; } = false;
         public bool OnboardingCompleted { get; set; } = false;
+
+        // Toast / notification popup settings
+        public bool HeadlessToastEnabled { get; set; } = true;
+        public HeadlessToastPosition HeadlessToastPosition { get; set; } = HeadlessToastPosition.TopCenter;
+        public MediaPlayerToastMode MediaPlayerToastMode { get; set; } = MediaPlayerToastMode.InMediaPlayer;
 
         public int CachClearInMB { get; set; } = 200;
         public string LyricsSearchFolderOverride { get; set; } = string.Empty;
@@ -505,59 +530,7 @@ namespace AndroidMusicPresenceLink
         {
             config = NormalizeConfig(config);
             MigrateLegacyWindowConfig(config);
-            MigrateResourcesPaths(config);
             return config;
-        }
-
-        // One-time migration for users who updated from the version where bundled tools
-        // lived in a "Resources" folder. That folder was renamed to "Assets". Any saved
-        // path that still contains the old segment is rewritten in-place so the app
-        // finds adb.exe, scrcpy.exe, and ffmpeg.exe without requiring the user to
-        // manually re-run onboarding. Custom paths that happen to contain the word
-        // "Resources" in an unrelated context are left alone (we only rewrite the
-        // segment when it appears as a path component, not as a substring of a file name).
-        private static void MigrateResourcesPaths(MusicConfig config)
-        {
-            try
-            {
-                config.Paths ??= new PathsConfig();
-
-                config.Paths.Adb = RewriteResourcesSegment(config.Paths.Adb);
-                config.Paths.Scrcpy = RewriteResourcesSegment(config.Paths.Scrcpy);
-                config.Paths.FfmpegPath = RewriteResourcesSegment(config.Paths.FfmpegPath);
-            }
-            catch
-            {
-                // Migration must never break startup.
-            }
-        }
-
-        private static string RewriteResourcesSegment(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return path;
-
-            // Match both backslash and forward-slash separators.
-            // Only replace the path component, not an accidental substring inside a filename.
-            const string OldSegmentBack = @"\Resources\";
-            const string NewSegmentBack = @"\Assets\";
-            const string OldSegmentForward = "/Resources/";
-            const string NewSegmentForward = "/Assets/";
-
-            if (path.Contains(OldSegmentBack, StringComparison.OrdinalIgnoreCase))
-                return ReplaceCaseInsensitive(path, OldSegmentBack, NewSegmentBack);
-
-            if (path.Contains(OldSegmentForward, StringComparison.OrdinalIgnoreCase))
-                return ReplaceCaseInsensitive(path, OldSegmentForward, NewSegmentForward);
-
-            return path;
-        }
-
-        private static string ReplaceCaseInsensitive(string input, string oldValue, string newValue)
-        {
-            int idx = input.IndexOf(oldValue, StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) return input;
-            return input[..idx] + newValue + input[(idx + oldValue.Length)..];
         }
 
         // One-time migration of the old config.json (which only ever stored the main

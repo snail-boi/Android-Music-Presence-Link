@@ -2,6 +2,7 @@ using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -626,6 +627,28 @@ namespace AndroidMusicPresenceLink
             _lastPositionMs = interpolated;
             ProgressSlider.Value = interpolated;
             RefreshPositionLabel();
+        }
+
+        // ── Inline toast support ─────────────────────────────────────────────
+
+        public void AddToast(UIElement element)
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => AddToast(element)); return; }
+            // Center the fixed-width toast card inside the panel.
+            element.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            var wrapper = new System.Windows.Controls.Border { Margin = new Thickness(0, 8, 0, 0), Child = (FrameworkElement)element };
+            ToastOverlayPanel.Children.Insert(0, wrapper);
+        }
+
+        public void RemoveToast(UIElement element)
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => RemoveToast(element)); return; }
+            // element is the Border we wrapped it in, or the panel itself -- find the wrapper.
+            var wrapper = ToastOverlayPanel.Children
+                .OfType<System.Windows.Controls.Border>()
+                .FirstOrDefault(b => b.Child == element || b == element);
+            if (wrapper != null)
+                ToastOverlayPanel.Children.Remove(wrapper);
         }
 
         public void SetConnectionStatus(string status, string detail, Color statusColor)

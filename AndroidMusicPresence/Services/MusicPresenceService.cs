@@ -391,14 +391,7 @@ namespace AndroidMusicPresenceLink
         {
             if (!_wifiReconnectPromptShown)
             {
-                await _dispatcher.InvokeAsync(() =>
-                {
-                    MessageBox.Show(
-                        "Wireless connection failed. Please reconnect your phone via USB to re-setup wireless.",
-                        "Reconnect Device",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                });
+                (Application.Current as App)?.ShowToast("Wireless connection failed. Please reconnect your phone via USB to re-setup wireless.", ToastLevel.Warning);
                 _wifiReconnectPromptShown = true;
             }
 
@@ -418,14 +411,7 @@ namespace AndroidMusicPresenceLink
             });
             _wifiReconnectPromptShown = false;
 
-            await _dispatcher.InvokeAsync(() =>
-            {
-                MessageBox.Show(
-                    $"Wireless device has been re-setup and saved as {newWifi}.\n\nIf you want to continue using USB, disconnect and reconnect the cable now (USB may stay unavailable right after Wi-Fi setup).",
-                    "Wireless Reconnected",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            });
+            (Application.Current as App)?.ShowToast($"Wireless device has been re-setup and saved as {newWifi}.\n\nIf you want to continue using USB, disconnect and reconnect the cable now (USB may stay unavailable right after Wi-Fi setup).", ToastLevel.Warning);
         }
 
         // -------------------------------------------------------------------
@@ -481,16 +467,8 @@ namespace AndroidMusicPresenceLink
             if (!_wifiReconnectFailurePromptShown)
             {
                 _wifiReconnectFailurePromptShown = true;
-                await _dispatcher.InvokeAsync(() =>
-                {
-                    MessageBox.Show(
-                        "Wireless connection failed. Make sure Wireless Debugging is still enabled on your phone "
-                        + "(Settings, Developer options, Wireless debugging). If it is, plug in USB so the app can "
-                        + "rediscover the device.",
-                        "Reconnect Device",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                });
+                (Application.Current as App)?.ShowToast("Wireless connection failed. Make sure Wireless Debugging is still enabled on your phone\n"
+                        + "(Settings, Developer options, Wireless debugging)", ToastLevel.Warning);
             }
 
             var usbDevice = await GetUsbDeviceForRecoveryAsync().ConfigureAwait(false);

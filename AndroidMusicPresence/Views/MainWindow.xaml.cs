@@ -151,10 +151,10 @@ namespace AndroidMusicPresenceLink
         // ── ISettingsInteraction (dialogs and message boxes) ─────────────────
 
         public void ShowInfo(string message, string title)
-            => MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
+            => (Application.Current as App)?.ShowToast(message, ToastLevel.Info);
 
         public void ShowWarning(string message, string title)
-            => MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            => (Application.Current as App)?.ShowToast(message, ToastLevel.Warning);
 
         public bool ConfirmYesNo(string message, string title)
             => MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;

@@ -279,6 +279,15 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
+                    <!-- Toast overlay: floats above all player content, anchored to the top -->
+                    <StackPanel x:Name="ToastOverlayPanel"
+                            Grid.RowSpan="6"
+                            VerticalAlignment="Top"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,0"
+                            Panel.ZIndex="100"
+                            IsHitTestVisible="True" />
+
                     <Grid Grid.Row="0"
                           Margin="0,16,0,24">
                         <Viewbox x:Name="CoverViewbox"

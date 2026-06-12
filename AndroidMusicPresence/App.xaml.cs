@@ -31,6 +31,7 @@ namespace AndroidMusicPresenceLink
         private MediaPlayerWindow? _mediaPlayerWindow;
         private NextSongManager _nextSongManager = new NextSongManager();
         private HwndSource? _hotkeySource;
+        private NotificationToastManager? _toastManager;
         private const string StartupRunValueName = "AndroidMusicPresenceLink";
 
         private const int HotkeyIdVolumeUp = 1;
@@ -49,6 +50,9 @@ namespace AndroidMusicPresenceLink
         private static readonly string version = GetAppVersion();
 
         internal static string CurrentVersion => version;
+
+        internal void ShowToast(string message, ToastLevel level = ToastLevel.Info)
+            => _toastManager?.Show(message, level);
 
 
 
@@ -103,6 +107,12 @@ namespace AndroidMusicPresenceLink
             Debugger.IsEnabled = Config.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
             ApplyTheme(Config.UseDarkMode);
+
+            _toastManager = new NotificationToastManager(Dispatcher)
+            {
+                GetConfig = () => Config,
+                IsMediaPlayerOpen = () => _mediaPlayerWindow != null
+            };
 
             _settingsWindow = new MainWindow();
             if (Config.OpenInTaskbar)
@@ -528,6 +538,7 @@ namespace AndroidMusicPresenceLink
             ApplyTheme(config.UseDarkMode);
             _presenceService?.UpdateConfig(config);
             _lyricsOverlayManager?.UpdateConfig(config);
+            _toastManager?.UpdateConfig(config);
             _settingsWindow?.SyncRuntimeConfig(config);
             _trayIconManager?.SetDarkMode(config.UseDarkMode);
             UpdateTrayAudioSettings();
@@ -621,6 +632,13 @@ namespace AndroidMusicPresenceLink
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
                 _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask, () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
 
+                // Wire toast manager to the new media player window.
+                if (_toastManager != null)
+                {
+                    _toastManager.AddToMediaPlayer = el => _mediaPlayerWindow?.AddToast(el);
+                    _toastManager.RemoveFromMediaPlayer = el => _mediaPlayerWindow?.RemoveToast(el);
+                }
+
                 // Push current connection + scrcpy state into the freshly created window.
                 ApplyConnectionStateToMediaPlayer();
                 _mediaPlayerWindow.SetAudioLinkState(_isScrcpyRunning);
@@ -692,6 +710,13 @@ namespace AndroidMusicPresenceLink
             Debugger.show("[MEDIAPLAYER] Closing media player window.");
             var window = _mediaPlayerWindow;
             _mediaPlayerWindow = null;
+
+            // Detach inline toast callbacks so toasts from now on go to headless mode.
+            if (_toastManager != null)
+            {
+                _toastManager.AddToMediaPlayer = null;
+                _toastManager.RemoveFromMediaPlayer = null;
+            }
 
             window.Closing -= MediaPlayerWindow_Closing;
             var hostedContent = window.TakeSettingsContent();
@@ -940,14 +965,14 @@ namespace AndroidMusicPresenceLink
             if (string.IsNullOrWhiteSpace(device))
             {
                 _audioLinkDesired = false;
-                MessageBox.Show("No device connected!", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                (Application.Current as App)?.ShowToast("No device connected!", ToastLevel.Warning);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(Config.Paths.Scrcpy) || !File.Exists(Config.Paths.Scrcpy))
             {
                 _audioLinkDesired = false;
-                MessageBox.Show("scrcpy.exe not found!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                (Application.Current as App)?.ShowToast("scrcpy.exe not found!", ToastLevel.Error);
                 return;
             }
 
@@ -957,7 +982,7 @@ namespace AndroidMusicPresenceLink
                 if (process == null)
                 {
                     _audioLinkDesired = false;
-                    MessageBox.Show("scrcpy failed to start.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    (Application.Current as App)?.ShowToast("scrcpy failed to start.", ToastLevel.Error);
                     _isScrcpyRunning = false;
                     _trayIconManager?.SetScrcpyRunning(false);
                     UpdateTrayAudioSettings();
@@ -978,7 +1003,7 @@ namespace AndroidMusicPresenceLink
             catch (Exception ex)
             {
                 _audioLinkDesired = false;
-                MessageBox.Show($"scrcpy launch failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                (Application.Current as App)?.ShowToast($"scrcpy launch failed: {ex.Message}", ToastLevel.Error);
                 _isScrcpyRunning = false;
                 _trayIconManager?.SetScrcpyRunning(false);
                 UpdateTrayAudioSettings();
@@ -1091,10 +1116,7 @@ namespace AndroidMusicPresenceLink
             {
                 if (!Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show($"Failed to stop scrcpy: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    });
+                    (Application.Current as App)?.ShowToast($"Failed to stop scrcpy: {ex.Message}", ToastLevel.Error);
                 }
             }
             finally

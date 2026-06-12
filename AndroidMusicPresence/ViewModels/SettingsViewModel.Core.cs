@@ -122,6 +122,64 @@ namespace AndroidMusicPresenceLink
         private string _copyTrackTemplate = string.Empty;
         public string CopyTrackTemplate { get => _copyTrackTemplate; set => Set(ref _copyTrackTemplate, value); }
 
+        // ── Toast / notification settings ────────────────────────────────────
+
+        private static readonly string[] HeadlessToastPositionLabels =
+            { "Top left", "Top center", "Top right", "Bottom left", "Bottom center", "Bottom right" };
+
+        private static readonly string[] MediaPlayerToastModeLabels =
+            { "In media player", "Headless overlay", "Off" };
+
+        private bool _headlessToastEnabled;
+        public bool HeadlessToastEnabled
+        {
+            get => _headlessToastEnabled;
+            set => Set(ref _headlessToastEnabled, value);
+        }
+
+        private int _headlessToastPositionIndex;
+        public int HeadlessToastPositionIndex
+        {
+            get => _headlessToastPositionIndex;
+            set
+            {
+                if (!Set(ref _headlessToastPositionIndex, value)) return;
+                RaisePropertyChanged(nameof(HeadlessToastPositionLabel));
+            }
+        }
+        public string HeadlessToastPositionLabel
+            => HeadlessToastPositionLabels[Math.Clamp(_headlessToastPositionIndex, 0, HeadlessToastPositionLabels.Length - 1)];
+
+        private int _mediaPlayerToastModeIndex;
+        public int MediaPlayerToastModeIndex
+        {
+            get => _mediaPlayerToastModeIndex;
+            set
+            {
+                if (!Set(ref _mediaPlayerToastModeIndex, value)) return;
+                RaisePropertyChanged(nameof(MediaPlayerToastModeLabel));
+                RaisePropertyChanged(nameof(MediaPlayerToastModeOpacity));
+            }
+        }
+        public string MediaPlayerToastModeLabel
+            => MediaPlayerToastModeLabels[Math.Clamp(_mediaPlayerToastModeIndex, 0, MediaPlayerToastModeLabels.Length - 1)];
+        public double MediaPlayerToastModeOpacity
+            => _mediaPlayerToastModeIndex == (int)MediaPlayerToastMode.Off ? 0.45 : 1.0;
+
+        public RelayCommand CycleHeadlessPositionCommand
+            => _cycleHeadlessPositionCommand ??= new RelayCommand(() =>
+            {
+                HeadlessToastPositionIndex = (HeadlessToastPositionIndex + 1) % HeadlessToastPositionLabels.Length;
+            });
+        private RelayCommand? _cycleHeadlessPositionCommand;
+
+        public RelayCommand CycleMediaPlayerToastModeCommand
+            => _cycleMediaPlayerToastModeCommand ??= new RelayCommand(() =>
+            {
+                MediaPlayerToastModeIndex = (MediaPlayerToastModeIndex + 1) % MediaPlayerToastModeLabels.Length;
+            });
+        private RelayCommand? _cycleMediaPlayerToastModeCommand;
+
         private void InitCore()
         {
             SaveCommand = new RelayCommand(() => Save(true));
@@ -143,6 +201,10 @@ namespace AndroidMusicPresenceLink
             _pauseClearDelayText = _config.SmtcPauseClearDelayMinutes.ToString();
             _coverPatterns = _config.CoverArtFileNamePatterns ?? string.Empty;
             _copyTrackTemplate = _config.CopyTrackInfoTemplate ?? string.Empty;
+
+            _headlessToastEnabled = _config.HeadlessToastEnabled;
+            _headlessToastPositionIndex = (int)_config.HeadlessToastPosition;
+            _mediaPlayerToastModeIndex = (int)_config.MediaPlayerToastMode;
         }
 
         private void ApplyCoreToConfig(MusicConfig config)
@@ -181,6 +243,10 @@ namespace AndroidMusicPresenceLink
 
             config.CoverArtFileNamePatterns = CoverPatterns.Trim();
             config.CopyTrackInfoTemplate = CopyTrackTemplate.Trim();
+
+            config.HeadlessToastEnabled = HeadlessToastEnabled;
+            config.HeadlessToastPosition = (HeadlessToastPosition)Math.Clamp(HeadlessToastPositionIndex, 0, 5);
+            config.MediaPlayerToastMode = (MediaPlayerToastMode)Math.Clamp(MediaPlayerToastModeIndex, 0, 2);
         }
 
         // ── Build / Save / Dirty / Revert / Sync ─────────────────────────────
@@ -319,6 +385,9 @@ namespace AndroidMusicPresenceLink
             if (!string.Equals(left.LyricsSearchFolderOverride ?? string.Empty, right.LyricsSearchFolderOverride ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(left.CoverArtFileNamePatterns ?? string.Empty, right.CoverArtFileNamePatterns ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(left.CopyTrackInfoTemplate ?? string.Empty, right.CopyTrackInfoTemplate ?? string.Empty, StringComparison.Ordinal)) return false;
+            if (left.HeadlessToastEnabled != right.HeadlessToastEnabled) return false;
+            if (left.HeadlessToastPosition != right.HeadlessToastPosition) return false;
+            if (left.MediaPlayerToastMode != right.MediaPlayerToastMode) return false;
 
             var eligibleLeft = (left.EligibleApps ?? new List<EligibleAppConfig>())
                 .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))

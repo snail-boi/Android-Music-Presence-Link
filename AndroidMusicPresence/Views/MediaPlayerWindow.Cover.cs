@@ -318,7 +318,7 @@ namespace AndroidMusicPresenceLink
             {
                 if (string.IsNullOrWhiteSpace(_currentCoverPath) || !File.Exists(_currentCoverPath))
                 {
-                    MessageBox.Show(this, "No cover image is available to save right now.", "Save Cover", MessageBoxButton.OK, MessageBoxImage.Information);
+                    (Application.Current as App)?.ShowToast("No cover image is available to save right now.", ToastLevel.Warning);
                     return;
                 }
 
@@ -340,7 +340,7 @@ namespace AndroidMusicPresenceLink
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Failed to save cover image: " + ex.Message, "Save Cover", MessageBoxButton.OK, MessageBoxImage.Error);
+                (Application.Current as App)?.ShowToast("Failed to save cover image: " + ex.Message, ToastLevel.Warning);
             }
         }
         private void CopyCoverInfoMenuItem_Click(object sender, RoutedEventArgs e)
