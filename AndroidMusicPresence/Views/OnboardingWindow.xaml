@@ -336,7 +336,7 @@
                     <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVis}, ConverterParameter=0}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <TextBlock Text="👋 Hi there!"
+                                <TextBlock Text="Hi there!"
                                            FontSize="32"
                                            FontWeight="Bold"
                                            Margin="0,4,0,12" />
@@ -359,9 +359,8 @@
                                             <ColumnDefinition Width="28" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="📱" FontSize="16" VerticalAlignment="Top" />
                                         <TextBlock Grid.Column="1" Style="{StaticResource InstructionText}">
-                         <Run FontWeight="SemiBold">Pair your phone wirelessly</Run> using Android's Wireless Debugging, with USB only needed for the first pairing step.
+                         <Run FontWeight="SemiBold">Pair your phone wirelessly</Run> using Android's Wireless Debugging, or use a USB cable.
                                         </TextBlock>
                                     </Grid>
                                     <Grid Margin="0,4">
@@ -369,9 +368,8 @@
                                             <ColumnDefinition Width="28" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="🎵" FontSize="16" VerticalAlignment="Top" />
                                         <TextBlock Grid.Column="1" Style="{StaticResource InstructionText}">
-											<Run FontWeight="SemiBold">Point us at your music</Run> so we can find cover art and lyrics for your tracks.
+											<Run FontWeight="SemiBold">Point it at your music</Run> so we can find cover art and lyrics for your tracks.
                                         </TextBlock>
                                     </Grid>
                                     <Grid Margin="0,4">
@@ -379,9 +377,8 @@
                                             <ColumnDefinition Width="28" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="🎧" FontSize="16" VerticalAlignment="Top" />
                                         <TextBlock Grid.Column="1" Style="{StaticResource InstructionText}">
-											<Run FontWeight="SemiBold">Choose which apps</Run> on your phone are allowed to share what they are playing.
+											<Run FontWeight="SemiBold">Choose which apps</Run> on your phone are allowed to share what they are playing and whether they may share with windows.
                                         </TextBlock>
                                     </Grid>
                                     <Grid Margin="0,4">
@@ -389,9 +386,8 @@
                                             <ColumnDefinition Width="28" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="⌨️" FontSize="16" VerticalAlignment="Top" />
                                         <TextBlock Grid.Column="1" Style="{StaticResource InstructionText}">
-											<Run FontWeight="SemiBold">Pick your hotkeys</Run> for volume, lyrics overlay and copying track info.
+											<Run FontWeight="SemiBold">Pick your hotkeys</Run> for volume, audiolink, lyrics overlay and copying track info and more.
                                         </TextBlock>
                                     </Grid>
                                     <Grid Margin="0,4">
@@ -399,7 +395,6 @@
                                             <ColumnDefinition Width="28" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="🚀" FontSize="16" VerticalAlignment="Top" />
                                         <TextBlock Grid.Column="1" Style="{StaticResource InstructionText}">
 											<Run FontWeight="SemiBold">Decide how it starts</Run>, whether to launch with Windows or stay in the tray.
                                         </TextBlock>
@@ -411,10 +406,9 @@
                                         Padding="14,12"
                                         Margin="0,18,0,0">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="💡" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0" />
                                         <TextBlock Style="{StaticResource InstructionText}"
                                                    FontSize="13">
-											Takes about 3 to 5 minutes. Don't worry if you get stuck on something, you can skip any step and come back to it later.
+											Takes about 3 to 5 minutes, you can skip any step and come back to it later.
                                         </TextBlock>
                                     </StackPanel>
                                 </Border>
@@ -476,7 +470,7 @@
                                         <TextBlock Style="{StaticResource InstructionText}"
                                                    Margin="0,4,0,0">
                          Go back to the main Settings screen and open <Run FontWeight="SemiBold">System &#8250; Developer options</Run>.
-                            Scroll down until you see <Run FontWeight="SemiBold">Wireless debugging</Run> and switch it on. Confirm any warning that pops up.
+                            Scroll down until you see <Run FontWeight="SemiBold">Wireless debugging and USB debugging</Run> and switch it on. Confirm any warning that pops up.
                                         </TextBlock>
                                     </StackPanel>
                                 </Grid>
@@ -496,8 +490,7 @@
                                                    FontSize="14" />
                                         <TextBlock Style="{StaticResource InstructionText}"
                                                    Margin="0,4,0,0">
-											Use a real USB data cable, not a charge-only one. If your phone asks
-											<Run FontWeight="SemiBold">"Use USB for..."</Run>, choose <Run FontWeight="SemiBold">File transfer</Run> or <Run FontWeight="SemiBold">MTP</Run>.
+											either plug in a cable for USB only or scan the QR code in Wireless Debugging
                                         </TextBlock>
                                     </StackPanel>
                                 </Grid>
@@ -530,10 +523,9 @@
                                         Padding="14,12"
                                         Margin="0,16,0,0">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="✅" FontSize="18" VerticalAlignment="Top" Margin="0,0,10,0" />
                                         <TextBlock Style="{StaticResource InstructionText}"
                                                    FontSize="13">
-											Once you've done that, your phone is ready. Click <Run FontWeight="SemiBold">Next</Run> and we'll detect it automatically on the following step.
+											Once you've done that, we can move onto the next step
                                         </TextBlock>
                                     </StackPanel>
                                 </Border>
@@ -560,8 +552,9 @@
                         <TextBlock Grid.Row="0" Style="{StaticResource InstructionText}"
                                    Margin="0,0,0,16"
                                    FontSize="14">
-                  Click the button below and we'll find your phone, or pair wireless debugging if that's the mode you choose. You can also fill these fields in by hand if you know what you're doing.
+                  Either click the pair phone button and use the QR code or pairing code to pair, or click through to USB only and just plug in a cable (Wireless debugging can also use cable), it's highly suggested you stick with wireless dubugging or USB only mode as TCP may be unsafe
                         </TextBlock>
+                        
 
                         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
                             <Button Content="{Binding AutoOrPairButtonText}"
@@ -633,7 +626,7 @@
                         <TextBlock Grid.Row="0" Style="{StaticResource InstructionText}"
                                    Margin="0,0,0,12"
                                    FontSize="14">
-							Tell us where your music lives on the phone so we can fetch cover art and lyrics. If you don't keep music on your device, you can skip this entirely.
+							Tell it where your music lives on the phone so we can fetch cover art and lyrics.
                         </TextBlock>
 
                         <TextBlock Grid.Row="1"
@@ -715,9 +708,9 @@
                         <TextBlock Grid.Row="0" Style="{StaticResource InstructionText}"
                                    Margin="0,0,0,12"
                                    FontSize="14">
-                 Pick which Android apps are allowed to share what they're playing. Use the
+                 Pick which Android apps are allowed to share what they're playing and whether they are shared to windows. Use the
                     <Run FontWeight="SemiBold">Presence</Run> button to cycle Full / Half / Off, and the
-                    <Run FontWeight="SemiBold">Cover</Run> button to toggle cover art lookup.
+                    <Run FontWeight="SemiBold">Cover</Run> button to toggle cover art lookup. (half means only this app knows what's playing, any other app which might need it wont see it)
                         </TextBlock>
 
                         <Grid Grid.Row="1" Margin="0,0,0,8">
