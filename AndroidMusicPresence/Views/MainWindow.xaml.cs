@@ -75,6 +75,12 @@ namespace AndroidMusicPresenceLink
 
         internal void AllowClose() => _allowClose = true;
 
+        internal bool HasUnsavedChanges() => _vm.HasUnsavedChanges();
+
+        internal void Save(bool showConfirmation) => _vm.Save(showConfirmation);
+
+        internal void RevertUnsavedChanges() => _vm.RevertUnsavedChanges();
+
         // ── Window lifecycle ─────────────────────────────────────────────────
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -139,6 +145,7 @@ namespace AndroidMusicPresenceLink
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             UpdateScrollIndicator();
+            InitExpanderVisibility(this);
         }
 
         // ── ISettingsInteraction (dialogs and message boxes) ─────────────────
@@ -274,6 +281,30 @@ namespace AndroidMusicPresenceLink
             return vk & 0xFF;
         }
 
+        // ── Expander visibility init (no template trigger) ───────────────────
+
+        private static void InitExpanderVisibility(System.Windows.DependencyObject root)
+        {
+            foreach (var expander in FindVisualChildren<Expander>(root))
+            {
+                var contentSite = expander.Template?.FindName("ContentSite", expander) as FrameworkElement;
+                if (contentSite != null)
+                    contentSite.Visibility = expander.IsExpanded ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private static System.Collections.Generic.IEnumerable<T> FindVisualChildren<T>(System.Windows.DependencyObject parent)
+            where T : System.Windows.DependencyObject
+        {
+            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T t) yield return t;
+                foreach (var desc in FindVisualChildren<T>(child)) yield return desc;
+            }
+        }
+
         // ── Scroll indicator (visual) ─────────────────────────────────────────
 
         private void MainScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -305,6 +336,16 @@ namespace AndroidMusicPresenceLink
             if (expander.Content is not FrameworkElement content)
                 return;
 
+            // We own ContentSite visibility (trigger removed from template).
+            var contentSite = expander.Template?.FindName("ContentSite", expander) as FrameworkElement;
+            if (contentSite != null)
+                contentSite.Visibility = Visibility.Visible;
+
+            // Cancel any in-progress collapse animation so we start clean.
+            content.BeginAnimation(OpacityProperty, null);
+            if (content.RenderTransform is ScaleTransform st)
+                st.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+
             content.RenderTransformOrigin = new Point(0.5, 0);
             if (content.RenderTransform is not ScaleTransform scaleTransform)
             {
@@ -320,6 +361,52 @@ namespace AndroidMusicPresenceLink
 
             var scaleAnimation = new DoubleAnimation(0.9, 1, duration) { EasingFunction = easing };
             var opacityAnimation = new DoubleAnimation(0, 1, duration) { EasingFunction = easing };
+
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation);
+            content.BeginAnimation(OpacityProperty, opacityAnimation);
+        }
+
+        private void Expander_Collapsed(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Expander expander)
+                return;
+
+            if (expander.Content is not FrameworkElement content)
+                return;
+
+            // We own ContentSite visibility (trigger removed from template), so it
+            // is still Visible here. No need to force it.
+            var contentSite = expander.Template?.FindName("ContentSite", expander) as FrameworkElement;
+
+            content.RenderTransformOrigin = new Point(0.5, 0);
+            if (content.RenderTransform is not ScaleTransform scaleTransform)
+            {
+                scaleTransform = new ScaleTransform(1, 1);
+                content.RenderTransform = scaleTransform;
+            }
+
+            var duration = TimeSpan.FromMilliseconds(160);
+            var easing = new CubicEase { EasingMode = EasingMode.EaseIn };
+
+            var scaleAnimation = new DoubleAnimation(1, 0.9, duration) { EasingFunction = easing };
+            var opacityAnimation = new DoubleAnimation(1, 0, duration) { EasingFunction = easing };
+
+            opacityAnimation.Completed += (_, _) =>
+            {
+                // If the user re-expanded before we finished, Expander_Expanded already
+                // cancelled our animations and took over. Do nothing.
+                if (expander.IsExpanded)
+                    return;
+
+                if (contentSite != null)
+                    contentSite.Visibility = Visibility.Collapsed;
+
+                // Release holds and restore base values so the next expand starts clean.
+                content.BeginAnimation(OpacityProperty, null);
+                scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                content.Opacity = 1;
+                scaleTransform.ScaleY = 1;
+            };
 
             scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation);
             content.BeginAnimation(OpacityProperty, opacityAnimation);

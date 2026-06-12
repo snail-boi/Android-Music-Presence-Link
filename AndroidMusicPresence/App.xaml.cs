@@ -516,6 +516,11 @@ namespace AndroidMusicPresenceLink
 
         internal void UpdateConfig(MusicConfig config)
         {
+            bool audioChanged = !string.Equals(Config.ScrcpyAudioCodec, config.ScrcpyAudioCodec, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(Config.ScrcpyAudioBitrate ?? string.Empty, config.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)
+                || Config.ScrcpyAudioBuffer != config.ScrcpyAudioBuffer
+                || Config.ScrcpyFlacCompressionLevel != config.ScrcpyFlacCompressionLevel;
+
             Config = config;
             ApplyStartupRegistration(config.StartWithWindows);
             Debugger.IsEnabled = Config.DebugMode;
@@ -537,6 +542,11 @@ namespace AndroidMusicPresenceLink
                 InitializeHotkeys();
             }
             catch { }
+
+            // Restart the audio link if it is running and the codec/bitrate/buffer changed,
+            // so the new settings take effect immediately without needing a manual restart.
+            if (audioChanged && _scrcpyProcess != null && !_scrcpyProcess.HasExited)
+                _ = RestartScrcpyForPresetAsync();
         }
 
         private void OnLyricsPlaybackChanged(string? artist, string? title, string? album, bool isPlaying, long positionMs)
@@ -714,6 +724,28 @@ namespace AndroidMusicPresenceLink
 
             if (_isExiting)
                 return;
+
+            // Check for unsaved changes in the hosted settings content before letting
+            // the media player window close. This mirrors the prompt in MainWindow_Closing.
+            if (_settingsWindow != null && _settingsWindow.HasUnsavedChanges())
+            {
+                var result = System.Windows.MessageBox.Show(
+                    "there are unsaved changes, do you wish to save them?",
+                    "Unsaved changes",
+                    System.Windows.MessageBoxButton.YesNoCancel,
+                    System.Windows.MessageBoxImage.Warning);
+
+                if (result == System.Windows.MessageBoxResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (result == System.Windows.MessageBoxResult.Yes)
+                    _settingsWindow.Save(false);
+                else
+                    _settingsWindow.RevertUnsavedChanges();
+            }
 
             var window = sender as MediaPlayerWindow;
             if (window != null)

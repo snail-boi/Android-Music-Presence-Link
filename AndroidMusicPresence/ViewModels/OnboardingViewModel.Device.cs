@@ -76,6 +76,7 @@ namespace AndroidMusicPresenceLink
                 RaisePropertyChanged(nameof(AutoOrPairButtonText));
                 RaisePropertyChanged(nameof(WifiAddressLabel));
                 RaisePropertyChanged(nameof(WifiAddressHelp));
+                RaisePropertyChanged(nameof(WifiAddressVisible));
 
                 // Show the value relevant to the new mode, as the old code did on toggle.
                 WifiAddress = value == WirelessMode.WirelessDebugging
@@ -84,13 +85,22 @@ namespace AndroidMusicPresenceLink
             }
         }
 
-        public string WifiModeButtonText => WifiMode == WirelessMode.WirelessDebugging
-            ? "Wi-Fi mode: Wireless Debugging"
-            : "Wi-Fi mode: adb tcpip";
+        // True only for TcpIp mode: hides the field in WirelessDebugging and UsbOnly.
+        public bool WifiAddressVisible => WifiMode == WirelessMode.TcpIp;
 
-        public string AutoOrPairButtonText => WifiMode == WirelessMode.WirelessDebugging
-            ? "Pair phone"
-            : "Auto Detect USB";
+        public string WifiModeButtonText => WifiMode switch
+        {
+            WirelessMode.WirelessDebugging => "Wi-Fi mode: Wireless Debugging",
+            WirelessMode.UsbOnly => "Wi-Fi mode: USB only",
+            _ => "Wi-Fi mode: adb tcpip"
+        };
+
+        public string AutoOrPairButtonText => WifiMode switch
+        {
+            WirelessMode.WirelessDebugging => "Pair phone",
+            WirelessMode.UsbOnly => "Auto Detect USB",
+            _ => "Auto Detect USB"
+        };
 
         public string WifiAddressLabel => WifiMode == WirelessMode.WirelessDebugging
             ? "mDNS"
@@ -130,9 +140,12 @@ namespace AndroidMusicPresenceLink
 
         private void ToggleWifiMode()
         {
-            WifiMode = WifiMode == WirelessMode.WirelessDebugging
-                ? WirelessMode.TcpIp
-                : WirelessMode.WirelessDebugging;
+            WifiMode = WifiMode switch
+            {
+                WirelessMode.TcpIp => WirelessMode.WirelessDebugging,
+                WirelessMode.WirelessDebugging => WirelessMode.UsbOnly,
+                _ => WirelessMode.TcpIp
+            };
         }
 
         private async Task AutoGatherOrPairAsync()
@@ -201,14 +214,10 @@ namespace AndroidMusicPresenceLink
 
         private async Task AutoGatherDeviceInfoAsync()
         {
-            try
-            {
-                await AdbHelper.RunAdbAsync("disconnect");
-            }
-            catch
-            {
-                // Ignore disconnect failures and continue with USB detection.
-            }
+            // Do NOT call `adb disconnect` here. Doing so removes the USB device from the
+            // ADB device list, which breaks folder detection on the next onboarding step
+            // because the working config hasn't been saved yet and DeviceQuery still needs
+            // a live USB connection to find the device.
 
             var usbSerial = await DeviceQuery.GetConnectedUsbDeviceAsync();
             if (string.IsNullOrWhiteSpace(usbSerial))
@@ -218,8 +227,7 @@ namespace AndroidMusicPresenceLink
             }
 
             UsbSerial = usbSerial;
-            var port = 0;
-            var ip = "none";
+            _workingConfig.SelectedDeviceUSB = usbSerial;
 
             // In Wireless Debugging mode the Wi-Fi address comes from the pair flow
             // (ip:random_port discovered via mDNS), not from service.adb.tcp.port.
@@ -230,22 +238,22 @@ namespace AndroidMusicPresenceLink
                     + "Use the 'Pair phone' button to set up wireless.",
                     "Wireless Debugging Mode");
             }
-            else if (!Interaction!.ConfirmYesNo("do you want to enable WiFi", "May be incompatible with certain networks"))
+            else if (_workingConfig.WifiMode == WirelessMode.UsbOnly)
             {
+                // USB-only mode: skip all Wi-Fi setup.
                 _workingConfig.IsWifiEnabled = false;
             }
             else
             {
+                // TcpIp mode: wifi is always the point, enable it automatically.
                 _workingConfig.IsWifiEnabled = true;
-                port = await DeviceQuery.GetWifiPortAsync(usbSerial);
-                ip = await DeviceQuery.GetDeviceWifiIpAsync(usbSerial);
-            }
+                var port = await DeviceQuery.GetWifiPortAsync(usbSerial);
+                var ip = await DeviceQuery.GetDeviceWifiIpAsync(usbSerial);
 
-            if (_workingConfig.WifiMode != WirelessMode.WirelessDebugging)
-            {
                 if (!string.IsNullOrWhiteSpace(ip))
                 {
-                    WifiAddress = _workingConfig.IsWifiEnabled ? $"{ip}:{port}" : string.Empty;
+                    WifiAddress = $"{ip}:{port}";
+                    _workingConfig.SelectedDeviceWiFi = WifiAddress;
                 }
                 else
                 {
@@ -257,6 +265,7 @@ namespace AndroidMusicPresenceLink
             if (!string.IsNullOrWhiteSpace(name))
             {
                 DeviceName = name.Trim();
+                _workingConfig.SelectedDeviceName = DeviceName;
             }
         }
 

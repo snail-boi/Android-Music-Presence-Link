@@ -97,6 +97,11 @@ namespace AndroidMusicPresenceLink
                 RaisePropertyChanged(nameof(NextText));
 
                 RebuildSidebar();
+
+                // Auto-refresh the apps list once when the user scrolls to step 4,
+                // in case the device was connected after the initial load ran (or failed).
+                if (value == 4 && AppPackages.Count == 0)
+                    _ = LoadInstalledAppsAsync();
             }
         }
 

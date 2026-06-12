@@ -52,7 +52,13 @@ namespace AndroidMusicPresenceLink
         // Android 11+ Wireless Debugging. One-time TLS pairing over USB-free network.
         // Survives reboots (pairing persists), but the connection port is randomly
         // assigned each time wireless debugging toggles on, so we need mDNS to find it.
-        WirelessDebugging = 1
+        WirelessDebugging = 1,
+
+        // USB cable only. All Wi-Fi reconnect logic is skipped; the app only talks to
+        // the phone over a physical USB connection. Useful when Wireless Debugging
+        // cannot be disabled on the phone side (WD mode keeps Wi-Fi on even when the
+        // cable is the preferred link).
+        UsbOnly = 2
     }
 
     public enum PresenceMode

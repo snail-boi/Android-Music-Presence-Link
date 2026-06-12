@@ -592,7 +592,8 @@
                             <TextBox Grid.Column="1" Text="{Binding UsbSerial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
 
-                        <Grid Grid.Row="3" Margin="0,0,0,12">
+                        <Grid Grid.Row="3" Margin="0,0,0,12"
+                              Visibility="{Binding WifiAddressVisible, Converter={StaticResource BoolToVis}}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="*" />

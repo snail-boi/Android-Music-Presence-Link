@@ -118,6 +118,10 @@ namespace AndroidMusicPresenceLink
                 return config.SelectedDeviceUSB;
             }
 
+            // USB-only mode: never attempt a wireless connection.
+            if (config.WifiMode == WirelessMode.UsbOnly)
+                return string.Empty;
+
             if (config.WifiMode == WirelessMode.WirelessDebugging && !string.IsNullOrWhiteSpace(config.WifiMdnsServiceName))
             {
                 var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(config.WifiMdnsServiceName).ConfigureAwait(false);

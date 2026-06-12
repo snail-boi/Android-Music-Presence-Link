@@ -217,6 +217,13 @@ namespace AndroidMusicPresenceLink
                     _currentDevice = connectedUsb;
                     _currentDeviceIsUsb = true;
 
+                    // In USB-only mode skip all wifi recovery; the cable is the only link.
+                    if (_config.WifiMode == WirelessMode.UsbOnly)
+                    {
+                        _wifiNeedsUsbReconnect = false;
+                        return;
+                    }
+
                     bool wifiConfigured = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None";
                     bool wifiConnected = wifiConfigured && IsWifiCurrentlyConnected(deviceList);
 
@@ -257,7 +264,8 @@ namespace AndroidMusicPresenceLink
                     return;
                 }
 
-                if (!string.IsNullOrEmpty(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None")
+                if (_config.WifiMode != WirelessMode.UsbOnly
+                    && !string.IsNullOrEmpty(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None")
                 {
                     bool wifiConnected = IsWifiCurrentlyConnected(deviceList);
                     if (!wifiConnected)

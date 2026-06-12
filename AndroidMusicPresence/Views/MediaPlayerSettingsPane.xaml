@@ -210,9 +210,6 @@
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsExpanded" Value="True">
-                                <Setter TargetName="ContentSite" Property="Visibility" Value="Visible" />
-                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -221,405 +218,54 @@
 
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="12,12,12,12">
+    <Grid>
+        <ScrollViewer x:Name="PaneScrollViewer"
+                  VerticalScrollBarVisibility="Hidden"
+                  HorizontalScrollBarVisibility="Disabled"
+                  ScrollChanged="PaneScrollViewer_ScrollChanged">
+            <StackPanel Margin="12,12,12,12">
 
-            <!-- ── PILL BUTTONS ──────────────────────────────────────────────── -->
-            <Expander Header="Pill buttons" IsExpanded="True" Margin="0,0,0,8" Expanded="Expander_Expanded">
-                <StackPanel>
+                <!-- ── PILL BUTTONS ──────────────────────────────────────────────── -->
+                <Expander Header="Pill buttons" IsExpanded="True" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <StackPanel>
 
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Connection" Style="{StaticResource RowLabel}" />
-                        <Button Grid.Column="1"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Content="{Binding ConnectionPillLabel}"
-                                Opacity="{Binding ConnectionPillOpacity}"
-                                Command="{Binding CycleConnectionPillCommand}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Audio link" Style="{StaticResource RowLabel}" />
-                        <Button Grid.Column="1"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Content="{Binding AudioLinkPillLabel}"
-                                Opacity="{Binding AudioLinkPillOpacity}"
-                                Command="{Binding CycleAudioLinkPillCommand}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Quality" Style="{StaticResource RowLabel}" />
-                        <Button Grid.Column="1"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Content="{Binding QualityPillLabel}"
-                                Opacity="{Binding QualityPillOpacity}"
-                                Command="{Binding CycleQualityPillCommand}" />
-                    </Grid>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Always on top" Style="{StaticResource RowLabel}" />
-                        <Button Grid.Column="1"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Content="{Binding AlwaysOnTopPillLabel}"
-                                Opacity="{Binding AlwaysOnTopPillOpacity}"
-                                Command="{Binding CycleAlwaysOnTopPillCommand}" />
-                    </Grid>
-
-                </StackPanel>
-            </Expander>
-
-            <!-- ── TRACK INFO ─────────────────────────────────────────────────── -->
-            <Expander Header="Track info" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded">
-                <StackPanel>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Title" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowTitle, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Artist" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowArtist, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Album" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowAlbum, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Swap artist and album" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerSwapArtistAlbum, Mode=TwoWay}" />
-                    </Grid>
-
-                </StackPanel>
-            </Expander>
-
-            <!-- ── COVER ──────────────────────────────────────────────────────── -->
-            <Expander Header="Cover" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded">
-                <StackPanel>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Show cover" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowCover, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Rounded corners" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerCoverRoundedCorners, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Cover shadow" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerCoverShadow, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Text shadow" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerTextShadow, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Gradient detail" Style="{StaticResource RowLabel}" VerticalAlignment="Center" />
-                        <Border Grid.Column="1"
-                                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="5"
-                                ClipToBounds="True">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="8" CommandParameter="8"
-                                        Command="{Binding SelectGradientCommand}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding GradientSamplePoints}" Value="8">
-                                                    <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-                                                    <Setter Property="Foreground" Value="White" />
-                                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                                <Border Width="1" Background="{DynamicResource ThemeControlBorderBrush}" />
-                                <Button Content="6" CommandParameter="6"
-                                        Command="{Binding SelectGradientCommand}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding GradientSamplePoints}" Value="6">
-                                                    <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-                                                    <Setter Property="Foreground" Value="White" />
-                                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                                <Border Width="1" Background="{DynamicResource ThemeControlBorderBrush}" />
-                                <Button Content="4" CommandParameter="4"
-                                        Command="{Binding SelectGradientCommand}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding GradientSamplePoints}" Value="4">
-                                                    <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-                                                    <Setter Property="Foreground" Value="White" />
-                                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                                <Border Width="1" Background="{DynamicResource ThemeControlBorderBrush}" />
-                                <Button Content="2" CommandParameter="2"
-                                        Command="{Binding SelectGradientCommand}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding GradientSamplePoints}" Value="2">
-                                                    <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-                                                    <Setter Property="Foreground" Value="White" />
-                                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                </StackPanel>
-            </Expander>
-
-            <!-- ── CONTROLS ───────────────────────────────────────────────────── -->
-            <Expander Header="Controls" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded">
-                <StackPanel>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Volume button" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowVolumeButton, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Lyrics button" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowLyricsButton, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Battery indicator" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowBattery, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Help button" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowHelpButton, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Fullscreen button" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowFullscreenButton, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Seek buttons" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowSeekButtons, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Seek button visibility" Style="{StaticResource RowLabel}" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBox Width="70"
-                                     TextAlignment="Center"
-                                     Style="{StaticResource InputTextBoxStyle}"
-                                     Text="{Binding SeekThresholdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button Margin="4,0,0,0"
-                                    MinWidth="45"
-                                    Padding="6,0"
-                                    Style="{StaticResource CycleButtonStyle}"
-                                    Content="{Binding SeekUnitLabel}"
-                                    Command="{Binding ToggleSeekUnitCommand}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Time format (click to toggle)" Style="{StaticResource RowLabel}" />
-                        <Button Grid.Column="1"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Content="{Binding TimeFormatLabel}"
-                                Command="{Binding ToggleTimeFormatCommand}" />
-                    </Grid>
-
-                </StackPanel>
-            </Expander>
-
-            <!-- ── LAYOUT ─────────────────────────────────────────────────────── -->
-            <Expander Header="Layout" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded">
-                <StackPanel>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Switch settings location" Style="{StaticResource RowLabel}" />
-                        <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding SwapSettingsLocation, Mode=TwoWay}" />
-                    </Grid>
-
-                </StackPanel>
-            </Expander>
-
-            <!-- ── NEXT / PREVIOUS SONG ──────────────────────────────────────── -->
-            <Expander Header="Next / previous song" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded">
-                <StackPanel>
-
-                    <TextBlock Text="Based on a local library scan. May not always be 100% accurate. Order within the same date may differ slightly from your player."
-                               FontSize="11"
-                               Opacity="0.55"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,10" />
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Mode" Style="{StaticResource RowLabel}" />
-                        <Button Grid.Column="1"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Content="{Binding NextSongModeLabel}"
-                                Opacity="{Binding NextSongModeOpacity}"
-                                Command="{Binding CycleNextSongModeCommand}" />
-                    </Grid>
-
-                    <!-- Sort and rescan: only visible when mode is not Off -->
-                    <StackPanel Visibility="{Binding NextSongOptionsVisible, Converter={StaticResource BoolToVis}}">
-
-                        <Grid Margin="0,0,0,8">
+                        <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Sort order" Style="{StaticResource RowLabel}" />
+                            <TextBlock Grid.Column="0" Text="Connection" Style="{StaticResource RowLabel}" />
                             <Button Grid.Column="1"
-                                    Style="{StaticResource CycleButtonStyle}"
-                                    Content="{Binding NextSongSortLabel}"
-                                    Command="{Binding CycleNextSongSortCommand}" />
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding ConnectionPillLabel}"
+                                Opacity="{Binding ConnectionPillOpacity}"
+                                Command="{Binding CycleConnectionPillCommand}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Audio link" Style="{StaticResource RowLabel}" />
+                            <Button Grid.Column="1"
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding AudioLinkPillLabel}"
+                                Opacity="{Binding AudioLinkPillOpacity}"
+                                Command="{Binding CycleAudioLinkPillCommand}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Quality" Style="{StaticResource RowLabel}" />
+                            <Button Grid.Column="1"
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding QualityPillLabel}"
+                                Opacity="{Binding QualityPillOpacity}"
+                                Command="{Binding CycleQualityPillCommand}" />
                         </Grid>
 
                         <Grid>
@@ -627,31 +273,408 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Library list" Style="{StaticResource RowLabel}" />
-                                <TextBlock Text="{Binding NextSongListStatus}"
+                            <TextBlock Grid.Column="0" Text="Always on top" Style="{StaticResource RowLabel}" />
+                            <Button Grid.Column="1"
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding AlwaysOnTopPillLabel}"
+                                Opacity="{Binding AlwaysOnTopPillOpacity}"
+                                Command="{Binding CycleAlwaysOnTopPillCommand}" />
+                        </Grid>
+
+                    </StackPanel>
+                </Expander>
+
+                <!-- ── TRACK INFO ─────────────────────────────────────────────────── -->
+                <Expander Header="Track info" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <StackPanel>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Title" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowTitle, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Artist" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowArtist, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Album" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowAlbum, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Swap artist and album" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerSwapArtistAlbum, Mode=TwoWay}" />
+                        </Grid>
+
+                    </StackPanel>
+                </Expander>
+
+                <!-- ── COVER ──────────────────────────────────────────────────────── -->
+                <Expander Header="Cover" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <StackPanel>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Show cover" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowCover, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Rounded corners" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerCoverRoundedCorners, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Cover shadow" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerCoverShadow, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Text shadow" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerTextShadow, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Gradient detail" Style="{StaticResource RowLabel}" VerticalAlignment="Center" />
+                            <Border Grid.Column="1"
+                                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="5"
+                                ClipToBounds="True">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="8" CommandParameter="8"
+                                        Command="{Binding SelectGradientCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding GradientSamplePoints}" Value="8">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+                                                        <Setter Property="Foreground" Value="White" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <Border Width="1" Background="{DynamicResource ThemeControlBorderBrush}" />
+                                    <Button Content="6" CommandParameter="6"
+                                        Command="{Binding SelectGradientCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding GradientSamplePoints}" Value="6">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+                                                        <Setter Property="Foreground" Value="White" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <Border Width="1" Background="{DynamicResource ThemeControlBorderBrush}" />
+                                    <Button Content="4" CommandParameter="4"
+                                        Command="{Binding SelectGradientCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding GradientSamplePoints}" Value="4">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+                                                        <Setter Property="Foreground" Value="White" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <Border Width="1" Background="{DynamicResource ThemeControlBorderBrush}" />
+                                    <Button Content="2" CommandParameter="2"
+                                        Command="{Binding SelectGradientCommand}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource StepButtonStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding GradientSamplePoints}" Value="2">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+                                                        <Setter Property="Foreground" Value="White" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                    </StackPanel>
+                </Expander>
+
+                <!-- ── CONTROLS ───────────────────────────────────────────────────── -->
+                <Expander Header="Controls" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <StackPanel>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Volume button" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowVolumeButton, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Lyrics button" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowLyricsButton, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Battery indicator" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowBattery, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Help button" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowHelpButton, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Fullscreen button" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowFullscreenButton, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Seek buttons" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowSeekButtons, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Seek button visibility" Style="{StaticResource RowLabel}"
+                                   TextWrapping="Wrap" Margin="0,0,8,0" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBox Width="70"
+                                     TextAlignment="Center"
+                                     Style="{StaticResource InputTextBoxStyle}"
+                                     Text="{Binding SeekThresholdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Margin="4,0,0,0"
+                                    MinWidth="45"
+                                    Padding="6,0"
+                                    Style="{StaticResource CycleButtonStyle}"
+                                    Content="{Binding SeekUnitLabel}"
+                                    Command="{Binding ToggleSeekUnitCommand}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Time format (click to toggle)" Style="{StaticResource RowLabel}" />
+                            <Button Grid.Column="1"
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding TimeFormatLabel}"
+                                Command="{Binding ToggleTimeFormatCommand}" />
+                        </Grid>
+
+                    </StackPanel>
+                </Expander>
+
+                <!-- ── LAYOUT ─────────────────────────────────────────────────────── -->
+                <Expander Header="Layout" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Switch settings location" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding SwapSettingsLocation, Mode=TwoWay}" />
+                        </Grid>
+
+                    </StackPanel>
+                </Expander>
+
+                <!-- ── NEXT / PREVIOUS SONG ──────────────────────────────────────── -->
+                <Expander Header="Next / previous song" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <StackPanel>
+
+                        <TextBlock Text="Based on a local library scan. May not always be 100% accurate. Order within the same date may differ slightly from your player."
+                               FontSize="11"
+                               Opacity="0.55"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10" />
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Mode" Style="{StaticResource RowLabel}" />
+                            <Button Grid.Column="1"
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding NextSongModeLabel}"
+                                Opacity="{Binding NextSongModeOpacity}"
+                                Command="{Binding CycleNextSongModeCommand}" />
+                        </Grid>
+
+                        <!-- Sort and rescan: only visible when mode is not Off -->
+                        <StackPanel Visibility="{Binding NextSongOptionsVisible, Converter={StaticResource BoolToVis}}">
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Sort order" Style="{StaticResource RowLabel}" />
+                                <Button Grid.Column="1"
+                                    Style="{StaticResource CycleButtonStyle}"
+                                    Content="{Binding NextSongSortLabel}"
+                                    Command="{Binding CycleNextSongSortCommand}" />
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Library list" Style="{StaticResource RowLabel}" />
+                                    <TextBlock Text="{Binding NextSongListStatus}"
                                            FontSize="11"
                                            Opacity="0.55"
                                            Margin="0,2,0,0" />
-                                <TextBlock Text="Scanning can be slow on large libraries."
+                                    <TextBlock Text="Scanning can be slow on large libraries."
                                            FontSize="11"
                                            Opacity="0.45"
                                            TextWrapping="Wrap"
                                            MaxWidth="200"
                                            Margin="0,2,0,0" />
-                            </StackPanel>
-                            <Button Grid.Column="1"
+                                </StackPanel>
+                                <Button Grid.Column="1"
                                     Style="{StaticResource CycleButtonStyle}"
                                     Content="{Binding RescanButtonText}"
                                     IsEnabled="{Binding RescanEnabled}"
                                     Command="{Binding RescanLibraryCommand}" />
-                        </Grid>
+                            </Grid>
+
+                        </StackPanel>
 
                     </StackPanel>
+                </Expander>
 
-                </StackPanel>
-            </Expander>
+            </StackPanel>
+        </ScrollViewer>
 
-        </StackPanel>
-    </ScrollViewer>
+        <!-- Scroll-more indicator: a chevron that fades out when scrolled to the bottom -->
+        <Border x:Name="PaneScrollIndicator"
+            VerticalAlignment="Bottom"
+            HorizontalAlignment="Stretch"
+            Height="48"
+            IsHitTestVisible="False"
+            Opacity="1"
+            Background="Transparent">
+            <Path x:Name="PaneScrollIndicatorChevron"
+              Data="M 0,0 L 10,8 L 20,0"
+              Stroke="{DynamicResource ThemeForegroundBrush}"
+              StrokeThickness="2"
+              StrokeLineJoin="Round"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Bottom"
+              Margin="0,0,0,8"
+              Opacity="0.5" />
+        </Border>
+    </Grid>
 </UserControl>

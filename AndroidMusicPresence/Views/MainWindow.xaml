@@ -427,9 +427,6 @@
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsExpanded" Value="True">
-                                <Setter TargetName="ContentSite" Property="Visibility" Value="Visible" />
-                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -612,7 +609,7 @@
                     </Border>
 
                     <!-- ====== FOLDERS ====== -->
-                    <Expander Header="Folders" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <Expander Header="Folders" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
                             <TextBlock Text="Tell the app where to find your music and lyrics on the device."
                                    Style="{StaticResource HintTextStyle}" />
@@ -680,7 +677,7 @@
                     </Expander>
 
                     <!-- ====== CACHING ====== -->
-                    <Expander Header="Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <Expander Header="Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
                             <TextBlock Text="Album art is cached locally so it loads faster."
                                    Style="{StaticResource HintTextStyle}" />
@@ -716,7 +713,7 @@
                     </Expander>
 
                     <!-- ====== ELIGIBLE APPS ====== -->
-                    <Expander Header="Eligible apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <Expander Header="Eligible apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
                             <TextBlock Text="Saved apps and their current settings. Use Manage apps to add or configure."
                                    Style="{StaticResource HintTextStyle}" />
@@ -829,7 +826,7 @@
                     </Expander>
 
                     <!-- ====== HOTKEYS ====== -->
-                    <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
                             <TextBlock Text="Enter virtual-key codes (letters, function keys or common names) and pick a modifier."
                                    Style="{StaticResource HintTextStyle}" />
@@ -941,7 +938,7 @@
                     </Expander>
 
                     <!-- ====== AUDIO ====== -->
-                    <Expander Header="Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <Expander Header="Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
                             <TextBlock Text="Quality settings used when streaming audio from your phone."
                                    Style="{StaticResource HintTextStyle}" />
@@ -1021,7 +1018,7 @@
                     </Expander>
 
                     <!-- ====== OTHER ====== -->
-                    <Expander Header="Other" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded">
+                    <Expander Header="Other" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
                             <TextBlock Text="Advanced behavior, startup, and miscellaneous options."
                                    Style="{StaticResource HintTextStyle}" />

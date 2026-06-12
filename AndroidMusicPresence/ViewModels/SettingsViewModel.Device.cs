@@ -59,15 +59,21 @@ namespace AndroidMusicPresenceLink
 
         private bool HasMdns => !string.IsNullOrWhiteSpace(MdnsService);
 
-        public string WifiModeButtonText => WifiMode == WirelessMode.WirelessDebugging
-            ? "mode: Wireless Debugging"
-            : "mode: adb tcpip";
+        public string WifiModeButtonText => WifiMode switch
+        {
+            WirelessMode.WirelessDebugging => "mode: Wireless Debugging",
+            WirelessMode.UsbOnly => "mode: USB only",
+            _ => "mode: adb tcpip"
+        };
 
-        public string AutoOrPairButtonText => WifiMode == WirelessMode.WirelessDebugging
-            ? (HasMdns ? "Re-pair phone" : "Pair phone")
-            : "Auto-detect USB";
+        public string AutoOrPairButtonText => WifiMode switch
+        {
+            WirelessMode.WirelessDebugging => HasMdns ? "Re-pair phone" : "Pair phone",
+            WirelessMode.UsbOnly => "Auto-detect USB",
+            _ => "Auto-detect USB"
+        };
 
-        public bool WifiAddressVisible => WifiMode != WirelessMode.WirelessDebugging;
+        public bool WifiAddressVisible => WifiMode == WirelessMode.TcpIp;
         public bool MdnsVisible => WifiMode == WirelessMode.WirelessDebugging && HasMdns;
 
         partial void InitDevice()
@@ -101,6 +107,12 @@ namespace AndroidMusicPresenceLink
             {
                 config.WifiMdnsServiceName = string.Empty;
             }
+            else if (config.WifiMode == WirelessMode.UsbOnly)
+            {
+                config.WifiMdnsServiceName = string.Empty;
+                config.SelectedDeviceWiFi = string.Empty;
+                config.IsWifiEnabled = false;
+            }
             else if (string.IsNullOrWhiteSpace(config.WifiMdnsServiceName))
             {
                 config.SelectedDeviceWiFi = string.Empty;
@@ -115,9 +127,12 @@ namespace AndroidMusicPresenceLink
 
         private void ToggleWifiMode()
         {
-            WifiMode = WifiMode == WirelessMode.WirelessDebugging
-                ? WirelessMode.TcpIp
-                : WirelessMode.WirelessDebugging;
+            WifiMode = WifiMode switch
+            {
+                WirelessMode.TcpIp => WirelessMode.WirelessDebugging,
+                WirelessMode.WirelessDebugging => WirelessMode.UsbOnly,
+                _ => WirelessMode.TcpIp
+            };
         }
 
         private async Task AutoGatherOrPairAsync()
@@ -219,32 +234,32 @@ namespace AndroidMusicPresenceLink
             }
 
             UsbSerial = usbSerial;
-            var port = 0;
-            var ip = "none";
 
-            if (!Interaction!.ConfirmYesNo("do you want to enable WiFi", "May be incompatible with certain networks"))
+            if (WifiMode == WirelessMode.UsbOnly)
             {
+                // USB-only mode: skip all Wi-Fi setup.
                 _config.IsWifiEnabled = false;
             }
             else
             {
+                // TcpIp mode: wifi is always the point, enable it automatically.
                 _config.IsWifiEnabled = true;
-                port = await DeviceQuery.GetWifiPortAsync(usbSerial);
-                ip = await DeviceQuery.GetDeviceWifiIpAsync(usbSerial);
-            }
+                var port = await DeviceQuery.GetWifiPortAsync(usbSerial);
+                var ip = await DeviceQuery.GetDeviceWifiIpAsync(usbSerial);
 
-            if (!string.IsNullOrWhiteSpace(ip))
-            {
-                WifiAddress = _config.IsWifiEnabled ? $"{ip}:{port}" : string.Empty;
-            }
-            else
-            {
-                Interaction!.ShowWarning("Could not read the device Wi-Fi IP address.", "Wi-Fi Info");
+                if (!string.IsNullOrWhiteSpace(ip))
+                {
+                    WifiAddress = $"{ip}:{port}";
+                }
+                else
+                {
+                    Interaction!.ShowWarning("Could not read the device Wi-Fi IP address.", "Wi-Fi Info");
+                }
             }
 
             var name = Interaction!.AskDeviceName();
             if (name == null)
-                return;   // name prompt cancelled: original returns before saving
+                return;
 
             if (!string.IsNullOrWhiteSpace(name))
                 DeviceName = name.Trim();

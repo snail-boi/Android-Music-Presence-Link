@@ -160,7 +160,7 @@ namespace AndroidMusicPresenceLink
             else if (status.StartsWith("Wireless"))
                 icon = BuildWdIcon(brush, 36);
             else if (status.StartsWith("Wi-Fi port"))
-                icon = BuildPortLostIcon(brush, 36);
+                icon = BuildPortLostIcon(brush, App.Config?.WifiMode == WirelessMode.WirelessDebugging, 36);
             else
                 icon = BuildNoConnectionIcon(brush, 36);
 

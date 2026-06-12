@@ -755,12 +755,13 @@ namespace AndroidMusicPresenceLink
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }
 
-        private static Viewbox BuildPortLostIcon(Brush brush, double size = 36)
+        private static Viewbox BuildPortLostIcon(Brush brush, bool isWd = false, double size = 36)
         {
             const double W = 32, H = 36, cx = W / 2;
             var canvas = new Canvas { Width = W, Height = H };
             AddWifiWaves(canvas, brush, cx: cx, baseY: 14, slashed: true);
-            var tb = new TextBlock { Text = "TCP", FontSize = 8.5, Foreground = brush, FontWeight = FontWeights.SemiBold, Opacity = 0.7, Width = W, TextAlignment = TextAlignment.Center };
+            var label = isWd ? "WD" : "TCP";
+            var tb = new TextBlock { Text = label, FontSize = 8.5, Foreground = brush, FontWeight = FontWeights.SemiBold, Opacity = 0.7, Width = W, TextAlignment = TextAlignment.Center };
             canvas.Children.Add(tb); Canvas.SetLeft(tb, 0); Canvas.SetTop(tb, 22);
             return new Viewbox { Width = size, Height = size, Child = canvas };
         }
