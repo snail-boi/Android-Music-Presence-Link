@@ -42,6 +42,8 @@ namespace AndroidMusicPresenceLink
             {
                 if (string.IsNullOrWhiteSpace(app.PackageName))
                     continue;
+                if (app.PresenceMode == PresenceMode.Off)
+                    continue;
                 AppPackages.Add(new AppPackageItem(app.PackageName, app.PresenceMode, app.EnableCoverSearch));
             }
         }
