@@ -8,6 +8,9 @@ namespace AndroidMusicPresenceLink
     /// ViewModel for RemoteFolderPicker. Owns the tree (a single "Internal Storage" root),
     /// tracks the currently selected folder, and provides the ADB directory listing that
     /// each node calls when it is expanded.
+    ///
+    /// SelectedFolder has a public setter so the path TextBox can write into it directly
+    /// via two-way binding. The tree also writes it via OnNodeSelected.
     /// </summary>
     public sealed class RemoteFolderPickerViewModel : ViewModelBase
     {
@@ -18,14 +21,15 @@ namespace AndroidMusicPresenceLink
         // Raised when the dialog should close. The bool becomes DialogResult.
         public event Action<bool>? RequestClose;
 
-        // Bound to TreeView.ItemsSource. Holds the single root node.
+        // Bound to TreeView.ItemsSource.
         public ObservableCollection<RemoteFolderNode> Roots { get; } = new();
 
-        private string _selectedFolder = "/";
+        private string _selectedFolder = string.Empty;
         public string SelectedFolder
         {
             get => _selectedFolder;
-            private set => Set(ref _selectedFolder, value);
+            set => Set(ref _selectedFolder, value);
+            // WPF re-evaluates CanExecute via CommandManager.RequerySuggested automatically.
         }
 
         public RelayCommand OkCommand { get; }
@@ -35,10 +39,17 @@ namespace AndroidMusicPresenceLink
         {
             _device = device;
 
-            OkCommand = new RelayCommand(() => RequestClose?.Invoke(true));
+            OkCommand = new RelayCommand(
+                () => RequestClose?.Invoke(true),
+                () => !string.IsNullOrWhiteSpace(SelectedFolder));
+
             CancelCommand = new RelayCommand(() => RequestClose?.Invoke(false));
 
-            Roots.Add(new RemoteFolderNode("Internal Storage", InitialPath, GetRemoteDirectoriesAsync, OnNodeSelected));
+            var root = new RemoteFolderNode("Internal Storage", InitialPath, GetRemoteDirectoriesAsync, OnNodeSelected);
+            Roots.Add(root);
+
+            // Pre-expand root so the first level is visible immediately.
+            root.IsExpanded = true;
         }
 
         private void OnNodeSelected(RemoteFolderNode node)
@@ -54,7 +65,10 @@ namespace AndroidMusicPresenceLink
             var dirs = new List<string>();
             foreach (var line in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                string name = line.Trim().TrimEnd('/');
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith("ls:", StringComparison.OrdinalIgnoreCase)) continue;
+
+                string name = trimmed.TrimEnd('/');
                 if (!string.IsNullOrEmpty(name))
                     dirs.Add(System.IO.Path.GetFileName(name));
             }

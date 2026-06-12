@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
@@ -14,6 +14,10 @@ namespace AndroidMusicPresenceLink
     /// IsExpanded and IsSelected are bound two-way to the TreeViewItem (see the
     /// ItemContainerStyle in the XAML), which is how a TreeView talks to a ViewModel:
     /// expanding triggers the load, selecting reports the path back up to the picker.
+    ///
+    /// IsLoading is true while the ADB call is in flight so the XAML can show a spinner.
+    /// HasError is set when the ADB call returns nothing (permission denied, empty dir, etc.)
+    /// HasNoChildren is set when the directory loaded successfully but is empty.
     /// </summary>
     public sealed class RemoteFolderNode : ViewModelBase
     {
@@ -33,15 +37,40 @@ namespace AndroidMusicPresenceLink
             Path = path;
             _loadSubdirs = loadSubdirs;
             _onSelected = onSelected;
-            Children.Add(new RemoteFolderNode());
+            Children.Add(new RemoteFolderNode());   // placeholder -> expand arrow
         }
 
-        // Empty placeholder child, replaced by the real folders on first expand.
+        // Empty placeholder child, replaced by real folders on first expand.
         private RemoteFolderNode()
         {
             Name = string.Empty;
             Path = string.Empty;
         }
+
+        // ── State flags ──────────────────────────────────────────────────────
+
+        private bool _isLoading;
+        public bool IsLoading
+        {
+            get => _isLoading;
+            private set => Set(ref _isLoading, value);
+        }
+
+        private bool _hasError;
+        public bool HasError
+        {
+            get => _hasError;
+            private set => Set(ref _hasError, value);
+        }
+
+        private bool _hasNoChildren;
+        public bool HasNoChildren
+        {
+            get => _hasNoChildren;
+            private set => Set(ref _hasNoChildren, value);
+        }
+
+        // ── Tree bindings ────────────────────────────────────────────────────
 
         private bool _isExpanded;
         public bool IsExpanded
@@ -67,15 +96,40 @@ namespace AndroidMusicPresenceLink
             }
         }
 
+        // ── Loading ──────────────────────────────────────────────────────────
+
         private async Task LoadChildrenAsync()
         {
-            _childrenLoaded = true; // set first, so a fast collapse/expand does not load twice
+            _childrenLoaded = true;     // guard against re-entrant expand during load
+            IsLoading = true;
+            HasError = false;
+            HasNoChildren = false;
 
-            var subdirs = await _loadSubdirs!(Path).ConfigureAwait(true);
+            try
+            {
+                var subdirs = await _loadSubdirs!(Path).ConfigureAwait(true);
 
-            Children.Clear(); // drop the placeholder
-            foreach (var dir in subdirs)
-                Children.Add(new RemoteFolderNode(dir, Path + "/" + dir, _loadSubdirs!, _onSelected!));
+                Children.Clear();       // drop the placeholder (or previous result)
+
+                if (subdirs.Count == 0)
+                {
+                    HasNoChildren = true;
+                }
+                else
+                {
+                    foreach (var dir in subdirs)
+                        Children.Add(new RemoteFolderNode(dir, Path + "/" + dir, _loadSubdirs!, _onSelected!));
+                }
+            }
+            catch
+            {
+                Children.Clear();
+                HasError = true;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
         }
     }
 }
