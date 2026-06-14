@@ -1,0 +1,56 @@
+<Window x:Class="AndroidMusicPresenceLink.CoverCropWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Crop cover" Height="600" Width="520"
+        WindowStartupLocation="CenterOwner"
+        Background="#111111"
+        ResizeMode="CanResizeWithGrip">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#5539cc"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="CropArea" Grid.Row="0" Background="#000000" ClipToBounds="True"
+              SizeChanged="CropArea_SizeChanged">
+            <Image x:Name="ImgSource" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+            <Canvas x:Name="Overlay" Background="Transparent"
+                    MouseMove="Overlay_MouseMove" MouseLeftButtonUp="Overlay_MouseUp">
+                <Path x:Name="MaskPath" Fill="#99000000" IsHitTestVisible="False"/>
+                <Rectangle x:Name="CropRect" Stroke="White" StrokeThickness="2" Fill="#01FFFFFF"
+                           MouseLeftButtonDown="CropRect_MouseDown" Cursor="SizeAll"/>
+                <Rectangle x:Name="ResizeHandle" Width="14" Height="14" Fill="White"
+                           MouseLeftButtonDown="ResizeHandle_MouseDown" Cursor="SizeNWSE"/>
+            </Canvas>
+        </Grid>
+
+        <StackPanel Grid.Row="1" Margin="0,12,0,0">
+            <CheckBox x:Name="ChkSquare" Content="Crop to square" Foreground="#AAAAAA" IsChecked="True"
+                      Checked="ChkSquare_Changed" Unchecked="ChkSquare_Changed" Margin="0,0,0,10"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel" Click="Cancel_Click" Background="#444444"/>
+                <Button Content="Use cover" Click="Ok_Click" IsDefault="True"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

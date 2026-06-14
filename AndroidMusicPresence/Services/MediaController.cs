@@ -38,6 +38,7 @@ namespace AndroidMusicPresenceLink
         public string? CurrentArtist { get; private set; }
         public string? CurrentAlbum { get; private set; }
         public string? CurrentCoverPath { get; private set; }
+        public string? CurrentRemoteFilePath { get; private set; }
         internal CoverCacheManager CoverCache => cacheManager;
 
         // Android only reports the last scrub position, so realPositionMs is the
@@ -892,6 +893,7 @@ namespace AndroidMusicPresenceLink
                 if (allFiles.Count == 0)
                 {
                     Debugger.show("[COVERART] No files found in configured remote roots");
+                    CurrentRemoteFilePath = null;
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, _defaultImagePath);
                 }
@@ -957,6 +959,7 @@ namespace AndroidMusicPresenceLink
                 if (matched.Count == 0)
                 {
                     Debugger.show($"[COVERART] No filename contains the title '{titleStr}' (normalized: '{normTitle}')");
+                    CurrentRemoteFilePath = null;
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, _defaultImagePath);
                 }
@@ -1027,6 +1030,8 @@ namespace AndroidMusicPresenceLink
                     .Select(r => r.path);
 
                 var filesToProcess = ordered.Select(o => o.path).Concat(rest).Take(20).ToList();
+
+                CurrentRemoteFilePath = filesToProcess.FirstOrDefault();
 
                 Debugger.show($"[COVERART] Files to process for cover art lookup (ranked): {filesToProcess.Count}");
                 for (int i = 0; i < ranked.Count; i++)

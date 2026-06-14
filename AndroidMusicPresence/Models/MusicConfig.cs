@@ -136,6 +136,7 @@ namespace AndroidMusicPresenceLink
         public string WifiMdnsServiceName { get; set; } = string.Empty;
 
         public string MusicRemoteRoot { get; set; } = string.Empty;
+        public bool RetainDateModifiedOnTagEdit { get; set; } = true;
         public List<string> MusicRemoteRoots { get; set; } = new List<string>();
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Extreme;
         public string IgnoredUpdateVersion { get; set; } = string.Empty;

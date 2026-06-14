@@ -341,6 +341,7 @@
                                                 <ContextMenu>
                                                     <MenuItem Header="Save cover image..." Click="SaveCoverMenuItem_Click" />
                                                     <MenuItem Header="Copy track info" Click="CopyCoverInfoMenuItem_Click" />
+                                                    <MenuItem Header="Edit metadata..." Click="EditMetadataMenuItem_Click" />
                                                 </ContextMenu>
                                             </Border.ContextMenu>
                                         </Border>

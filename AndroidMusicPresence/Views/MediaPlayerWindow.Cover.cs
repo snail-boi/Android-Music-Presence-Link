@@ -353,5 +353,22 @@ namespace AndroidMusicPresenceLink
             string text = $"{artist} - {title} [{album}]".Trim(' ', '-', '[', ']').Trim();
             try { Clipboard.SetText(text); } catch { }
         }
+
+        // Opens the tag editor for the current track. Orchestration lives in App via the
+        // injected _editMetadataAction (declared in MediaPlayerWindow_xaml.cs).
+        private async void EditMetadataMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_editMetadataAction == null)
+            {
+                (Application.Current as App)?.ShowToast("Metadata editing is not available right now.", ToastLevel.Warning);
+                return;
+            }
+
+            try { await _editMetadataAction(); }
+            catch (Exception ex)
+            {
+                (Application.Current as App)?.ShowToast("Edit metadata failed: " + ex.Message, ToastLevel.Warning);
+            }
+        }
     }
 }

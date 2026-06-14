@@ -606,6 +606,67 @@ namespace AndroidMusicPresenceLink
             return _mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible;
         }
 
+        internal async Task EditCurrentTrackMetadataAsync()
+        {
+            var device = _presenceService?.CurrentDevice ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(device))
+            {
+                ShowToast("No device is connected.", ToastLevel.Warning);
+                return;
+            }
+
+            var remotePath = _presenceService?.CurrentRemoteFilePath;
+            if (string.IsNullOrWhiteSpace(remotePath))
+            {
+                ShowToast("No track file has been resolved yet.", ToastLevel.Warning);
+                return;
+            }
+
+            string ffmpeg = Config.Paths.FfmpegPath;
+            string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AMPL_TagEdit");
+
+            var meta = await MetadataEditService.ReadAsync(device, remotePath, ffmpeg, tempDir);
+            if (meta == null)
+            {
+                ShowToast("Could not read this track's tags.", ToastLevel.Warning);
+                return;
+            }
+
+            meta.RetainDateModified = Config?.RetainDateModifiedOnTagEdit ?? true;
+
+            try
+            {
+                var window = new MetadataEditWindow(meta, System.IO.Path.GetFileName(remotePath))
+                {
+                    Owner = _mediaPlayerWindow
+                };
+
+                if (window.ShowDialog() == true && window.Result != null)
+                {
+                    if (Config != null)
+                    {
+                        Config.RetainDateModifiedOnTagEdit = window.Result.RetainDateModified;
+                        MusicConfigManager.Save(Config);
+                    }
+
+                    var (ok, message) = await MetadataEditService.WriteAsync(device, remotePath, window.Result, ffmpeg, tempDir, window.Result.RetainDateModified);
+                    ShowToast(message, ok ? ToastLevel.Info : ToastLevel.Warning);
+                }
+            }
+            finally
+            {
+                // The pulled copy is reused by WriteAsync, so it is only safe to delete now.
+                TryDeleteTagEditTemp(meta.LocalSourcePath);
+                TryDeleteTagEditTemp(meta.CoverPreviewPath);
+            }
+        }
+
+        private static void TryDeleteTagEditTemp(string? path)
+        {
+            try { if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path)) System.IO.File.Delete(path); }
+            catch { }
+        }
+
         internal void ShowMediaPlayerWindowNow()
         {
             Debugger.show("[MEDIAPLAYER] Opening media player window.");
@@ -628,7 +689,8 @@ namespace AndroidMusicPresenceLink
                     ApplyAudioQualityPresetFromMediaPlayer,
                     () => OpenAudioQualityWindow(showPresets: false, calledFromMediaPlayer: true),
                     GetPhoneVolumeAsync,
-                    (prev, target, max) => SetPhoneVolumeAsync(prev, target, max));
+                    (prev, target, max) => SetPhoneVolumeAsync(prev, target, max),
+                    EditCurrentTrackMetadataAsync);
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
                 _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask, () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
 
