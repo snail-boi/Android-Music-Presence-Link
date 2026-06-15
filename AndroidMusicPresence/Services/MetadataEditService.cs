@@ -62,19 +62,49 @@ namespace AndroidMusicPresenceLink
 
                 var meta = new TrackMetadata { LocalSourcePath = local };
 
-                // Dump tags via ffmetadata. Parse every key=value line regardless of section
-                // so stream-level tags (OGG/Opus store comments on the stream, not globally)
-                // are captured too.
-                string ffmetaPath = Path.Combine(tempDir, "tagedit_meta_" + Guid.NewGuid().ToString("N") + ".txt");
-                bool dumped = await RunFfmpegAsync(ffmpegPath, new List<string>
-                {
-                    "-i", local, "-f", "ffmetadata", "-y", ffmetaPath
-                }).ConfigureAwait(false);
+                // The ffmetadata muxer only emits global/format-level tags and silently drops
+                // stream-level ones. OGG/Opus always keep their Vorbis comments on the stream,
+                // and some FLAC and other files do too, so a single dump returns empty fields
+                // for them. Dump twice: the stream-mapped pass first, then the global pass so
+                // genuinely global tags win on the rare conflict, and the union catches a tag
+                // wherever it physically lives.
+                string metaGuid = Guid.NewGuid().ToString("N");
+                string streamMetaPath = Path.Combine(tempDir, "tagedit_meta_s_" + metaGuid + ".txt");
+                string globalMetaPath = Path.Combine(tempDir, "tagedit_meta_g_" + metaGuid + ".txt");
 
-                if (dumped && File.Exists(ffmetaPath))
+                bool streamDumped = await RunFfmpegAsync(ffmpegPath, new List<string>
                 {
-                    ParseFfmetadata(File.ReadAllText(ffmetaPath, Encoding.UTF8), meta);
-                    TryDelete(ffmetaPath);
+                    "-i", local, "-map_metadata:g", "0:s:0", "-f", "ffmetadata", "-y", streamMetaPath
+                }).ConfigureAwait(false);
+                if (streamDumped && File.Exists(streamMetaPath))
+                {
+                    ParseFfmetadata(File.ReadAllText(streamMetaPath, Encoding.UTF8), meta);
+                    TryDelete(streamMetaPath);
+                }
+
+                bool globalDumped = await RunFfmpegAsync(ffmpegPath, new List<string>
+                {
+                    "-i", local, "-f", "ffmetadata", "-y", globalMetaPath
+                }).ConfigureAwait(false);
+                if (globalDumped && File.Exists(globalMetaPath))
+                {
+                    ParseFfmetadata(File.ReadAllText(globalMetaPath, Encoding.UTF8), meta);
+                    TryDelete(globalMetaPath);
+                }
+
+                // Some files carry no embedded title/album at all (the player shows the file
+                // name and the containing folder instead, which is what makes them look
+                // tagged). Seed those fields so the editor starts from something useful and a
+                // save writes real tags: the file name without extension as the title, and the
+                // immediate parent folder as the album. These are normal editable values, so
+                // the user can adjust or clear them before saving.
+                if (string.IsNullOrWhiteSpace(meta.Title))
+                    meta.Title = FileNameWithoutExtension(remotePath);
+                if (string.IsNullOrWhiteSpace(meta.Album))
+                {
+                    string folder = ParentFolderName(remotePath);
+                    if (!string.IsNullOrWhiteSpace(folder))
+                        meta.Album = folder;
                 }
 
                 // No embedded lyrics: fall back to a sibling .lrc next to the track.
@@ -141,8 +171,21 @@ namespace AndroidMusicPresenceLink
                         return (false, "Could not pull the file from the device.");
                 }
 
-                var args = BuildFfmpegWriteArgs(local, outPath, ext, edited);
-                bool encoded = await RunFfmpegAsync(ffmpegPath, args).ConfigureAwait(false);
+                bool encoded;
+                if (IsStreamTagFormat(ext))
+                {
+                    // OGG/Opus keep their cover as a base64 METADATA_BLOCK_PICTURE comment that
+                    // ffmpeg surfaces as a fake mjpeg stream it then refuses to remux, so the
+                    // ordinary "-map 0 -c copy" path dies with "Unsupported codec id". Instead
+                    // map audio only and apply tags plus the rebuilt picture from a ffmetadata
+                    // input file (no command-line length limit on the big base64).
+                    encoded = await WriteOggAsync(ffmpegPath, local, outPath, ext, edited, tempDir).ConfigureAwait(false);
+                }
+                else
+                {
+                    var args = BuildFfmpegWriteArgs(local, outPath, ext, edited);
+                    encoded = await RunFfmpegAsync(ffmpegPath, args).ConfigureAwait(false);
+                }
                 if (!encoded || !File.Exists(outPath) || new FileInfo(outPath).Length == 0)
                     return (false, "ffmpeg could not write the new tags (the original was left untouched).");
 
@@ -249,18 +292,24 @@ namespace AndroidMusicPresenceLink
                     args.AddRange(new[] { "-metadata:s:v", "title=Album cover", "-metadata:s:v", "comment=Cover (front)" });
             }
 
+            // OGG/Opus store Vorbis comments on the stream; a global -metadata write is
+            // silently ignored for them (the old tags survive). Those formats must be written
+            // with -metadata:s:a:0. Everything else (mp3, flac, m4a, wma, wav) takes tags at
+            // the global level, so a stream-level write would be the one that no-ops there.
+            string metaOpt = IsStreamTagFormat(ext) ? "-metadata:s:a:0" : "-metadata";
+
             // Always write every field. Empty string clears the tag, which is the intended
             // behaviour when the user blanks a box.
-            AddMeta(args, "title", m.Title);
-            AddMeta(args, "album", m.Album);
-            AddMeta(args, "artist", m.Artist);
-            AddMeta(args, "album_artist", m.AlbumArtist);
-            AddMeta(args, "composer", m.Composer);
-            AddMeta(args, "genre", m.Genre);
-            AddMeta(args, "track", m.TrackNumber);
-            AddMeta(args, "disc", m.DiscNumber);
-            AddMeta(args, "date", m.Year);
-            AddMeta(args, "comment", m.Comment);
+            AddMeta(args, metaOpt, "title", m.Title);
+            AddMeta(args, metaOpt, "album", m.Album);
+            AddMeta(args, metaOpt, "artist", m.Artist);
+            AddMeta(args, metaOpt, "album_artist", m.AlbumArtist);
+            AddMeta(args, metaOpt, "composer", m.Composer);
+            AddMeta(args, metaOpt, "genre", m.Genre);
+            AddMeta(args, metaOpt, "track", m.TrackNumber);
+            AddMeta(args, metaOpt, "disc", m.DiscNumber);
+            AddMeta(args, metaOpt, "date", m.Year);
+            AddMeta(args, metaOpt, "comment", m.Comment);
 
             // Lyrics. When the lyrics are going to a .lrc file (checkbox, or WAV which can't
             // embed), we do not embed and instead clear any existing embedded field so it
@@ -270,7 +319,7 @@ namespace AndroidMusicPresenceLink
             if (lyricsToLrc)
             {
                 if (!m.LyricsFromLrc && !string.IsNullOrEmpty(m.LyricsSourceField))
-                    AddMeta(args, m.LyricsSourceField!, string.Empty);
+                    AddMeta(args, metaOpt, m.LyricsSourceField!, string.Empty);
             }
             else
             {
@@ -278,17 +327,173 @@ namespace AndroidMusicPresenceLink
                     ? m.LyricsSourceField
                     : DefaultLyricsField(ext);
                 if (!string.IsNullOrEmpty(field))
-                    AddMeta(args, field!, m.Lyrics ?? string.Empty);
+                    AddMeta(args, metaOpt, field!, m.Lyrics ?? string.Empty);
             }
 
             args.AddRange(new[] { "-y", outPath });
             return args;
         }
 
-        private static void AddMeta(List<string> args, string key, string value)
+        private static bool IsStreamTagFormat(string ext)
+            => ext == ".ogg" || ext == ".opus" || ext == ".oga";
+
+        private static void AddMeta(List<string> args, string metaOpt, string key, string value)
         {
-            args.Add("-metadata");
+            args.Add(metaOpt);
             args.Add(key + "=" + (value ?? string.Empty));
+        }
+
+        // OGG/Opus write: audio stream copied, all tags (managed + preserved unknown + lyrics)
+        // and the cover rebuilt as a METADATA_BLOCK_PICTURE comment come from a ffmetadata
+        // input file mapped onto the audio stream. -map_metadata replaces the stream's tags
+        // wholesale, which is why every tag we want to keep must be written into the file.
+        private static async Task<bool> WriteOggAsync(string ffmpegPath, string local, string outPath, string ext, TrackMetadata m, string tempDir)
+        {
+            string? coverImage = null;
+            string? extractedCover = null;
+            try
+            {
+                if (!m.RemoveCover)
+                {
+                    if (!string.IsNullOrWhiteSpace(m.NewCoverImagePath) && File.Exists(m.NewCoverImagePath!))
+                    {
+                        coverImage = m.NewCoverImagePath;
+                    }
+                    else
+                    {
+                        // Pull the existing cover out losslessly (-c copy) so re-embedding does
+                        // not recompress it on every edit.
+                        extractedCover = Path.Combine(tempDir, "tagedit_covraw_" + Guid.NewGuid().ToString("N") + ".img");
+                        bool got = await RunFfmpegAsync(ffmpegPath, new List<string>
+                        {
+                            "-i", local, "-an", "-map", "0:v:0?", "-frames:v", "1", "-c", "copy", "-f", "image2", "-y", extractedCover
+                        }).ConfigureAwait(false);
+                        if (got && File.Exists(extractedCover) && new FileInfo(extractedCover).Length > 0)
+                            coverImage = extractedCover;
+                        else
+                            TryDelete(extractedCover);
+                    }
+                }
+
+                string? pictureB64 = coverImage != null ? BuildPictureBlockBase64(coverImage) : null;
+                string metaFile = BuildOggFfmetadataFile(tempDir, ext, m, pictureB64);
+                try
+                {
+                    return await RunFfmpegAsync(ffmpegPath, new List<string>
+                    {
+                        "-i", local, "-i", metaFile, "-map", "0:a", "-c:a", "copy", "-map_metadata:s:a:0", "1:g", "-y", outPath
+                    }).ConfigureAwait(false);
+                }
+                finally
+                {
+                    TryDelete(metaFile);
+                }
+            }
+            finally
+            {
+                if (extractedCover != null) TryDelete(extractedCover);
+            }
+        }
+
+        private static string BuildOggFfmetadataFile(string tempDir, string ext, TrackMetadata m, string? pictureB64)
+        {
+            var sb = new StringBuilder();
+            sb.Append(";FFMETADATA1\n");
+
+            if (m.ExtraTags != null)
+                foreach (var kv in m.ExtraTags)
+                    AppendFfmeta(sb, kv.Key, kv.Value);
+
+            AppendFfmeta(sb, "title", m.Title);
+            AppendFfmeta(sb, "album", m.Album);
+            AppendFfmeta(sb, "artist", m.Artist);
+            AppendFfmeta(sb, "album_artist", m.AlbumArtist);
+            AppendFfmeta(sb, "composer", m.Composer);
+            AppendFfmeta(sb, "genre", m.Genre);
+            AppendFfmeta(sb, "track", m.TrackNumber);
+            AppendFfmeta(sb, "disc", m.DiscNumber);
+            AppendFfmeta(sb, "date", m.Year);
+            AppendFfmeta(sb, "comment", m.Comment);
+
+            // Embed lyrics unless they are going to a .lrc file. When going to .lrc, omitting
+            // the field here drops any old embedded lyrics so the .lrc is not shadowed.
+            if (!m.SaveLyricsAsLrc)
+            {
+                string? field = (!m.LyricsFromLrc && !string.IsNullOrEmpty(m.LyricsSourceField))
+                    ? m.LyricsSourceField
+                    : DefaultLyricsField(ext);
+                if (!string.IsNullOrEmpty(field))
+                    AppendFfmeta(sb, field!, m.Lyrics ?? string.Empty);
+            }
+
+            if (!string.IsNullOrEmpty(pictureB64))
+                AppendFfmeta(sb, "metadata_block_picture", pictureB64!);
+
+            string path = Path.Combine(tempDir, "tagedit_wmeta_" + Guid.NewGuid().ToString("N") + ".txt");
+            File.WriteAllText(path, sb.ToString(), new UTF8Encoding(false));
+            return path;
+        }
+
+        private static void AppendFfmeta(StringBuilder sb, string key, string value)
+        {
+            sb.Append(key);
+            sb.Append('=');
+            sb.Append(EscapeFfmeta(value ?? string.Empty));
+            sb.Append('\n');
+        }
+
+        // ffmetadata escapes \, =, ;, # and newline with a leading backslash.
+        private static string EscapeFfmeta(string v)
+        {
+            if (string.IsNullOrEmpty(v)) return string.Empty;
+            var sb = new StringBuilder(v.Length + 8);
+            foreach (char c in v)
+            {
+                if (c == '\r') continue;
+                if (c == '\\' || c == '=' || c == ';' || c == '#') { sb.Append('\\'); sb.Append(c); }
+                else if (c == '\n') { sb.Append('\\'); sb.Append('\n'); }
+                else sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
+        // Build a FLAC METADATA_BLOCK_PICTURE (front cover, type 3) and base64-encode it.
+        // Width/height/depth/colors are left at zero; players read them from the image data.
+        private static string? BuildPictureBlockBase64(string imagePath)
+        {
+            try
+            {
+                byte[] data = File.ReadAllBytes(imagePath);
+                if (data.Length == 0) return null;
+                byte[] mime = Encoding.ASCII.GetBytes(SniffImageMime(data));
+
+                using var ms = new MemoryStream();
+                void U32(uint v)
+                {
+                    ms.WriteByte((byte)(v >> 24));
+                    ms.WriteByte((byte)(v >> 16));
+                    ms.WriteByte((byte)(v >> 8));
+                    ms.WriteByte((byte)v);
+                }
+                U32(3);
+                U32((uint)mime.Length); ms.Write(mime, 0, mime.Length);
+                U32(0);                      // empty description
+                U32(0); U32(0); U32(0); U32(0);
+                U32((uint)data.Length); ms.Write(data, 0, data.Length);
+                return Convert.ToBase64String(ms.ToArray());
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[TAGEDIT] picture block build failed: " + ex.Message);
+                return null;
+            }
+        }
+
+        private static string SniffImageMime(byte[] d)
+        {
+            if (d.Length >= 4 && d[0] == 0x89 && d[1] == 0x50 && d[2] == 0x4E && d[3] == 0x47)
+                return "image/png";
+            return "image/jpeg";
         }
 
         private static void ParseFfmetadata(string text, TrackMetadata meta)
@@ -313,7 +518,17 @@ namespace AndroidMusicPresenceLink
                 {
                     meta.Lyrics = value;
                     meta.LyricsSourceField = key;
+                    continue;
                 }
+                if (IsLyricKey(lower)) continue;
+
+                // Anything else is a tag we do not manage. Keep it (e.g. PURL, SYNOPSIS,
+                // LANGUAGE) so rewriting an OGG/Opus file does not strip it. Skip ffmpeg's
+                // own "encoder" line and the cover picture comment, which are handled
+                // elsewhere or regenerated.
+                if (lower == "encoder" || lower == "metadata_block_picture" || key.Length == 0)
+                    continue;
+                meta.ExtraTags[key] = value;
             }
         }
 
@@ -447,6 +662,25 @@ namespace AndroidMusicPresenceLink
             string p = remotePath.Replace('\\', '/');
             int slash = p.LastIndexOf('/');
             return slash <= 0 ? "" : p.Substring(0, slash);
+        }
+
+        private static string FileNameWithoutExtension(string remotePath)
+        {
+            string p = remotePath.Replace('\\', '/');
+            int slash = p.LastIndexOf('/');
+            string file = slash >= 0 ? p.Substring(slash + 1) : p;
+            int dot = file.LastIndexOf('.');
+            return dot > 0 ? file.Substring(0, dot) : file;
+        }
+
+        private static string ParentFolderName(string remotePath)
+        {
+            string p = remotePath.Replace('\\', '/').TrimEnd('/');
+            int slash = p.LastIndexOf('/');
+            if (slash <= 0) return string.Empty;
+            string dir = p.Substring(0, slash);            // drop the file name
+            int slash2 = dir.LastIndexOf('/');
+            return slash2 >= 0 ? dir.Substring(slash2 + 1) : dir;
         }
 
         // The field a new (no prior source) embedded lyric goes into, matching what Musicolet

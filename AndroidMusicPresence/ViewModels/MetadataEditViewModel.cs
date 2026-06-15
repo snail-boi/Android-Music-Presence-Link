@@ -46,7 +46,10 @@ namespace AndroidMusicPresenceLink
             _lyricsLrcPath = initial.LyricsLrcPath;
             _lrcLocked = (_fileLabel ?? string.Empty).EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
             _saveLyricsAsLrc = _lrcLocked || initial.SaveLyricsAsLrc;
+            _extraTags = initial.ExtraTags;
         }
+
+        private readonly System.Collections.Generic.Dictionary<string, string>? _extraTags;
 
         private readonly string? _lyricsSourceField;
         private readonly bool _lyricsFromLrc;
@@ -180,7 +183,8 @@ namespace AndroidMusicPresenceLink
                 LyricsSourceField = _lyricsSourceField,
                 LyricsFromLrc = _lyricsFromLrc,
                 LyricsLrcPath = _lyricsLrcPath,
-                SaveLyricsAsLrc = SaveLyricsAsLrc
+                SaveLyricsAsLrc = SaveLyricsAsLrc,
+                ExtraTags = _extraTags ?? new System.Collections.Generic.Dictionary<string, string>()
             };
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace AndroidMusicPresenceLink
 {
@@ -54,6 +55,9 @@ namespace AndroidMusicPresenceLink
         public string? LyricsLrcPath { get; set; }
         public bool SaveLyricsAsLrc { get; set; }
 
+        /// <summary>Tags read from the file that the editor does not manage (e.g. PURL, SYNOPSIS, LANGUAGE), kept so a stream-tag rewrite (OGG/Opus) does not strip them. Key is the original field name.</summary>
+        public Dictionary<string, string> ExtraTags { get; set; } = new Dictionary<string, string>();
+
         public TrackMetadata Clone()
         {
             return new TrackMetadata
@@ -77,7 +81,8 @@ namespace AndroidMusicPresenceLink
                 LyricsSourceField = LyricsSourceField,
                 LyricsFromLrc = LyricsFromLrc,
                 LyricsLrcPath = LyricsLrcPath,
-                SaveLyricsAsLrc = SaveLyricsAsLrc
+                SaveLyricsAsLrc = SaveLyricsAsLrc,
+                ExtraTags = ExtraTags == null ? new Dictionary<string, string>() : new Dictionary<string, string>(ExtraTags)
             };
         }
     }
