@@ -44,6 +44,16 @@ namespace AndroidMusicPresenceLink
         /// <summary>True means restore the original modification time (plus one second so the media scanner still re-reads tags).</summary>
         public bool RetainDateModified { get; set; } = true;
 
+        // Lyrics. Lyrics is the text (plain or LRC-timestamped; sync is decided by content).
+        // LyricsSourceField is the exact embedded tag key the lyrics were read from, so an
+        // edit goes back to the same place. LyricsFromLrc/LyricsLrcPath track a sibling .lrc
+        // source. SaveLyricsAsLrc means write to a .lrc instead of embedding.
+        public string Lyrics { get; set; } = string.Empty;
+        public string? LyricsSourceField { get; set; }
+        public bool LyricsFromLrc { get; set; }
+        public string? LyricsLrcPath { get; set; }
+        public bool SaveLyricsAsLrc { get; set; }
+
         public TrackMetadata Clone()
         {
             return new TrackMetadata
@@ -62,7 +72,12 @@ namespace AndroidMusicPresenceLink
                 NewCoverImagePath = NewCoverImagePath,
                 RemoveCover = RemoveCover,
                 LocalSourcePath = LocalSourcePath,
-                RetainDateModified = RetainDateModified
+                RetainDateModified = RetainDateModified,
+                Lyrics = Lyrics,
+                LyricsSourceField = LyricsSourceField,
+                LyricsFromLrc = LyricsFromLrc,
+                LyricsLrcPath = LyricsLrcPath,
+                SaveLyricsAsLrc = SaveLyricsAsLrc
             };
         }
     }

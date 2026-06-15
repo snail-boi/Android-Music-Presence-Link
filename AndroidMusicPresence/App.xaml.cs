@@ -634,6 +634,13 @@ namespace AndroidMusicPresenceLink
 
             meta.RetainDateModified = Config?.RetainDateModifiedOnTagEdit ?? true;
 
+            string ext = (System.IO.Path.GetExtension(remotePath) ?? string.Empty).ToLowerInvariant();
+            // WAV can't embed lyrics, so it's always .lrc. Otherwise use the saved preference,
+            // and stick with .lrc if the existing lyrics already came from one.
+            meta.SaveLyricsAsLrc = ext == ".wav"
+                ? true
+                : (meta.LyricsFromLrc || (Config?.SaveLyricsAsLrcInFolder ?? false));
+
             try
             {
                 var window = new MetadataEditWindow(meta, System.IO.Path.GetFileName(remotePath))
@@ -646,6 +653,9 @@ namespace AndroidMusicPresenceLink
                     if (Config != null)
                     {
                         Config.RetainDateModifiedOnTagEdit = window.Result.RetainDateModified;
+                        // Don't let WAV's forced-on value poison the default for other formats.
+                        if (ext != ".wav")
+                            Config.SaveLyricsAsLrcInFolder = window.Result.SaveLyricsAsLrc;
                         MusicConfigManager.Save(Config);
                     }
 

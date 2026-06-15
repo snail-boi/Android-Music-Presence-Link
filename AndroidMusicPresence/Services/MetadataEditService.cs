@@ -77,6 +77,21 @@ namespace AndroidMusicPresenceLink
                     TryDelete(ffmetaPath);
                 }
 
+                // No embedded lyrics: fall back to a sibling .lrc next to the track.
+                if (string.IsNullOrWhiteSpace(meta.Lyrics))
+                {
+                    string lrcRemote = RemoteLrcPath(remotePath);
+                    string lrcLocal = Path.Combine(tempDir, "tagedit_lrc_" + Guid.NewGuid().ToString("N") + ".lrc");
+                    await AdbHelper.RunAdbCaptureAsync($"-s {device} pull \"{lrcRemote}\" \"{lrcLocal}\"").ConfigureAwait(false);
+                    if (File.Exists(lrcLocal) && new FileInfo(lrcLocal).Length > 0)
+                    {
+                        meta.Lyrics = File.ReadAllText(lrcLocal, Encoding.UTF8);
+                        meta.LyricsFromLrc = true;
+                        meta.LyricsLrcPath = lrcRemote;
+                    }
+                    TryDelete(lrcLocal);
+                }
+
                 // Extract current cover for preview (best effort).
                 string coverPath = Path.Combine(tempDir, "tagedit_cover_" + Guid.NewGuid().ToString("N") + ".jpg");
                 bool gotCover = await RunFfmpegAsync(ffmpegPath, new List<string>
@@ -172,6 +187,22 @@ namespace AndroidMusicPresenceLink
                     return (false, "Could not replace the file; it may be locked while the track is playing. The original was left untouched. " + mvOut.Trim());
                 }
 
+                // Replacing the file out-of-band leaves MediaStore holding the old extracted
+                // tags, so the player keeps showing them. An explicit per-file scan forces
+                // MediaStore to re-read the new tags from the file.
+                await AdbHelper.RunAdbAsync($"-s {device} shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d {Sq("file://" + remotePath)}").ConfigureAwait(false);
+
+                // Lyrics destined for a .lrc file (checkbox, or WAV): write the sibling file,
+                // or remove it when the lyrics were cleared.
+                if (edited.SaveLyricsAsLrc || ext == ".wav")
+                {
+                    string lrcRemote = RemoteLrcPath(remotePath);
+                    if (!string.IsNullOrWhiteSpace(edited.Lyrics))
+                        await PushLrcAsync(device, lrcRemote, edited.Lyrics, tempDir).ConfigureAwait(false);
+                    else
+                        await AdbHelper.RunAdbAsync($"-s {device} shell rm -f {Sq(lrcRemote)}").ConfigureAwait(false);
+                }
+
                 return (true, "Tags saved.");
             }
             catch (Exception ex)
@@ -231,6 +262,25 @@ namespace AndroidMusicPresenceLink
             AddMeta(args, "date", m.Year);
             AddMeta(args, "comment", m.Comment);
 
+            // Lyrics. When the lyrics are going to a .lrc file (checkbox, or WAV which can't
+            // embed), we do not embed and instead clear any existing embedded field so it
+            // does not shadow the .lrc (embedded wins on read). Otherwise embed into the
+            // field the lyrics came from, or the per-format default for new lyrics.
+            bool lyricsToLrc = m.SaveLyricsAsLrc || ext == ".wav";
+            if (lyricsToLrc)
+            {
+                if (!m.LyricsFromLrc && !string.IsNullOrEmpty(m.LyricsSourceField))
+                    AddMeta(args, m.LyricsSourceField!, string.Empty);
+            }
+            else
+            {
+                string? field = (!m.LyricsFromLrc && !string.IsNullOrEmpty(m.LyricsSourceField))
+                    ? m.LyricsSourceField
+                    : DefaultLyricsField(ext);
+                if (!string.IsNullOrEmpty(field))
+                    AddMeta(args, field!, m.Lyrics ?? string.Empty);
+            }
+
             args.AddRange(new[] { "-y", outPath });
             return args;
         }
@@ -243,27 +293,83 @@ namespace AndroidMusicPresenceLink
 
         private static void ParseFfmetadata(string text, TrackMetadata meta)
         {
-            foreach (var raw in text.Replace("\r\n", "\n").Split('\n'))
+            foreach (var (rawKey, value) in ParseFfmetadataEntries(text))
             {
-                var line = raw;
+                string key = rawKey.Trim();
+                string lower = key.ToLowerInvariant();
+
+                bool mapped = false;
+                foreach (var (k, set) in ReadMap)
+                {
+                    if (k == lower) { set(meta, value); mapped = true; break; }
+                }
+                if (mapped) continue;
+
+                // Lyrics can live under several keys depending on the format/tagger:
+                // USLT shows as "lyrics" or "lyrics-<lang>", Vorbis uses UNSYNCEDLYRICS,
+                // MP4 uses "lyrics" (the c-lyr atom), WMA uses WM/Lyrics. Keep the first
+                // non-empty one and remember the exact key so we can write back to it.
+                if (string.IsNullOrEmpty(meta.Lyrics) && !string.IsNullOrWhiteSpace(value) && IsLyricKey(lower))
+                {
+                    meta.Lyrics = value;
+                    meta.LyricsSourceField = key;
+                }
+            }
+        }
+
+        private static bool IsLyricKey(string lowerKey)
+            => lowerKey == "lyrics"
+            || lowerKey.StartsWith("lyrics-", StringComparison.Ordinal)
+            || lowerKey == "unsyncedlyrics"
+            || lowerKey == "syncedlyrics"
+            || lowerKey == "wm/lyrics";
+
+        // ffmetadata uses key=value lines, with \, =, ;, # and newline escaped by a leading
+        // backslash. A backslash before a real newline means the value continues onto the
+        // next physical line, so multi-line values (lyrics) must be reassembled before split.
+        private static List<(string key, string value)> ParseFfmetadataEntries(string text)
+        {
+            var entries = new List<(string, string)>();
+            text = text.Replace("\r\n", "\n").Replace("\r", "\n");
+
+            var logical = new List<string>();
+            var cur = new StringBuilder();
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '\\' && i + 1 < text.Length)
+                {
+                    cur.Append(c);
+                    cur.Append(text[i + 1]);
+                    i++;
+                    continue;
+                }
+                if (c == '\n')
+                {
+                    logical.Add(cur.ToString());
+                    cur.Clear();
+                    continue;
+                }
+                cur.Append(c);
+            }
+            if (cur.Length > 0) logical.Add(cur.ToString());
+
+            foreach (var line in logical)
+            {
                 if (line.Length == 0) continue;
                 if (line[0] == ';' || line[0] == '#' || line[0] == '[') continue;
 
-                int eq = line.IndexOf('=');
+                int eq = -1;
+                for (int k = 0; k < line.Length; k++)
+                {
+                    if (line[k] == '\\') { k++; continue; }
+                    if (line[k] == '=') { eq = k; break; }
+                }
                 if (eq <= 0) continue;
 
-                string key = line.Substring(0, eq).Trim().ToLowerInvariant();
-                string value = Unescape(line.Substring(eq + 1));
-
-                foreach (var (k, set) in ReadMap)
-                {
-                    if (k == key)
-                    {
-                        set(meta, value);
-                        break;
-                    }
-                }
+                entries.Add((Unescape(line.Substring(0, eq)), Unescape(line.Substring(eq + 1))));
             }
+            return entries;
         }
 
         // ffmetadata escapes \, =, ;, # and newline with a leading backslash.
@@ -341,6 +447,64 @@ namespace AndroidMusicPresenceLink
             string p = remotePath.Replace('\\', '/');
             int slash = p.LastIndexOf('/');
             return slash <= 0 ? "" : p.Substring(0, slash);
+        }
+
+        // The field a new (no prior source) embedded lyric goes into, matching what Musicolet
+        // writes per format. WAV is not here because WAV lyrics are .lrc only.
+        private static string? DefaultLyricsField(string ext) => ext switch
+        {
+            ".mp3" => "lyrics-",                 // USLT, empty language
+            ".flac" => "UNSYNCEDLYRICS",
+            ".ogg" => "UNSYNCEDLYRICS",
+            ".opus" => "UNSYNCEDLYRICS",
+            ".m4a" => "lyrics",                  // c-lyr atom
+            ".mp4" => "lyrics",
+            ".m4b" => "lyrics",
+            ".wma" => "WM/Lyrics",
+            _ => "lyrics"
+        };
+
+        private static string RemoteLrcPath(string remotePath)
+        {
+            string p = remotePath.Replace('\\', '/');
+            int slash = p.LastIndexOf('/');
+            string dir = slash >= 0 ? p.Substring(0, slash) : "";
+            string file = slash >= 0 ? p.Substring(slash + 1) : p;
+            int dot = file.LastIndexOf('.');
+            string baseName = dot > 0 ? file.Substring(0, dot) : file;
+            return (dir.Length > 0 ? dir + "/" : "") + baseName + ".lrc";
+        }
+
+        // Write the lyrics to a local temp .lrc, push to a temp name in the same folder, then
+        // rename over the sibling .lrc so a failed push never leaves a half-written file.
+        private static async Task PushLrcAsync(string device, string lrcRemote, string text, string tempDir)
+        {
+            string localLrc = Path.Combine(tempDir, "tagedit_lrcout_" + Guid.NewGuid().ToString("N") + ".lrc");
+            try
+            {
+                Directory.CreateDirectory(tempDir);
+                File.WriteAllText(localLrc, text, new UTF8Encoding(false));
+
+                string dir = RemoteDirectory(lrcRemote);
+                string remoteTmp = dir + "/.ampl_lrc_tmp_" + Guid.NewGuid().ToString("N") + ".lrc";
+
+                await AdbHelper.RunAdbCaptureAsync($"-s {device} push \"{localLrc}\" \"{remoteTmp}\"").ConfigureAwait(false);
+
+                string check = await AdbHelper.RunAdbCaptureAsync(
+                    $"-s {device} shell test -s {Sq(remoteTmp)} && echo __AMPL_OK__").ConfigureAwait(false);
+                if (check.IndexOf("__AMPL_OK__", StringComparison.Ordinal) >= 0)
+                    await AdbHelper.RunAdbAsync($"-s {device} shell mv -f {Sq(remoteTmp)} {Sq(lrcRemote)}").ConfigureAwait(false);
+                else
+                    await AdbHelper.RunAdbAsync($"-s {device} shell rm -f {Sq(remoteTmp)}").ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[TAGEDIT] PushLrcAsync failed: " + ex.Message);
+            }
+            finally
+            {
+                TryDelete(localLrc);
+            }
         }
 
         // Single-quote a path for an adb shell command, escaping embedded single quotes.

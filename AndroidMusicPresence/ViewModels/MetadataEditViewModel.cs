@@ -39,7 +39,19 @@ namespace AndroidMusicPresenceLink
             _originalCoverPreviewPath = initial.CoverPreviewPath;
             _coverPreviewPath = initial.CoverPreviewPath;
             _localSourcePath = initial.LocalSourcePath;
+
+            _lyrics = initial.Lyrics ?? string.Empty;
+            _lyricsSourceField = initial.LyricsSourceField;
+            _lyricsFromLrc = initial.LyricsFromLrc;
+            _lyricsLrcPath = initial.LyricsLrcPath;
+            _lrcLocked = (_fileLabel ?? string.Empty).EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
+            _saveLyricsAsLrc = _lrcLocked || initial.SaveLyricsAsLrc;
         }
+
+        private readonly string? _lyricsSourceField;
+        private readonly bool _lyricsFromLrc;
+        private readonly string? _lyricsLrcPath;
+        private readonly bool _lrcLocked;
 
         private readonly string? _localSourcePath;
 
@@ -78,6 +90,35 @@ namespace AndroidMusicPresenceLink
 
         private bool _retainDate;
         public bool RetainDate { get => _retainDate; set => Set(ref _retainDate, value); }
+
+        // Lyrics. The inline editor commits its draft into Lyrics/SaveLyricsAsLrc; the
+        // indicators below drive the button label and status text.
+        private string _lyrics;
+        public string Lyrics
+        {
+            get => _lyrics;
+            set
+            {
+                if (Set(ref _lyrics, value))
+                {
+                    RaisePropertyChanged(nameof(HasLyrics));
+                    RaisePropertyChanged(nameof(LyricsButtonLabel));
+                    RaisePropertyChanged(nameof(LyricsStatus));
+                }
+            }
+        }
+
+        private bool _saveLyricsAsLrc;
+        public bool SaveLyricsAsLrc { get => _saveLyricsAsLrc; set => Set(ref _saveLyricsAsLrc, value); }
+
+        public bool LrcLocked => _lrcLocked;
+        public bool HasLyrics => !string.IsNullOrWhiteSpace(Lyrics);
+        public string LyricsButtonLabel => HasLyrics ? "Edit lyrics" : "Create lyrics";
+        public string LyricsStatus => !HasLyrics ? string.Empty : (LyricsIsSynced(Lyrics) ? "Lyrics: synced" : "Lyrics: unsynced");
+
+        private static bool LyricsIsSynced(string text)
+            => !string.IsNullOrEmpty(text)
+            && System.Text.RegularExpressions.Regex.IsMatch(text, @"\[\d{1,2}:\d{2}");
 
         // Cover state.
         private string? _coverPreviewPath;
@@ -134,7 +175,12 @@ namespace AndroidMusicPresenceLink
                 RemoveCover = _removeCover,
                 CoverPreviewPath = _originalCoverPreviewPath,
                 LocalSourcePath = _localSourcePath,
-                RetainDateModified = RetainDate
+                RetainDateModified = RetainDate,
+                Lyrics = Lyrics ?? string.Empty,
+                LyricsSourceField = _lyricsSourceField,
+                LyricsFromLrc = _lyricsFromLrc,
+                LyricsLrcPath = _lyricsLrcPath,
+                SaveLyricsAsLrc = SaveLyricsAsLrc
             };
         }
     }

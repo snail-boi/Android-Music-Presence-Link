@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 
@@ -17,6 +18,10 @@ namespace AndroidMusicPresenceLink
     {
         private readonly MetadataEditViewModel _vm;
 
+        private const double LyricsExtraHeight = 280;
+        private double _restoreHeight;
+        private bool _lyricsOpen;
+
         internal TrackMetadata? Result { get; private set; }
 
         internal MetadataEditWindow(TrackMetadata initial, string fileLabel)
@@ -27,6 +32,9 @@ namespace AndroidMusicPresenceLink
             DataContext = _vm;
             _vm.RequestClose += OnRequestClose;
             _vm.PropertyChanged += OnVmPropertyChanged;
+
+            LyricsEditor.Saved += OnLyricsSaved;
+            LyricsEditor.Cancelled += OnLyricsCancelled;
 
             LoadCoverPreview(_vm.CoverPreviewPath);
         }
@@ -97,6 +105,51 @@ namespace AndroidMusicPresenceLink
             // Non-square: let the user crop to a square or keep the original aspect ratio.
             var crop = new CoverCropWindow(path) { Owner = this };
             return crop.ShowDialog() == true ? crop.Result : null;
+        }
+
+        // Pressing the lyrics button grows the window and reveals the inline editor, seeded
+        // from the current staged lyrics. Save/Cancel collapse it and shrink back.
+        private void BtnLyrics_Click(object sender, RoutedEventArgs e)
+        {
+            if (_lyricsOpen) return;
+            _lyricsOpen = true;
+            _restoreHeight = ActualHeight;
+
+            LyricsEditor.SetData(_vm.Lyrics, _vm.SaveLyricsAsLrc, _vm.LrcLocked);
+            LyricsHost.Visibility = Visibility.Visible;
+            AnimateHeight(_restoreHeight + LyricsExtraHeight, null);
+        }
+
+        private void OnLyricsSaved(string text, bool saveAsLrc)
+        {
+            _vm.Lyrics = text;
+            _vm.SaveLyricsAsLrc = saveAsLrc;
+            CollapseLyrics();
+        }
+
+        private void OnLyricsCancelled() => CollapseLyrics();
+
+        private void CollapseLyrics()
+        {
+            if (!_lyricsOpen) return;
+            _lyricsOpen = false;
+            AnimateHeight(_restoreHeight, () => LyricsHost.Visibility = Visibility.Collapsed);
+        }
+
+        private void AnimateHeight(double target, Action? completed)
+        {
+            var anim = new DoubleAnimation(ActualHeight, target, new Duration(TimeSpan.FromMilliseconds(180)))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+            };
+            anim.Completed += (s, e) =>
+            {
+                // Release the animation's hold on Height so the window stays user-resizable.
+                BeginAnimation(HeightProperty, null);
+                Height = target;
+                completed?.Invoke();
+            };
+            BeginAnimation(HeightProperty, anim);
         }
 
         private void OnRequestClose(bool result)
