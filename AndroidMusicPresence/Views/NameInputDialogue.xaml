@@ -3,36 +3,104 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding WindowTitle}" Height="180" Width="400"
         WindowStartupLocation="CenterOwner"
-        Background="#111111"
+        Background="{DynamicResource ThemeBackgroundBrush}"
         ResizeMode="NoResize"
         FocusManager.FocusedElement="{Binding ElementName=TxtInput}">
     <Window.Resources>
+
+        <!-- Primary (accent) button -->
         <Style TargetType="Button">
-            <Setter Property="Background" Value="#5539cc"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,7"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Secondary (outlined) button -->
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
+
     <Grid Margin="15">
         <StackPanel>
-            <TextBlock Text="{Binding PromptText}" Foreground="White" Margin="0,0,0,10" TextWrapping="Wrap"/>
-            <TextBox x:Name="TxtInput" Background="#222" Foreground="White" BorderBrush="#444" Padding="5" Margin="0,0,0,15"
+            <TextBlock Text="{Binding PromptText}"
+                       Foreground="{DynamicResource ThemeForegroundBrush}"
+                       Margin="0,0,0,10" TextWrapping="Wrap"/>
+            <TextBox x:Name="TxtInput"
+                     Background="{DynamicResource ThemeControlBackgroundBrush}"
+                     Foreground="{DynamicResource ThemeControlForegroundBrush}"
+                     BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                     CaretBrush="{DynamicResource ThemeControlForegroundBrush}"
+                     Padding="8,6" Margin="0,0,0,15"
                      Text="{Binding InputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Cancel" Command="{Binding CancelCommand}" Background="#444" Width="50"/>
-                <Button Content="OK" Command="{Binding OkCommand}" IsDefault="True" Width="50" Height="20"/>
+                <Button Content="Cancel" Command="{Binding CancelCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}" Width="70"/>
+                <Button Content="OK" Command="{Binding OkCommand}"
+                        IsDefault="True" Width="70" Margin="6,0,0,0"/>
             </StackPanel>
         </StackPanel>
     </Grid>

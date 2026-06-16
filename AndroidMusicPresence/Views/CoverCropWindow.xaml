@@ -3,26 +3,84 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Crop cover" Height="600" Width="520"
         WindowStartupLocation="CenterOwner"
-        Background="#111111"
+        Background="{DynamicResource ThemeBackgroundBrush}"
         ResizeMode="CanResizeWithGrip">
     <Window.Resources>
+
+        <!-- Primary (accent) button -->
         <Style TargetType="Button">
-            <Setter Property="Background" Value="#5539cc"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="Margin" Value="5,0,0,0"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,7"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Secondary (outlined) button -->
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
     <Grid Margin="12">
@@ -31,6 +89,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Crop canvas: stays black regardless of theme - it's a functional working area -->
         <Grid x:Name="CropArea" Grid.Row="0" Background="#000000" ClipToBounds="True"
               SizeChanged="CropArea_SizeChanged">
             <Image x:Name="ImgSource" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -45,11 +104,16 @@
         </Grid>
 
         <StackPanel Grid.Row="1" Margin="0,12,0,0">
-            <CheckBox x:Name="ChkSquare" Content="Crop to square" Foreground="#AAAAAA" IsChecked="True"
-                      Checked="ChkSquare_Changed" Unchecked="ChkSquare_Changed" Margin="0,0,0,10"/>
+            <CheckBox x:Name="ChkSquare" Content="Crop to square"
+                      Style="{StaticResource ToggleSwitchStyle}"
+                      IsChecked="True"
+                      Checked="ChkSquare_Changed" Unchecked="ChkSquare_Changed"
+                      Margin="0,0,0,10"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Cancel" Click="Cancel_Click" Background="#444444"/>
-                <Button Content="Use cover" Click="Ok_Click" IsDefault="True"/>
+                <Button Content="Cancel" Click="Cancel_Click"
+                        Style="{StaticResource SecondaryButtonStyle}"/>
+                <Button Content="Use cover" Click="Ok_Click"
+                        IsDefault="True" Margin="6,0,0,0"/>
             </StackPanel>
         </StackPanel>
     </Grid>

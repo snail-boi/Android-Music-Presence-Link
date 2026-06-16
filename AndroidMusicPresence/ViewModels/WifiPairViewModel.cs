@@ -189,7 +189,7 @@ namespace AndroidMusicPresenceLink
             using var data = generator.CreateQrCode(qrContent, QRCodeGenerator.ECCLevel.M);
             using var qrCode = new BitmapByteQRCode(data);
 
-            byte[] bitmapBytes = qrCode.GetGraphic(10, new byte[] { 255, 255, 255 }, new byte[] { 0, 0, 0 });
+            byte[] bitmapBytes = qrCode.GetGraphic(10, new byte[] { 0, 0, 0 }, new byte[] { 255, 255, 255 });
 
             var image = new BitmapImage();
             image.BeginInit();

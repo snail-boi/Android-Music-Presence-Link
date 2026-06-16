@@ -2,26 +2,89 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
+
+        <!-- Primary (accent) button -->
         <Style x:Key="LyrButton" TargetType="Button">
-            <Setter Property="Background" Value="#5539cc"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="Margin" Value="5,0,0,0"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,7"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Secondary (outlined) button -->
+        <Style x:Key="LyrSecondaryButton" TargetType="Button" BasedOn="{StaticResource LyrButton}">
+            <Setter Property="Background" Value="{DynamicResource ThemeControlBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentPressedBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </UserControl.Resources>
 
-    <Border Background="#1A1A1A" CornerRadius="6" Padding="10">
+    <!-- Card: ThemeControlBackgroundBrush so it lifts off the window background in both modes -->
+    <Border Background="{DynamicResource ThemeControlBackgroundBrush}"
+            BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6"
+            Padding="10">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -31,24 +94,35 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" Margin="0,0,0,6">
-                <TextBlock Text="Lyrics" Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center"/>
-                <TextBlock x:Name="LblStatus" HorizontalAlignment="Right" Foreground="#888888" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Text="Lyrics"
+                           Foreground="{DynamicResource ThemeForegroundBrush}"
+                           FontSize="12" FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+                <TextBlock x:Name="LblStatus"
+                           HorizontalAlignment="Right"
+                           Foreground="{DynamicResource ThemeForegroundBrush}"
+                           Opacity="0.55"
+                           FontSize="11" VerticalAlignment="Center"/>
             </Grid>
 
             <TextBox x:Name="Txt" Grid.Row="1"
-                     Background="#222222" Foreground="White" BorderBrush="#444444" CaretBrush="White"
+                     Background="{DynamicResource ThemeControlBackgroundBrush}"
+                     Foreground="{DynamicResource ThemeControlForegroundBrush}"
+                     BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                     CaretBrush="{DynamicResource ThemeControlForegroundBrush}"
                      AcceptsReturn="True" AcceptsTab="True" TextWrapping="NoWrap"
                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                      FontFamily="Consolas" Padding="6,4"
                      TextChanged="Txt_TextChanged"/>
 
             <CheckBox x:Name="ChkLrc" Grid.Row="2" Content="Save .LRC in folder"
-                      Foreground="#AAAAAA" Margin="0,8,0,0"/>
+                      Style="{StaticResource ToggleSwitchStyle}"
+                      Margin="0,8,0,0"/>
 
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-                <Button Content="Cancel" Style="{StaticResource LyrButton}" Background="#444444" Click="Cancel_Click"/>
-                <Button Content="Clear" Style="{StaticResource LyrButton}" Background="#444444" Click="Clear_Click"/>
-                <Button Content="Save" Style="{StaticResource LyrButton}" Click="Save_Click"/>
+                <Button Content="Cancel" Style="{StaticResource LyrSecondaryButton}" Click="Cancel_Click"/>
+                <Button Content="Clear"  Style="{StaticResource LyrSecondaryButton}" Click="Clear_Click" Margin="6,0,0,0"/>
+                <Button Content="Save"   Style="{StaticResource LyrButton}"          Click="Save_Click"   Margin="6,0,0,0"/>
             </StackPanel>
         </Grid>
     </Border>
