@@ -496,6 +496,49 @@ namespace AndroidMusicPresenceLink
             return "image/jpeg";
         }
 
+        /// <summary>
+        /// Read just the embedded lyric field from an already-local file (no device pull),
+        /// using the same global + stream-mapped merge as the editor so OGG/Opus stream tags
+        /// are covered. Returns null when the file has no embedded lyrics. Intended to be
+        /// called by the cover pull, which already has the file on disk.
+        /// </summary>
+        public static async Task<string?> ReadEmbeddedLyricsAsync(string ffmpegPath, string localFilePath)
+        {
+            try
+            {
+                if (!File.Exists(ffmpegPath) || !File.Exists(localFilePath))
+                    return null;
+
+                var meta = new TrackMetadata();
+                string baseTmp = Path.Combine(Path.GetTempPath(), "ampl_lyr_" + Guid.NewGuid().ToString("N"));
+                string streamPath = baseTmp + "_s.txt";
+                string globalPath = baseTmp + "_g.txt";
+
+                if (await RunFfmpegAsync(ffmpegPath, new List<string>
+                    { "-i", localFilePath, "-map_metadata:g", "0:s:0", "-f", "ffmetadata", "-y", streamPath }).ConfigureAwait(false)
+                    && File.Exists(streamPath))
+                {
+                    ParseFfmetadata(File.ReadAllText(streamPath, Encoding.UTF8), meta);
+                    TryDelete(streamPath);
+                }
+
+                if (await RunFfmpegAsync(ffmpegPath, new List<string>
+                    { "-i", localFilePath, "-f", "ffmetadata", "-y", globalPath }).ConfigureAwait(false)
+                    && File.Exists(globalPath))
+                {
+                    ParseFfmetadata(File.ReadAllText(globalPath, Encoding.UTF8), meta);
+                    TryDelete(globalPath);
+                }
+
+                return string.IsNullOrWhiteSpace(meta.Lyrics) ? null : meta.Lyrics;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[LYRICS] embedded read failed: " + ex.Message);
+                return null;
+            }
+        }
+
         private static void ParseFfmetadata(string text, TrackMetadata meta)
         {
             foreach (var (rawKey, value) in ParseFfmetadataEntries(text))

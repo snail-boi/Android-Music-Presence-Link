@@ -303,6 +303,17 @@ namespace AndroidMusicPresenceLink
                         try { dur = await GetMediaDurationAsync(tempPull); } catch { }
                         try { meta = await GetMediaMetadataAsync(tempPull); } catch { }
 
+                        // Piggyback on this pull: grab embedded lyrics from the same local file
+                        // and cache them. "key" is ComputeKey(cacheDeviceKey, remoteFilePath),
+                        // the exact key the lyrics resolver looks up by file path.
+                        try
+                        {
+                            var embeddedLyrics = await MetadataEditService.ReadEmbeddedLyricsAsync(ffmpegPath, tempPull).ConfigureAwait(false);
+                            if (!string.IsNullOrWhiteSpace(embeddedLyrics))
+                                LyricsCache.Save(key, LyricsCache.Source.Embed, embeddedLyrics);
+                        }
+                        catch { }
+
                         try { File.Delete(tempPull); } catch { }
 
                         if (extracted && File.Exists(cachedFull))

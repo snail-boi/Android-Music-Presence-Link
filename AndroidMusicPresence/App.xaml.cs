@@ -131,7 +131,7 @@ namespace AndroidMusicPresenceLink
             }
 
             _presenceService = new MusicPresenceService(Dispatcher, Config);
-            _lyricsOverlayManager = new LyricsOverlayManager(Dispatcher, Config, () => _presenceService?.CurrentDevice ?? string.Empty);
+            _lyricsOverlayManager = new LyricsOverlayManager(Dispatcher, Config, () => _presenceService?.CurrentDevice ?? string.Empty, () => (_presenceService?.CurrentRemoteFilePath, _presenceService?.CurrentRemoteFileToken));
             _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication, Config.UseDarkMode);
             SessionEnding += OnSessionEnding;
             _presenceService.TrayStateChanged += OnTrayStateChanged;
@@ -661,6 +661,22 @@ namespace AndroidMusicPresenceLink
 
                     var (ok, message) = await MetadataEditService.WriteAsync(device, remotePath, window.Result, ffmpeg, tempDir, window.Result.RetainDateModified);
                     ShowToast(message, ok ? ToastLevel.Info : ToastLevel.Warning);
+
+                    if (ok)
+                    {
+                        // We just wrote this file and know its new lyrics, so update the cache
+                        // directly (no re-pull needed) and nudge the resolver to re-read the
+                        // current track so the change shows without switching songs.
+                        var dk = LyricsCache.DeviceKey(Config?.SelectedDeviceName, device);
+                        var fk = LyricsCache.FileKey(dk, remotePath);
+                        var newLyrics = window.Result.Lyrics;
+                        if (!string.IsNullOrWhiteSpace(newLyrics))
+                            LyricsCache.Save(fk, LyricsCache.Source.Embed, newLyrics);
+                        else
+                            LyricsCache.Invalidate(fk);
+
+                        _lyricsOverlayManager?.MarkCurrentTrackDirty();
+                    }
                 }
             }
             finally

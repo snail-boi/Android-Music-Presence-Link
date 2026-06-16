@@ -38,32 +38,39 @@ namespace AndroidMusicPresenceLink
         // False for plain-text lyrics files (no [mm:ss] markers anywhere).
         private bool _linesAreTimed;
 
-        private readonly string _lyricsCachePath;
-        private readonly Dictionary<string, LyricsCacheEntry?> _trackLyricsPathCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Func<(string? path, string? token)> _getCurrentFileInfo;
+        // Whether the lyrics currently loaded were resolved using the matched file path (true)
+        // or only from track metadata (false, e.g. before the file path caught up to the track).
+        private bool _loadedUsedFile;
+        // Guards the initial async resolve so overlapping playback ticks do not double-load.
+        private bool _loadInFlight;
 
-        public LyricsOverlayManager(Dispatcher dispatcher, MusicConfig config, Func<string> getCurrentDevice)
+        public LyricsOverlayManager(Dispatcher dispatcher, MusicConfig config, Func<string> getCurrentDevice, Func<(string? path, string? token)> getCurrentFileInfo)
         {
             _dispatcher = dispatcher;
             _config = config;
             _getCurrentDevice = getCurrentDevice;
+            _getCurrentFileInfo = getCurrentFileInfo;
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _timer.Tick += Timer_Tick;
-
-            _lyricsCachePath = AppPaths.GetDataPath("LyricsCache");
-
-            try
-            {
-                Directory.CreateDirectory(_lyricsCachePath);
-            }
-            catch
-            {
-            }
         }
 
         public void UpdateConfig(MusicConfig config)
         {
             _config = config;
-            _trackLyricsPathCache.Clear();
+        }
+
+        /// <summary>
+        /// Force the current track's lyrics to be re-resolved on the next playback update
+        /// (e.g. after the user edits this track's lyrics). Clearing the loaded-track key makes
+        /// the next tick run a full resolve, which picks up the just-saved lyrics (or clears
+        /// them if they were removed). The existing lines stay on screen until the new resolve
+        /// completes, so there is no flash.
+        /// </summary>
+        public void MarkCurrentTrackDirty()
+        {
+            _loadedTrackKey = null;
+            _loadedUsedFile = false;
         }
 
         public void ToggleVisibility()
@@ -127,6 +134,7 @@ namespace AndroidMusicPresenceLink
                 if (string.IsNullOrWhiteSpace(_currentTitle) || string.IsNullOrWhiteSpace(_currentArtist))
                 {
                     _loadedTrackKey = null;
+                    _loadedUsedFile = false;
                     bool hadLines = _lines.Count > 0;
                     _lines.Clear();
                     _linesAreTimed = false;
@@ -139,11 +147,43 @@ namespace AndroidMusicPresenceLink
 
                 if (!string.Equals(_loadedTrackKey, trackKey, StringComparison.Ordinal))
                 {
+                    // New track: full resolve (file key if the path has caught up, else metadata
+                    // key). Guard against the track changing during the await.
                     _loadedTrackKey = trackKey;
+                    _loadInFlight = true;
                     var loaded = await LoadLyricsForCurrentTrackAsync().ConfigureAwait(true);
-                    _lines = loaded.lines;
-                    _linesAreTimed = loaded.isTimed;
-                    RaiseLinesChanged();
+                    if (string.Equals(_loadedTrackKey, trackKey, StringComparison.Ordinal))
+                    {
+                        _lines = loaded.lines;
+                        _linesAreTimed = loaded.isTimed;
+                        _loadedUsedFile = loaded.usedFile;
+                        RaiseLinesChanged();
+                    }
+                    _loadInFlight = false;
+                }
+                else if (!_loadedUsedFile && !_loadInFlight)
+                {
+                    // Same track, initial resolve happened before the file path caught up (the
+                    // path is produced by the cover pipeline, which runs after this metadata
+                    // notification). Once it matches, fold in embedded lyrics the cover pull
+                    // cached for this file. This only upgrades to embedded; it never re-searches
+                    // and never clears what is already shown (e.g. a found .lrc).
+                    var info = _getCurrentFileInfo?.Invoke() ?? (null, null);
+                    if (!string.IsNullOrWhiteSpace(info.Item1)
+                        && string.Equals(info.Item2, LyricsCache.TrackToken(_currentTitle, _currentArtist), StringComparison.Ordinal))
+                    {
+                        _loadedUsedFile = true; // path resolved; no more upgrade checks for this track
+
+                        var deviceKey = LyricsCache.DeviceKey(_config?.SelectedDeviceName, _getCurrentDevice());
+                        var entry = LyricsCache.TryLoad(LyricsCache.FileKey(deviceKey, info.Item1!));
+                        if (entry != null && entry.Source == LyricsCache.Source.Embed && !string.IsNullOrWhiteSpace(entry.Text))
+                        {
+                            var parsed = ParseLrcText(entry.Text);
+                            _lines = parsed.lines;
+                            _linesAreTimed = parsed.isTimed;
+                            RaiseLinesChanged();
+                        }
+                    }
                 }
 
                 if (_lines.Count == 0 || !_overlayVisible)
@@ -203,49 +243,62 @@ namespace AndroidMusicPresenceLink
             return _lines[idx].Text;
         }
 
-        private async Task<(List<LyricsLine> lines, bool isTimed)> LoadLyricsForCurrentTrackAsync()
+        private async Task<(List<LyricsLine> lines, bool isTimed, bool usedFile)> LoadLyricsForCurrentTrackAsync()
         {
             var artist = _currentArtist ?? string.Empty;
             var title = _currentTitle ?? string.Empty;
             var album = _currentAlbum ?? string.Empty;
-            var key = BuildTrackKey(artist, title, album);
-
-            if (_trackLyricsPathCache.TryGetValue(key, out var cachedEntry))
-            {
-                if (cachedEntry?.RemotePath == null)
-                {
-                    if (!string.IsNullOrWhiteSpace(cachedEntry?.LocalPath) && File.Exists(cachedEntry.LocalPath))
-                        return await ParseLrcFileAsync(cachedEntry.LocalPath).ConfigureAwait(true);
-
-                    return (new List<LyricsLine>(), false);
-                }
-
-                var refreshDevice = _getCurrentDevice();
-                if (string.IsNullOrWhiteSpace(refreshDevice))
-                {
-                    if (!string.IsNullOrWhiteSpace(cachedEntry.LocalPath) && File.Exists(cachedEntry.LocalPath))
-                        return await ParseLrcFileAsync(cachedEntry.LocalPath).ConfigureAwait(true);
-
-                    return (new List<LyricsLine>(), false);
-                }
-
-                var refreshedPath = await PullAndCacheLyricsAsync(refreshDevice, cachedEntry.RemotePath, key).ConfigureAwait(true);
-                var finalPath = !string.IsNullOrWhiteSpace(refreshedPath) ? refreshedPath : cachedEntry.LocalPath;
-                _trackLyricsPathCache[key] = new LyricsCacheEntry(cachedEntry.RemotePath, finalPath);
-
-                if (!string.IsNullOrWhiteSpace(finalPath) && File.Exists(finalPath))
-                    return await ParseLrcFileAsync(finalPath).ConfigureAwait(true);
-
-                return (new List<LyricsLine>(), false);
-            }
 
             var device = _getCurrentDevice();
-            if (string.IsNullOrWhiteSpace(device))
+            var deviceKey = LyricsCache.DeviceKey(_config?.SelectedDeviceName, device);
+
+            // Only trust the resolved file path when it was stamped for THIS track. The path
+            // is produced by the cover pipeline, which lags the metadata notification, so a
+            // raw read here can still hold the previous track's file. Without this check we
+            // would key lyrics by the wrong file and map one song's lyrics onto another.
+            var info = _getCurrentFileInfo?.Invoke() ?? (null, null);
+            string? filePath = info.Item1;
+            bool fileMatches = !string.IsNullOrWhiteSpace(filePath)
+                && string.Equals(info.Item2, LyricsCache.TrackToken(title, artist), StringComparison.Ordinal);
+
+            string cacheKey = fileMatches
+                ? LyricsCache.FileKey(deviceKey, filePath!)
+                : LyricsCache.MetaKey(BuildTrackKey(artist, title, album));
+
+            // 1) Unified cache. Embedded wins because it is stored as EMBED here and never
+            //    overwritten by an .lrc entry.
+            var cached = LyricsCache.TryLoad(cacheKey);
+            if (cached != null)
             {
-                _trackLyricsPathCache[key] = new LyricsCacheEntry(null, null);
-                return (new List<LyricsLine>(), false);
+                if (cached.Source == LyricsCache.Source.None)
+                    return (new List<LyricsLine>(), false, fileMatches);
+                var parsedCached = ParseLrcText(cached.Text);
+                return (parsedCached.lines, parsedCached.isTimed, fileMatches);
             }
 
+            // 2) Nothing cached yet. Embedded lyrics, if any, are filled in separately by the
+            //    cover pull. Here we do the sibling .lrc search and cache whatever we resolve.
+            if (string.IsNullOrWhiteSpace(device))
+                return (new List<LyricsLine>(), false, fileMatches); // no device: transient, do not cache NONE
+
+            string? bestRemotePath = await FindBestLrcAsync(device, artist, title, album).ConfigureAwait(true);
+            if (string.IsNullOrWhiteSpace(bestRemotePath))
+            {
+                LyricsCache.Save(cacheKey, LyricsCache.Source.None, string.Empty);
+                return (new List<LyricsLine>(), false, fileMatches);
+            }
+
+            string? text = await PullLrcTextAsync(device, bestRemotePath!).ConfigureAwait(true);
+            if (string.IsNullOrWhiteSpace(text))
+                return (new List<LyricsLine>(), false, fileMatches); // pull failed: transient, do not cache NONE
+
+            LyricsCache.Save(cacheKey, LyricsCache.Source.Lrc, text!);
+            var parsed = ParseLrcText(text!);
+            return (parsed.lines, parsed.isTimed, fileMatches);
+        }
+
+        private async Task<string?> FindBestLrcAsync(string device, string artist, string title, string album)
+        {
             var remoteRoots = GetRemoteRoots(_config);
             string? bestRemotePath = null;
             int bestScore = int.MinValue;
@@ -275,48 +328,36 @@ namespace AndroidMusicPresenceLink
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(bestRemotePath) || bestScore < 20)
-            {
-                _trackLyricsPathCache[key] = new LyricsCacheEntry(null, null);
-                return (new List<LyricsLine>(), false);
-            }
-
-            var localPath = await PullAndCacheLyricsAsync(device, bestRemotePath, key).ConfigureAwait(true);
-            _trackLyricsPathCache[key] = new LyricsCacheEntry(bestRemotePath, localPath);
-
-            if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
-                return (new List<LyricsLine>(), false);
-
-            return await ParseLrcFileAsync(localPath).ConfigureAwait(true);
+            return (!string.IsNullOrWhiteSpace(bestRemotePath) && bestScore >= 20) ? bestRemotePath : null;
         }
 
-        private async Task<string?> PullAndCacheLyricsAsync(string device, string remotePath, string trackKey)
+        // Pull a .lrc to a temp file, read its text, and delete the temp. The text is what we
+        // cache; the .lrc file itself is not kept around any more.
+        private static async Task<string?> PullLrcTextAsync(string device, string remotePath)
         {
+            string localPath = Path.Combine(Path.GetTempPath(), "ampl_lrcpull_" + Guid.NewGuid().ToString("N") + ".lrc");
             try
             {
-                var cacheKey = ComputeKey(remotePath, trackKey);
-                var localPath = Path.Combine(_lyricsCachePath, cacheKey + ".lrc");
-                string? existingPath = null;
-                if (File.Exists(localPath) && new FileInfo(localPath).Length > 0)
-                    existingPath = localPath;
-
-                Directory.CreateDirectory(_lyricsCachePath);
-
                 var escapedRemote = remotePath.Replace("\"", "\\\"");
                 var escapedLocal = localPath.Replace("\"", "\\\"");
                 await AdbHelper.RunAdbAsync($"-s {device} pull \"{escapedRemote}\" \"{escapedLocal}\"").ConfigureAwait(true);
 
                 if (File.Exists(localPath) && new FileInfo(localPath).Length > 0)
-                    return localPath;
-
-                return existingPath;
+                {
+                    try { return await File.ReadAllTextAsync(localPath, Encoding.UTF8).ConfigureAwait(true); }
+                    catch { return await File.ReadAllTextAsync(localPath).ConfigureAwait(true); }
+                }
+                return null;
             }
             catch (Exception ex)
             {
-                Debugger.show("PullAndCacheLyricsAsync failed: " + ex.Message);
+                Debugger.show("PullLrcTextAsync failed: " + ex.Message);
+                return null;
             }
-
-            return null;
+            finally
+            {
+                try { if (File.Exists(localPath)) File.Delete(localPath); } catch { }
+            }
         }
 
         private static List<string> GetRemoteRoots(MusicConfig config)
@@ -386,32 +427,9 @@ namespace AndroidMusicPresenceLink
             return Regex.Replace(new string(chars), "\\s+", " ").Trim();
         }
 
-        private static string ComputeKey(string a, string b)
+        private static (List<LyricsLine> lines, bool isTimed) ParseLrcText(string text)
         {
-            using var sha = System.Security.Cryptography.SHA256.Create();
-            var bytes = Encoding.UTF8.GetBytes(a + "|" + b);
-            var hash = sha.ComputeHash(bytes);
-            return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
-        }
-
-        private static async Task<(List<LyricsLine> lines, bool isTimed)> ParseLrcFileAsync(string path)
-        {
-            string text;
-            try
-            {
-                text = await File.ReadAllTextAsync(path, Encoding.UTF8).ConfigureAwait(true);
-            }
-            catch
-            {
-                try
-                {
-                    text = await File.ReadAllTextAsync(path).ConfigureAwait(true);
-                }
-                catch
-                {
-                    return (new List<LyricsLine>(), false);
-                }
-            }
+            text ??= string.Empty;
 
             var lines = new List<LyricsLine>();
             var regex = new Regex(@"\[(\d{1,2}):(\d{2})(?:[\.:](\d{1,3}))?\]");
@@ -643,8 +661,6 @@ namespace AndroidMusicPresenceLink
         public sealed record LyricsLineDto(TimeSpan Time, string Text, bool IsUntimed = false);
 
         public sealed record LyricsTrackData(IReadOnlyList<LyricsLineDto> Lines, bool IsTimed);
-
-        private sealed record LyricsCacheEntry(string? RemotePath, string? LocalPath);
 
         private sealed record LyricsLine(TimeSpan Time, string Text, bool IsUntimed = false);
     }

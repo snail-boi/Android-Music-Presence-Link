@@ -39,6 +39,11 @@ namespace AndroidMusicPresenceLink
         public string? CurrentAlbum { get; private set; }
         public string? CurrentCoverPath { get; private set; }
         public string? CurrentRemoteFilePath { get; private set; }
+        // The track (title/artist) CurrentRemoteFilePath was resolved for. Lets the lyrics
+        // resolver reject a path that still belongs to the previous track, since the path is
+        // resolved on this cover pipeline, which runs separately from (and later than) the
+        // metadata notification that drives lyric loading.
+        public string? CurrentRemoteFileToken { get; private set; }
         internal CoverCacheManager CoverCache => cacheManager;
 
         // Android only reports the last scrub position, so realPositionMs is the
@@ -894,6 +899,7 @@ namespace AndroidMusicPresenceLink
                 {
                     Debugger.show("[COVERART] No files found in configured remote roots");
                     CurrentRemoteFilePath = null;
+                    CurrentRemoteFileToken = null;
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, _defaultImagePath);
                 }
@@ -960,6 +966,7 @@ namespace AndroidMusicPresenceLink
                 {
                     Debugger.show($"[COVERART] No filename contains the title '{titleStr}' (normalized: '{normTitle}')");
                     CurrentRemoteFilePath = null;
+                    CurrentRemoteFileToken = null;
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, _defaultImagePath);
                 }
@@ -1031,8 +1038,6 @@ namespace AndroidMusicPresenceLink
 
                 var filesToProcess = ordered.Select(o => o.path).Concat(rest).Take(20).ToList();
 
-                CurrentRemoteFilePath = filesToProcess.FirstOrDefault();
-
                 Debugger.show($"[COVERART] Files to process for cover art lookup (ranked): {filesToProcess.Count}");
                 for (int i = 0; i < ranked.Count; i++)
                 {
@@ -1068,6 +1073,12 @@ namespace AndroidMusicPresenceLink
                         Debugger.show($"[COVERARTCACHE] Found cached image at {imagePath}, setting SMTC thumbnail");
                         var imageFile = await StorageFile.GetFileFromPathAsync(imagePath).AsTask().ConfigureAwait(false);
 
+                        // This candidate is the match we are using; its embedded lyrics (if any)
+                        // were already cached inside GetImagePathForNowPlayingAsync. Stamp the
+                        // resolved file with the current track so the lyrics resolver trusts it.
+                        CurrentRemoteFilePath = remotePath;
+                        CurrentRemoteFileToken = LyricsCache.TrackToken(titleStr, artist);
+
                         await dispatcher.InvokeAsync(() =>
                         {
                             try
@@ -1091,6 +1102,10 @@ namespace AndroidMusicPresenceLink
                 }
 
                 Debugger.show("[COVERART] No cover art found for any candidates; using default image");
+                // No cover matched, but every candidate was pulled while trying, so the best
+                // guess's embedded lyrics are cached. Stamp it so the resolver can use them.
+                CurrentRemoteFilePath = filesToProcess.FirstOrDefault();
+                CurrentRemoteFileToken = filesToProcess.Count > 0 ? LyricsCache.TrackToken(titleStr, artist) : null;
                 await SetDefaultImage().ConfigureAwait(false);
                 return (duration, metadata, _defaultImagePath);
             }
