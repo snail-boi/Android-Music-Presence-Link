@@ -7,7 +7,7 @@ namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// The settings window's action buttons: check for update, redo onboarding, toggle the
-    /// media-player view, clear/open the cover cache, open the log folder, and toggle theme.
+    /// media-player view, clear/open the media cache, open the log folder, and toggle theme.
     ///
     /// Commands are created lazily on first access, so this partial needs no constructor hook
     /// and the Core partial is unchanged. Dialogs and message boxes go through the interaction
@@ -29,6 +29,9 @@ namespace AndroidMusicPresenceLink
 
         private RelayCommand? _openCoverCacheCommand;
         public RelayCommand OpenCoverCacheCommand => _openCoverCacheCommand ??= new RelayCommand(OpenCoverCache);
+
+        private RelayCommand? _openLyricsCacheCommand;
+        public RelayCommand OpenLyricsCacheCommand => _openLyricsCacheCommand ??= new RelayCommand(OpenLyricsCache);
 
         private RelayCommand? _openLogFolderCommand;
         public RelayCommand OpenLogFolderCommand => _openLogFolderCommand ??= new RelayCommand(OpenLogFolder);
@@ -94,11 +97,12 @@ namespace AndroidMusicPresenceLink
                     _config.CachClearInMB,
                     _config.CoverArtFileNamePatterns);
                 manager.ClearCache();
-                Interaction?.ShowInfo("Cover cache cleared.", "Cover Cache");
+                LyricsCache.ClearAll();
+                Interaction?.ShowInfo("Media cache cleared.", "Cache");
             }
             catch (Exception ex)
             {
-                Interaction?.ShowWarning($"Failed to clear cover cache: {ex.Message}", "Error");
+                Interaction?.ShowWarning($"Failed to clear media cache: {ex.Message}", "Error");
             }
         }
 
@@ -123,6 +127,24 @@ namespace AndroidMusicPresenceLink
             catch (Exception ex)
             {
                 Interaction?.ShowWarning($"Failed to open cover cache folder: {ex.Message}", "Error");
+            }
+        }
+
+        private void OpenLyricsCache()
+        {
+            try
+            {
+                var cachePath = AppPaths.GetDataPath("LyricsCache");
+                Directory.CreateDirectory(cachePath);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = cachePath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Interaction?.ShowWarning($"Failed to open lyrics cache folder: {ex.Message}", "Error");
             }
         }
 

@@ -679,7 +679,7 @@
                     <!-- ====== CACHING ====== -->
                     <Expander Header="Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
-                            <TextBlock Text="Album art is cached locally so it loads faster."
+                            <TextBlock Text="Album art and embedded lyrics are cached locally so they load faster."
                                    Style="{StaticResource HintTextStyle}" />
 
                             <Grid Margin="0,0,0,12">
@@ -699,15 +699,20 @@
                             </Grid>
 
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="Clear cover cache"
+                                <Button Content="Clear cache"
                                     Style="{StaticResource SecondaryButtonStyle}"
-                                    Width="170"
+                                    Width="135"
                                     Command="{Binding ClearCoverCacheCommand}" />
                                 <Button Content="Open cover cache"
                                     Style="{StaticResource SecondaryButtonStyle}"
-                                    Width="170"
+                                    Width="135"
                                     Margin="8,0,0,0"
                                     Command="{Binding OpenCoverCacheCommand}" />
+                                <Button Content="Open lyrics cache"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="135"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding OpenLyricsCacheCommand}" />
                             </StackPanel>
                         </StackPanel>
                     </Expander>
@@ -1070,7 +1075,7 @@
 
                         </StackPanel>
                     </Expander>
-                    
+
                     <!-- ====== OTHER ====== -->
                     <Expander Header="Other" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>

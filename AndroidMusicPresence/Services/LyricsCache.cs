@@ -126,6 +126,31 @@ namespace AndroidMusicPresenceLink
             }
         }
 
+        internal static void ClearAll()
+        {
+            try
+            {
+                lock (_gate)
+                {
+                    string dir = Dir;
+                    if (Directory.Exists(dir))
+                    {
+                        foreach (var f in Directory.GetFiles(dir))
+                        {
+                            try { File.Delete(f); } catch { }
+                        }
+                    }
+
+                    _noLyrics = new HashSet<string>(StringComparer.Ordinal);
+                    Debugger.show("[LYRICS] cache cleared");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[LYRICS] ClearAll failed: " + ex.Message);
+            }
+        }
+
         internal static void Invalidate(string key)
         {
             try
