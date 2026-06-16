@@ -89,6 +89,7 @@ namespace AndroidMusicPresenceLink
             RootPanel.Visibility = Visibility.Collapsed;
             CoverImage.Source = null;
             PanelStale.Visibility = Visibility.Collapsed;
+            IsHitTestVisible = false;
         }
 
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)
@@ -109,6 +110,8 @@ namespace AndroidMusicPresenceLink
 
         private void ApplyState()
         {
+            IsHitTestVisible = true;
+
             if (_isStale)
             {
                 CoverBorder.Visibility = Visibility.Collapsed;

@@ -37,6 +37,11 @@ namespace AndroidMusicPresenceLink
 
             PrevPanelHost.Child = _prevPanel;
             NextPanelHost.Child = _nextPanel;
+
+            // Start both hosts collapsed; UpdateNeighbours will make them
+            // visible only if the feature is enabled and results are available.
+            PrevPanelHost.Visibility = Visibility.Collapsed;
+            NextPanelHost.Visibility = Visibility.Collapsed;
         }
 
         internal void UpdateNeighbours(NextSongManager.NeighbourResult result, NextSongMode mode, string? prevCoverPath, string? nextCoverPath)

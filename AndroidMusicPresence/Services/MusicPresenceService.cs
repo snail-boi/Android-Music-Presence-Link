@@ -728,7 +728,10 @@ namespace AndroidMusicPresenceLink
                     "else { sub(/.*state=/, \"\", line); sub(/,.*/, \"\", line) }; " +
                     "if (line ~ /^[0-9]/) state=line; line=$0; sub(/.*, position=/, \"\", line); sub(/,.*/, \"\", line); pos=line } " +
                     "in_block && active && pkg && desc && state && (pkg ~ pkgs) { " +
-                    "print \"package=\" pkg; print \"description=\" desc; print \"state=\" state; print \"position=\" pos; in_block=0 }";
+                    "if (state+0 == 3) { best_pkg=pkg; best_desc=desc; best_state=state; best_pos=pos; found_playing=1 } " +
+                    "else if (!found_playing && !best_pkg) { best_pkg=pkg; best_desc=desc; best_state=state; best_pos=pos } " +
+                    "in_block=0 } " +
+                    "END { if (best_pkg) { print \"package=\" best_pkg; print \"description=\" best_desc; print \"state=\" best_state; print \"position=\" best_pos } }";
 
                 string output = await AdbHelper.RunAdbCaptureAsync(
                     $"-s {_currentDevice} shell dumpsys media_session | awk -v pkgs='{pkgList}' '{awkMediaSession}'"
