@@ -22,13 +22,23 @@ namespace AndroidMusicPresenceLink
         {
             BitmapImage? bitmap = null;
 
-            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            // Resolve the effective image path: use the cover if available,
+            // otherwise fall back to the user-configured no-cover icon.
+            string? effectivePath = path;
+            if (string.IsNullOrWhiteSpace(effectivePath))
+            {
+                var noCoverPath = App.Config?.Paths?.NoCoverIconPath;
+                if (!string.IsNullOrWhiteSpace(noCoverPath) && File.Exists(noCoverPath))
+                    effectivePath = noCoverPath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(effectivePath) && File.Exists(effectivePath))
             {
                 try
                 {
                     bitmap = new BitmapImage();
                     bitmap.BeginInit();
-                    bitmap.UriSource = new Uri(path, UriKind.Absolute);
+                    bitmap.UriSource = new Uri(effectivePath, UriKind.Absolute);
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
                     bitmap.EndInit();
                     bitmap.Freeze();

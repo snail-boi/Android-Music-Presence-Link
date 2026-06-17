@@ -37,6 +37,7 @@ namespace AndroidMusicPresenceLink
         internal string CurrentDevice => _currentDevice;
         internal string? CurrentRemoteFilePath => _mediaController.CurrentRemoteFilePath;
         internal string? CurrentRemoteFileToken => _mediaController.CurrentRemoteFileToken;
+        internal string? CurrentCoverPath => _mediaController.CurrentCoverPath;
         internal CoverCacheManager? GetCoverCacheManager() => _mediaController.CoverCache;
         internal event Action<TrayIconState>? TrayStateChanged;
         internal event Action<string?, string?, string?>? NowPlayingChanged;
@@ -82,6 +83,8 @@ namespace AndroidMusicPresenceLink
                 _timer.Start();
             }
         }
+
+        public void ResetCoverSearch() => _mediaController.ResetCoverSearch();
 
         private async Task TickAsync()
         {

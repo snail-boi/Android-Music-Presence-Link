@@ -122,6 +122,79 @@ namespace AndroidMusicPresenceLink
         private string _copyTrackTemplate = string.Empty;
         public string CopyTrackTemplate { get => _copyTrackTemplate; set => Set(ref _copyTrackTemplate, value); }
 
+        // ── Custom binary paths ───────────────────────────────────────────────
+
+        private string _customAdbPath = string.Empty;
+        public string CustomAdbPath { get => _customAdbPath; set => Set(ref _customAdbPath, value); }
+
+        private string _customScrcpyPath = string.Empty;
+        public string CustomScrcpyPath { get => _customScrcpyPath; set => Set(ref _customScrcpyPath, value); }
+
+        private string _customFfmpegPath = string.Empty;
+        public string CustomFfmpegPath { get => _customFfmpegPath; set => Set(ref _customFfmpegPath, value); }
+
+        private RelayCommand? _browseAdbCommand;
+        public RelayCommand BrowseAdbCommand => _browseAdbCommand ??= new RelayCommand(() =>
+        {
+            var path = BrowseForExecutable("adb.exe", "ADB executable|adb.exe|All executables|*.exe");
+            if (path != null) CustomAdbPath = path;
+        });
+
+        private RelayCommand? _browseScrcpyCommand;
+        public RelayCommand BrowseScrcpyCommand => _browseScrcpyCommand ??= new RelayCommand(() =>
+        {
+            var path = BrowseForExecutable("scrcpy.exe", "scrcpy executable|scrcpy.exe|All executables|*.exe");
+            if (path != null) CustomScrcpyPath = path;
+        });
+
+        private RelayCommand? _browseFfmpegCommand;
+        public RelayCommand BrowseFfmpegCommand => _browseFfmpegCommand ??= new RelayCommand(() =>
+        {
+            var path = BrowseForExecutable("ffmpeg.exe", "ffmpeg executable|ffmpeg.exe|All executables|*.exe");
+            if (path != null) CustomFfmpegPath = path;
+        });
+
+        private RelayCommand? _resetBinaryPathsCommand;
+        public RelayCommand ResetBinaryPathsCommand => _resetBinaryPathsCommand ??= new RelayCommand(() =>
+        {
+            CustomAdbPath = AppPaths.GetResourcePath("adb.exe");
+            CustomScrcpyPath = AppPaths.GetResourcePath("scrcpy.exe");
+            CustomFfmpegPath = AppPaths.GetResourcePath("ffmpeg.exe");
+        });
+
+        private static string? BrowseForExecutable(string fileName, string filter)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Select " + fileName,
+                Filter = filter,
+                CheckFileExists = true
+            };
+            return dlg.ShowDialog() == true ? dlg.FileName : null;
+        }
+
+        // ── No-cover icon ─────────────────────────────────────────────────────
+
+        private string _noCoverIconPath = string.Empty;
+        public string NoCoverIconPath { get => _noCoverIconPath; set => Set(ref _noCoverIconPath, value); }
+
+        private RelayCommand? _browseNoCoverIconCommand;
+        public RelayCommand BrowseNoCoverIconCommand => _browseNoCoverIconCommand ??= new RelayCommand(() =>
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Select no-cover icon",
+                Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.webp|All files|*.*",
+                CheckFileExists = true
+            };
+            if (dlg.ShowDialog() == true)
+                NoCoverIconPath = dlg.FileName;
+        });
+
+        private RelayCommand? _clearNoCoverIconCommand;
+        public RelayCommand ClearNoCoverIconCommand => _clearNoCoverIconCommand ??= new RelayCommand(() =>
+            NoCoverIconPath = string.Empty);
+
         // ── Toast / notification settings ────────────────────────────────────
 
         private static readonly string[] HeadlessToastPositionLabels =
@@ -202,6 +275,12 @@ namespace AndroidMusicPresenceLink
             _coverPatterns = _config.CoverArtFileNamePatterns ?? string.Empty;
             _copyTrackTemplate = _config.CopyTrackInfoTemplate ?? string.Empty;
 
+            var paths = _config.Paths ?? new PathsConfig();
+            _customAdbPath = paths.Adb;
+            _customScrcpyPath = paths.Scrcpy;
+            _customFfmpegPath = paths.FfmpegPath;
+            _noCoverIconPath = paths.NoCoverIconPath ?? string.Empty;
+
             _headlessToastEnabled = _config.HeadlessToastEnabled;
             _headlessToastPositionIndex = (int)_config.HeadlessToastPosition;
             _mediaPlayerToastModeIndex = (int)_config.MediaPlayerToastMode;
@@ -243,6 +322,15 @@ namespace AndroidMusicPresenceLink
 
             config.CoverArtFileNamePatterns = CoverPatterns.Trim();
             config.CopyTrackInfoTemplate = CopyTrackTemplate.Trim();
+
+            config.Paths ??= new PathsConfig();
+            config.Paths.Adb = string.IsNullOrWhiteSpace(CustomAdbPath)
+                ? AppPaths.GetResourcePath("adb.exe") : CustomAdbPath.Trim();
+            config.Paths.Scrcpy = string.IsNullOrWhiteSpace(CustomScrcpyPath)
+                ? AppPaths.GetResourcePath("scrcpy.exe") : CustomScrcpyPath.Trim();
+            config.Paths.FfmpegPath = string.IsNullOrWhiteSpace(CustomFfmpegPath)
+                ? AppPaths.GetResourcePath("ffmpeg.exe") : CustomFfmpegPath.Trim();
+            config.Paths.NoCoverIconPath = NoCoverIconPath.Trim();
 
             config.HeadlessToastEnabled = HeadlessToastEnabled;
             config.HeadlessToastPosition = (HeadlessToastPosition)Math.Clamp(HeadlessToastPositionIndex, 0, 5);
@@ -334,7 +422,8 @@ namespace AndroidMusicPresenceLink
                 return string.Equals(a.Adb, b.Adb, StringComparison.Ordinal)
                     && string.Equals(a.FfmpegPath, b.FfmpegPath, StringComparison.Ordinal)
                     && string.Equals(a.Scrcpy, b.Scrcpy, StringComparison.Ordinal)
-                    && string.Equals(a.CoverCachePath, b.CoverCachePath, StringComparison.Ordinal);
+                    && string.Equals(a.CoverCachePath, b.CoverCachePath, StringComparison.Ordinal)
+                    && string.Equals(a.NoCoverIconPath ?? string.Empty, b.NoCoverIconPath ?? string.Empty, StringComparison.OrdinalIgnoreCase);
             }
 
             if (!PathsEqual(left.Paths, right.Paths)) return false;

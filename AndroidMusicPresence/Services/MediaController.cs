@@ -28,6 +28,11 @@ namespace AndroidMusicPresenceLink
         private DateTime? _snapTime;
         private TimeSpan? lastTrackDuration;
         private readonly string _defaultImagePath = AppPaths.GetResourcePath("AMPLLOGO.png");
+        private string _noCoverIconPath = string.Empty;
+        private string EffectiveNoCoverPath =>
+            !string.IsNullOrWhiteSpace(_noCoverIconPath) && File.Exists(_noCoverIconPath)
+                ? _noCoverIconPath
+                : _defaultImagePath;
         private const string SmtcAppLabel = "Android Music Presence Link";
 
         private CoverCacheManager cacheManager;
@@ -64,6 +69,7 @@ namespace AndroidMusicPresenceLink
             cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB, config.CoverArtFileNamePatterns);
             remoteRoots = GetNormalizedRemoteRoots(config);
             deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
+            _noCoverIconPath = config.Paths?.NoCoverIconPath ?? string.Empty;
         }
 
         public Task PauseTrackAsync() => PauseTrack();
@@ -81,12 +87,18 @@ namespace AndroidMusicPresenceLink
                 cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB, config.CoverArtFileNamePatterns);
                 remoteRoots = GetNormalizedRemoteRoots(config);
                 deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
+                _noCoverIconPath = config.Paths?.NoCoverIconPath ?? string.Empty;
                 Debugger.show("MediaController configuration updated. RemoteRoots='" + string.Join(";", remoteRoots) + "'");
             }
             catch (Exception ex)
             {
                 Debugger.show("MediaController.UpdateConfig failed: " + ex.Message);
             }
+        }
+
+        public void ResetCoverSearch()
+        {
+            lastSMTCTitle = null;
         }
 
         private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
@@ -515,7 +527,7 @@ namespace AndroidMusicPresenceLink
                 CurrentTitle = null;
                 CurrentArtist = null;
                 CurrentAlbum = null;
-                CurrentCoverPath = _defaultImagePath;
+                CurrentCoverPath = EffectiveNoCoverPath;
             }
             catch (Exception ex)
             {
@@ -552,7 +564,7 @@ namespace AndroidMusicPresenceLink
                 CurrentTitle = null;
                 CurrentArtist = null;
                 CurrentAlbum = null;
-                CurrentCoverPath = _defaultImagePath;
+                CurrentCoverPath = EffectiveNoCoverPath;
             }
             catch (Exception ex)
             {
@@ -759,7 +771,7 @@ namespace AndroidMusicPresenceLink
                 if (mediaPlayer == null || smtcDisplayUpdater == null)
                 {
                     Debugger.show("Failed to initialize media player");
-                    return (null, null, _defaultImagePath);
+                    return (null, null, EffectiveNoCoverPath);
                 }
             }
 
@@ -775,14 +787,14 @@ namespace AndroidMusicPresenceLink
                 {
                     Debugger.show("[COVERART] No device selected for cover lookup");
                     await SetDefaultImage().ConfigureAwait(false);
-                    return (null, null, _defaultImagePath);
+                    return (null, null, EffectiveNoCoverPath);
                 }
 
                 if (localRemoteRoots.Count == 0)
                 {
                     Debugger.show("[COVERART] No remote roots configured for cover lookup");
                     await SetDefaultImage().ConfigureAwait(false);
-                    return (null, null, _defaultImagePath);
+                    return (null, null, EffectiveNoCoverPath);
                 }
 
                 Debugger.show($"[COVERART] Searching in remote roots: {string.Join("; ", localRemoteRoots)}");
@@ -901,7 +913,7 @@ namespace AndroidMusicPresenceLink
                     CurrentRemoteFilePath = null;
                     CurrentRemoteFileToken = null;
                     await SetDefaultImage().ConfigureAwait(false);
-                    return (null, null, _defaultImagePath);
+                    return (null, null, EffectiveNoCoverPath);
                 }
 
                 // --- New simple matching & scoring ---
@@ -968,7 +980,7 @@ namespace AndroidMusicPresenceLink
                     CurrentRemoteFilePath = null;
                     CurrentRemoteFileToken = null;
                     await SetDefaultImage().ConfigureAwait(false);
-                    return (null, null, _defaultImagePath);
+                    return (null, null, EffectiveNoCoverPath);
                 }
 
                 var ranked = matched
@@ -1107,13 +1119,13 @@ namespace AndroidMusicPresenceLink
                 CurrentRemoteFilePath = filesToProcess.FirstOrDefault();
                 CurrentRemoteFileToken = filesToProcess.Count > 0 ? LyricsCache.TrackToken(titleStr, artist) : null;
                 await SetDefaultImage().ConfigureAwait(false);
-                return (duration, metadata, _defaultImagePath);
+                return (duration, metadata, EffectiveNoCoverPath);
             }
             catch (Exception ex)
             {
                 Debugger.show($"[COVERART] Critical error in SetSMTCImageAsync: {ex.Message}");
                 await SetDefaultImage().ConfigureAwait(false);
-                return (null, null, _defaultImagePath);
+                return (null, null, EffectiveNoCoverPath);
             }
         }
 
@@ -1146,16 +1158,17 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
-                Debugger.show($"[COVERART] Setting default image from: {_defaultImagePath}");
+                var effectivePath = EffectiveNoCoverPath;
+                Debugger.show($"[COVERART] Setting default image from: {effectivePath}");
 
-                var imageFile = await StorageFile.GetFileFromPathAsync(_defaultImagePath).AsTask().ConfigureAwait(false);
+                var imageFile = await StorageFile.GetFileFromPathAsync(effectivePath).AsTask().ConfigureAwait(false);
                 await dispatcher.InvokeAsync(() =>
                 {
                     try
                     {
                         smtcDisplayUpdater!.Thumbnail = RandomAccessStreamReference.CreateFromFile(imageFile);
                         smtcDisplayUpdater.Update();
-                        CurrentCoverPath = _defaultImagePath;
+                        CurrentCoverPath = effectivePath;
                         Debugger.show("[COVERART] Default thumbnail set successfully");
                     }
                     catch (Exception ex)

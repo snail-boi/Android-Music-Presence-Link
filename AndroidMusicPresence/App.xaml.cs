@@ -531,6 +531,11 @@ namespace AndroidMusicPresenceLink
                 || Config.ScrcpyAudioBuffer != config.ScrcpyAudioBuffer
                 || Config.ScrcpyFlacCompressionLevel != config.ScrcpyFlacCompressionLevel;
 
+            bool noCoverChanged = !string.Equals(
+                Config.Paths?.NoCoverIconPath ?? string.Empty,
+                config.Paths?.NoCoverIconPath ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
+
             Config = config;
             ApplyStartupRegistration(config.StartWithWindows);
             Debugger.IsEnabled = Config.DebugMode;
@@ -558,6 +563,19 @@ namespace AndroidMusicPresenceLink
             // so the new settings take effect immediately without needing a manual restart.
             if (audioChanged && _scrcpyProcess != null && !_scrcpyProcess.HasExited)
                 _ = RestartScrcpyForPresetAsync();
+
+            // When the no-cover icon changes, force the next tick to re-push the image and
+            // immediately refresh the media player window cover without waiting for a tick.
+            if (noCoverChanged && _presenceService != null)
+            {
+                _presenceService.ResetCoverSearch();
+                var newCoverPath = _presenceService.CurrentCoverPath;
+                if (_mediaPlayerWindow != null)
+                {
+                    _lastMediaPlayerCoverPath = newCoverPath;
+                    _mediaPlayerWindow.UpdateTrack(_lastMediaPlayerTitle, _lastMediaPlayerArtist, _lastMediaPlayerAlbum, newCoverPath, _lastMediaPlayerIsPlaying);
+                }
+            }
         }
 
         private void OnLyricsPlaybackChanged(string? artist, string? title, string? album, bool isPlaying, long positionMs)

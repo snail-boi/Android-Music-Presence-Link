@@ -1156,6 +1156,35 @@
 
                             <CheckBox Content="Start minimized to tray" IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
                             <CheckBox Content="Start when Windows starts" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
+
+                            <!-- No-cover icon -->
+                            <TextBlock Text="No-cover icon"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,0,0,4" />
+                            <TextBlock Text="Shown in the media player when no cover art is found. Leave empty to show nothing."
+                                       Style="{StaticResource HintTextStyle}" />
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding NoCoverIconPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsReadOnly="True"
+                                         Margin="0,0,6,0" />
+                                <Button Grid.Column="1"
+                                        Content="Browse"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="72"
+                                        Margin="0,0,6,0"
+                                        Command="{Binding BrowseNoCoverIconCommand}" />
+                                <Button Grid.Column="2"
+                                        Content="Clear"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="60"
+                                        Command="{Binding ClearNoCoverIconCommand}" />
+                            </Grid>
                         </StackPanel>
                     </Expander>
 
@@ -1170,8 +1199,76 @@
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Width="160"
                                 HorizontalAlignment="Left"
-                                Margin="0,0,0,12"
+                                Margin="0,0,0,16"
                                 Command="{Binding OpenLogFolderCommand}" />
+
+                            <!-- Custom binary paths -->
+                            <TextBlock Text="Custom binaries"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,0,0,4" />
+                            <TextBlock Text="Override the bundled ADB, scrcpy, and ffmpeg. Leave as-is to use the bundled versions."
+                                       Style="{StaticResource HintTextStyle}" />
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="60" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="ADB" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding CustomAdbPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsReadOnly="True"
+                                         Margin="0,0,6,0" />
+                                <Button Grid.Column="2"
+                                        Content="Browse"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="72"
+                                        Command="{Binding BrowseAdbCommand}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="60" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="scrcpy" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding CustomScrcpyPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsReadOnly="True"
+                                         Margin="0,0,6,0" />
+                                <Button Grid.Column="2"
+                                        Content="Browse"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="72"
+                                        Command="{Binding BrowseScrcpyCommand}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="60" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="ffmpeg" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding CustomFfmpegPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsReadOnly="True"
+                                         Margin="0,0,6,0" />
+                                <Button Grid.Column="2"
+                                        Content="Browse"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Width="72"
+                                        Command="{Binding BrowseFfmpegCommand}" />
+                            </Grid>
+
+                            <Button Content="Reset to bundled binaries"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="200"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,0,0,16"
+                                    Command="{Binding ResetBinaryPathsCommand}" />
 
                             <CheckBox Content="Use dark mode" IsChecked="{Binding UseDarkMode, Mode=TwoWay}" VerticalAlignment="Center" Visibility="Collapsed" />
 
