@@ -260,9 +260,17 @@ namespace AndroidMusicPresenceLink
                         var p = Path.Combine(cachePath, entry.FileName);
 
                         // 🔥 CREATE SONG CACHE ENTRY
+                        // entry is the folder cover IMAGE entry, so entry.DurationSeconds
+                        // describes the image (always 0), not the song. Pull the song's own
+                        // metadata to get the real duration, cache it, and return THAT value.
+                        // Returning entry.DurationSeconds left the first play with duration 0,
+                        // and the real value only surfaced on a later cache hit. That is the
+                        // "reload the song to make the time show up" bug.
+                        double? songDuration = null;
                         if (!index.ContainsKey(key))
                         {
                             var songInfo = await PullSongInfoAsync(deviceId, remoteFilePath, key).ConfigureAwait(false);
+                            songDuration = songInfo.DurationSeconds;
 
                             index[key] = new CacheEntry
                             {
@@ -275,8 +283,12 @@ namespace AndroidMusicPresenceLink
 
                             SaveIndex();
                         }
+                        else if (index.TryGetValue(key, out var songEntry) && songEntry.DurationSeconds > 0)
+                        {
+                            songDuration = songEntry.DurationSeconds;
+                        }
 
-                        return (p, entry.DurationSeconds > 0 ? entry.DurationSeconds : null, null);
+                        return (p, songDuration.HasValue && songDuration.Value > 0 ? songDuration : null, null);
                     }
                 }
 

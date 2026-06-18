@@ -614,9 +614,17 @@ namespace AndroidMusicPresenceLink
 
             ProgressSlider.Maximum = durationMs;
 
+            // Paint the position immediately. The smooth timer only advances the
+            // slider while playing, so a freshly resolved track (duration arrives
+            // after the pull) or a paused track would otherwise leave the bar and
+            // elapsed label stuck at their previous value until playback resumes.
+            long paintedMs = Math.Max(0, Math.Min(positionMs, durationMs));
+            ProgressSlider.Value = paintedMs;
+
             RefreshSeekButtonVisibility();
 
             _vm.DurationLabel = FormatMs(durationMs);
+            RefreshPositionLabel();
         }
 
         private void SmoothTimer_Tick(object? sender, EventArgs e)
