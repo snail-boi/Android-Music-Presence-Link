@@ -34,6 +34,32 @@ namespace AndroidMusicPresenceLink
         private bool _lastParseSuccess;
         private int _reparseTicksRemaining;
 
+        // Set by UpdateCurrentSongAsync when the media_session query returns no
+        // output. That is the ambiguous "idle or disconnected" signal: the
+        // persistent adb shell returns empty in both cases. TickAsync uses it to
+        // decide whether a one-off `adb devices` reconcile is needed.
+        private bool _deviceQueryCameBackEmpty;
+
+        // Set when a connection-relevant setting changes (mode, enabled flag, or a
+        // selected serial). Forces the next tick to re-run detection even while a
+        // link is currently held, so a manual switch to/from USB takes effect
+        // without waiting for the connection to drop.
+        private bool _forceRedetect;
+
+        // Coalesces bursts of WM_DEVICECHANGE notifications so a single physical
+        // plug event doesn't fire several `adb devices` probes back to back.
+        private DateTimeOffset _lastUsbPromotionProbeUtc = DateTimeOffset.MinValue;
+        private static readonly TimeSpan UsbPromotionProbeThrottle = TimeSpan.FromMilliseconds(750);
+
+        // Windows reports the device-tree change the instant the cable is seen, but
+        // adb needs a moment to enumerate and authorize the device before it lists
+        // in `adb devices`. Wait this long after a device-change before probing.
+        private static readonly TimeSpan UsbPromotionProbeDelay = TimeSpan.FromMilliseconds(1500);
+
+        // After the delay, wait briefly for any in-flight tick to release the lock
+        // rather than bailing, so a freshly plugged device isn't missed.
+        private const int UsbPromotionLockWaitMs = 2000;
+
         internal string CurrentDevice => _currentDevice;
         internal string? CurrentRemoteFilePath => _mediaController.CurrentRemoteFilePath;
         internal string? CurrentRemoteFileToken => _mediaController.CurrentRemoteFileToken;
@@ -69,8 +95,20 @@ namespace AndroidMusicPresenceLink
 
         public void UpdateConfig(MusicConfig config)
         {
+            // If anything that affects which transport/device we use changed, force
+            // the next tick to re-detect. Otherwise a manual switch (e.g. Wi-Fi to
+            // USB) would be ignored while the current link keeps answering.
+            bool connectionChanged =
+                _config.WifiMode != config.WifiMode
+                || _config.IsWifiEnabled != config.IsWifiEnabled
+                || !string.Equals(_config.SelectedDeviceUSB, config.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(_config.SelectedDeviceWiFi, config.SelectedDeviceWiFi, StringComparison.OrdinalIgnoreCase);
+
             _config = config;
             _mediaController.UpdateConfig(config);
+
+            if (connectionChanged)
+                _forceRedetect = true;
 
             var interval = GetInterval(config.UpdateIntervalMode);
             _timer.Interval = interval;
@@ -92,14 +130,44 @@ namespace AndroidMusicPresenceLink
 
             try
             {
-                await DetectDeviceAsync().ConfigureAwait(false);
+                // Connection tracking is split to avoid an `adb devices` call on
+                // every tick. When we already hold a device we trust the
+                // media_session query in UpdateCurrentSongAsync as the liveness
+                // signal and skip detection entirely. Detection only runs when:
+                //   - we have no device (cold start, or a confirmed disconnect), or
+                //   - the media_session query returned nothing, which means the
+                //     device is either idle or gone and only `adb devices` can say
+                //     which (this is also the USB->Wi-Fi fallback path: a pulled
+                //     cable makes the query go empty, and detection then picks up
+                //     the wireless link if it's available).
+                if (string.IsNullOrEmpty(_currentDevice) || _forceRedetect)
+                {
+                    _forceRedetect = false;
+                    await DetectDeviceAsync().ConfigureAwait(false);
+
+                    // Detection's recovery branch can settle on a wireless link in
+                    // WD/TCP modes even when a USB cable is present. The app has
+                    // always preferred USB whenever it's plugged in, so if we landed
+                    // on wireless, prefer USB now. This is the "USB already plugged
+                    // in at startup" case that WM_DEVICECHANGE can't see.
+                    if (!string.IsNullOrEmpty(_currentDevice) && !_currentDeviceIsUsb)
+                        await TryPromoteToUsbAsync().ConfigureAwait(false);
+                }
 
                 bool hasActiveSong = false;
                 if (!string.IsNullOrEmpty(_currentDevice))
                 {
                     hasActiveSong = await UpdateCurrentSongAsync().ConfigureAwait(false);
+
+                    if (_deviceQueryCameBackEmpty)
+                    {
+                        await DetectDeviceAsync().ConfigureAwait(false);
+                        if (string.IsNullOrEmpty(_currentDevice))
+                            hasActiveSong = false;
+                    }
                 }
-                else
+
+                if (string.IsNullOrEmpty(_currentDevice))
                 {
                     NotifyNowPlaying(null, null, null);
                     NotifyLyricsPlayback(null, null, null, false, 0);
@@ -359,6 +427,91 @@ namespace AndroidMusicPresenceLink
             {
                 Debugger.show("DetectDeviceAsync failed: " + ex.Message);
             }
+        }
+
+        // Called from the WM_DEVICECHANGE handler when Windows reports a change to
+        // the device tree. This is the Wi-Fi->USB promotion path: while a wireless
+        // link is healthy the tick loop never runs `adb devices`, so a cable being
+        // plugged in would otherwise go unnoticed. The cost is one `adb devices`
+        // call per (throttled) hardware change. If the change was some unrelated
+        // USB device, no USB Android serial is found and the method simply returns.
+        public async Task CheckForUsbPromotionAsync()
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (now - _lastUsbPromotionProbeUtc < UsbPromotionProbeThrottle)
+                return;
+            _lastUsbPromotionProbeUtc = now;
+
+            // Give adb time to enumerate the just-plugged device before we probe;
+            // otherwise `adb devices` runs before the USB serial appears and the
+            // promotion silently no-ops. Unnoticeable to the user.
+            await Task.Delay(UsbPromotionProbeDelay).ConfigureAwait(false);
+
+            // Wait briefly for any in-flight tick to finish rather than bailing, so
+            // the freshly plugged device isn't missed due to lock contention.
+            if (!await _updateLock.WaitAsync(UsbPromotionLockWaitMs).ConfigureAwait(false))
+                return;
+
+            try
+            {
+                await TryPromoteToUsbAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("CheckForUsbPromotionAsync failed: " + ex.Message);
+            }
+            finally
+            {
+                _updateLock.Release();
+            }
+        }
+
+        // Core USB-preference logic. The caller MUST already hold _updateLock (the
+        // tick loop calls this directly; the public wrapper above acquires the lock
+        // first). Promotes to a connected USB device when we're currently on a
+        // wireless link or have no device. No-op if already on USB or no USB found.
+        private async Task TryPromoteToUsbAsync()
+        {
+            if (_currentDeviceIsUsb)
+                return;
+
+            var devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
+            var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            string usbSerial = string.Empty;
+            if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB)
+                && deviceList.Any(l => GetOnlineSerial(l).Equals(_config.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)))
+            {
+                usbSerial = _config.SelectedDeviceUSB;
+            }
+            else
+            {
+                foreach (var entry in deviceList)
+                {
+                    var serial = GetOnlineSerial(entry);
+                    if (string.IsNullOrWhiteSpace(serial) || IsWirelessSerial(serial))
+                        continue;
+
+                    usbSerial = serial;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(usbSerial))
+                return;
+
+            if (string.Equals(_currentDevice, usbSerial, StringComparison.OrdinalIgnoreCase))
+            {
+                // Already pointed at this USB serial; just make sure the flags agree.
+                _currentDeviceIsUsb = true;
+                return;
+            }
+
+            Debugger.show($"[CONNECTION] Preferring USB; switching from '{(string.IsNullOrEmpty(_currentDevice) ? "none" : _currentDevice)}' to USB '{usbSerial}'.");
+            _currentDevice = usbSerial;
+            _currentDeviceIsUsb = true;
+            _wifiNeedsUsbReconnect = false;
+            _deviceQueryCameBackEmpty = false;
         }
 
         private async Task RecoverWirelessConnectionAsync()
@@ -701,6 +854,8 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
+                _deviceQueryCameBackEmpty = false;
+
                 if (string.IsNullOrEmpty(_currentDevice)) return false;
 
                 // Server-side awk script: runs entirely on the phone and emits only the four
@@ -739,7 +894,15 @@ namespace AndroidMusicPresenceLink
                 string output = await AdbHelper.RunAdbCaptureAsync(
                     $"-s {_currentDevice} shell dumpsys media_session | awk -v pkgs='{pkgList}' '{awkMediaSession}'"
                 );
-                if (string.IsNullOrWhiteSpace(output)) return false;
+                if (string.IsNullOrWhiteSpace(output))
+                {
+                    // Empty output means the device gave us nothing: either it's
+                    // idle with no eligible session, or the connection dropped.
+                    // TickAsync reconciles with a single `adb devices` to tell
+                    // which, and to promote a wireless link in if USB was pulled.
+                    _deviceQueryCameBackEmpty = true;
+                    return false;
+                }
 
                 // Parse the flat awk output: four key=value lines.
                 string pkg = string.Empty;

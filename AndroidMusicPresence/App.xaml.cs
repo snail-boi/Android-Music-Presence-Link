@@ -44,6 +44,9 @@ namespace AndroidMusicPresenceLink
         private const int VkVolumeUp = 0xAF;
         private const int VkVolumeDown = 0xAE;
         private const int WmHotkey = 0x0312;
+        private const int WmDeviceChange = 0x0219;
+        private const int DbtDevnodesChanged = 0x0007;
+        private const int DbtDeviceArrival = 0x8000;
         private const float ScrcpyVolumeStep = 0.05f;
         private const string AppUserModelId = "Android Music Presence Link";
 
@@ -1560,6 +1563,21 @@ namespace AndroidMusicPresenceLink
                         OpenAudioQualityFromHotkey();
                         handled = true;
                         break;
+                }
+            }
+            else if (msg == WmDeviceChange)
+            {
+                // A change to the USB device tree. DBT_DEVNODES_CHANGED fires for
+                // any plug/unplug without us registering for notifications. Ask the
+                // service to look for a USB device to promote to; if the change was
+                // unrelated it just finds nothing and returns. We don't mark the
+                // message handled so the system can keep broadcasting it.
+                int evt = wParam.ToInt32();
+                if (evt == DbtDevnodesChanged || evt == DbtDeviceArrival)
+                {
+                    var svc = _presenceService;
+                    if (svc != null)
+                        _ = svc.CheckForUsbPromotionAsync();
                 }
             }
 
