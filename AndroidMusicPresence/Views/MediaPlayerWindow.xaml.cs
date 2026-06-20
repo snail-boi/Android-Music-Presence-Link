@@ -633,7 +633,19 @@ namespace AndroidMusicPresenceLink
                 return;
 
             long elapsed = (long)(DateTime.UtcNow - _positionAnchorTime).TotalMilliseconds;
-            long interpolated = Math.Max(0, Math.Min(_positionAnchorMs + elapsed, _lastDurationMs));
+            long raw = _positionAnchorMs + elapsed;
+
+            // If we've passed the end of the track, wrap the anchor forward so the bar
+            // runs smoothly from 0 without waiting for the next UpdateProgress(0,...) poll.
+            if (raw >= _lastDurationMs)
+            {
+                long overflow = raw - _lastDurationMs;
+                _positionAnchorMs = 0;
+                _positionAnchorTime = DateTime.UtcNow - TimeSpan.FromMilliseconds(overflow);
+                raw = overflow;
+            }
+
+            long interpolated = Math.Max(0, Math.Min(raw, _lastDurationMs));
 
             _lastPositionMs = interpolated;
             ProgressSlider.Value = interpolated;
