@@ -46,6 +46,16 @@ namespace AndroidMusicPresenceLink
         // without waiting for the connection to drop.
         private bool _forceRedetect;
 
+        // Throttles the expensive active wireless reconnect (mDNS for WD, the single
+        // connect for TCP/IP) while disconnected. The cheap `adb devices` probe still
+        // runs every poll to spot a cable or an already-up link; only the costly
+        // re-establish (which spawns an mDNS scan or a blocking connect) is gated to
+        // this interval so a dropped link doesn't hammer adb every tick. Reset to
+        // MinValue whenever a device is acquired or the mode changes, so a fresh
+        // disconnect attempts immediately.
+        private DateTimeOffset _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
+        private static readonly TimeSpan WirelessReconnectInterval = TimeSpan.FromSeconds(10);
+
         // Coalesces bursts of WM_DEVICECHANGE notifications so a single physical
         // plug event doesn't fire several `adb devices` probes back to back.
         private DateTimeOffset _lastUsbPromotionProbeUtc = DateTimeOffset.MinValue;
@@ -127,7 +137,12 @@ namespace AndroidMusicPresenceLink
             _mediaController.UpdateConfig(config);
 
             if (connectionChanged)
+            {
                 _forceRedetect = true;
+                // Let the new mode/target attempt a wireless reconnect immediately
+                // rather than waiting out the throttle interval.
+                _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
+            }
 
             var interval = GetInterval(config.UpdateIntervalMode);
             _timer.Interval = interval;
@@ -224,31 +239,6 @@ namespace AndroidMusicPresenceLink
             return false;
         }
 
-        // Returns the serial of the first online wireless device in the
-        // adb-devices output, or empty if none. Handles both transports.
-        private static string FindConnectedWifiSerial(string[] deviceList)
-        {
-            foreach (var entry in deviceList)
-            {
-                if (!entry.EndsWith("device"))
-                    continue;
-
-                var serial = entry.Split('\t', ' ').FirstOrDefault();
-                if (string.IsNullOrWhiteSpace(serial))
-                    continue;
-
-                if (IsWirelessSerial(serial))
-                    return serial;
-            }
-            return string.Empty;
-        }
-
-        // True if any wireless device is currently online in adb devices.
-        private static bool IsWifiCurrentlyConnected(string[] deviceList)
-        {
-            return !string.IsNullOrEmpty(FindConnectedWifiSerial(deviceList));
-        }
-
         private static string GetOnlineSerial(string entry)
         {
             if (string.IsNullOrWhiteSpace(entry))
@@ -279,171 +269,214 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
+                // One adb-devices probe per detection pass. Detection only runs on
+                // cold start, a forced redetect, a manual mode switch, or when the
+                // media_session liveness query came back empty. The per-poll path
+                // never calls adb devices; dumpsys media_session is the liveness
+                // signal. With no _currentDevice there is no serial to target dumpsys
+                // against, so this single probe is the one unavoidable spot.
                 var devices = await AdbHelper.RunAdbCaptureAsync("devices");
                 var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-                string connectedUsb = string.Empty;
-                if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB))
+                // Drop to "no device" and notify the UI once on the transition.
+                void Disconnect()
                 {
-                    bool selectedUsbConnected = deviceList.Any(l => GetOnlineSerial(l).Equals(_config.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase));
-                    if (selectedUsbConnected)
+                    if (!string.IsNullOrEmpty(_currentDevice))
                     {
-                        connectedUsb = _config.SelectedDeviceUSB;
+                        _currentDevice = string.Empty;
+                        _mediaController.Clear();
+                        NotifyNowPlaying(null, null, null);
+                        NotifyLyricsPlayback(null, null, null, false, 0);
                     }
                 }
 
-                if (string.IsNullOrWhiteSpace(connectedUsb))
+                // -- USB: always the preferred transport when a cable is present --
+                // True in every mode (USB-only, WD, TCP/IP). Prefer the saved serial;
+                // otherwise take the first online non-wireless serial.
+                string usb = string.Empty;
+                if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB)
+                    && deviceList.Any(l => GetOnlineSerial(l).Equals(_config.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)))
+                {
+                    usb = _config.SelectedDeviceUSB;
+                }
+                else
                 {
                     foreach (var entry in deviceList)
                     {
                         var serial = GetOnlineSerial(entry);
-                        if (string.IsNullOrWhiteSpace(serial))
+                        if (string.IsNullOrWhiteSpace(serial) || IsWirelessSerial(serial))
                             continue;
 
-                        if (IsWirelessSerial(serial))
-                            continue;
-
-                        connectedUsb = serial;
+                        usb = serial;
                         break;
                     }
                 }
 
-                if (!string.IsNullOrWhiteSpace(connectedUsb))
+                if (!string.IsNullOrWhiteSpace(usb))
                 {
-                    _currentDevice = connectedUsb;
+                    // Capture whether we were waiting for this reconnect before we
+                    // clear the flag, so the TCP/IP re-setup below can tell a prompted
+                    // reconnect from a cable that was simply always there.
+                    bool wasAwaitingUsbReconnect = _wifiNeedsUsbReconnect;
+
+                    _currentDevice = usb;
                     _currentDeviceIsUsb = true;
-
-                    // In USB-only mode skip all wifi recovery; the cable is the only link.
-                    if (_config.WifiMode == WirelessMode.UsbOnly)
-                    {
-                        _wifiNeedsUsbReconnect = false;
-                        return;
-                    }
-
-                    bool wifiConfigured = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None";
-                    bool wifiConnected = wifiConfigured && IsWifiCurrentlyConnected(deviceList);
-
-                    if (wifiConfigured && !wifiConnected && _config.IsWifiEnabled == true)
-                    {
-                        _wifiNeedsUsbReconnect = true;
-                        await RecoverWirelessConnectionAsync().ConfigureAwait(false);
-
-                        // Recovery may have set _currentDevice to a wireless
-                        // serial. Recheck using IsWirelessSerial rather than
-                        // a naive contains-':' check, since Wireless Debugging
-                        // serials have no colon.
-                        if (!string.IsNullOrEmpty(_currentDevice) && IsWirelessSerial(_currentDevice))
-                        {
-                            _currentDeviceIsUsb = false;
-                            _wifiNeedsUsbReconnect = false;
-                        }
-                        else
-                        {
-                            _currentDeviceIsUsb = true;
-                        }
-                    }
-                    else
-                    {
-                        _wifiNeedsUsbReconnect = false;
-                    }
-
-                    return;
-                }
-
-                var connectedWireless = FindConnectedWirelessSerial(deviceList);
-                if (!string.IsNullOrWhiteSpace(connectedWireless))
-                {
-                    _currentDevice = connectedWireless;
-                    _currentDeviceIsUsb = false;
-                    _wifiReconnectPromptShown = false;
                     _wifiNeedsUsbReconnect = false;
+                    _wifiReconnectPromptShown = false;
+                    _wifiReconnectFailurePromptShown = false;
+                    _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
+
+                    // TCP/IP only: the user was asked to reconnect USB because the
+                    // wireless link dropped, and they just did. Re-run the tcpip setup
+                    // once so Wi-Fi is ready next time the cable is pulled. Gated on
+                    // wasAwaitingUsbReconnect so it fires only in direct response to
+                    // the prompt (one attempt per unplug/replug cycle), never on the
+                    // steady-state "USB always plugged" path. WD never reaches this;
+                    // it reconnects over mDNS without USB.
+                    if (wasAwaitingUsbReconnect
+                        && _config.WifiMode == WirelessMode.TcpIp
+                        && _config.IsWifiEnabled == true
+                        && !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
+                        && _config.SelectedDeviceWiFi != "None")
+                    {
+                        var newWifi = await SetupWirelessFromUsbAsync(usb).ConfigureAwait(false);
+                        if (!string.IsNullOrWhiteSpace(newWifi)
+                            && !string.Equals(newWifi, _config.SelectedDeviceWiFi, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _config.SelectedDeviceWiFi = newWifi;
+                            MusicConfigManager.Save(_config);
+                            await _dispatcher.InvokeAsync(() => (Application.Current as App)?.UpdateConfig(_config));
+                        }
+
+                        // USB stays the active link regardless of the setup outcome.
+                        _currentDevice = usb;
+                        _currentDeviceIsUsb = true;
+                        _wifiNeedsUsbReconnect = false;
+                    }
+
                     return;
                 }
 
-                if (_config.WifiMode != WirelessMode.UsbOnly
-                    && !string.IsNullOrEmpty(_config.SelectedDeviceWiFi) && _config.SelectedDeviceWiFi != "None")
+                // -- No cable. What we try next is dictated entirely by the mode. --
+                var now = DateTimeOffset.UtcNow;
+                bool mayReconnect = now - _lastWirelessReconnectUtc >= WirelessReconnectInterval;
+
+                switch (_config.WifiMode)
                 {
-                    bool wifiConnected = IsWifiCurrentlyConnected(deviceList);
-                    if (!wifiConnected)
-                    {
-                        if (_config.WifiMode == WirelessMode.WirelessDebugging)
+                    case WirelessMode.UsbOnly:
+                        // No wireless of any kind. Without a cable there is no device,
+                        // and we never ask for a reconnect (that is TCP/IP only).
+                        Disconnect();
+                        _currentDeviceIsUsb = false;
+                        _wifiNeedsUsbReconnect = false;
+                        _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
+                        return;
+
+                    case WirelessMode.WirelessDebugging:
                         {
-                            // The stored ip:port is likely stale (the wireless
-                            // debugging port changes every time it toggles),
-                            // so route through the recovery path which does
-                            // mDNS lookup, then last-known, then USB-assisted.
-                            await RecoverWirelessConnectionAsync().ConfigureAwait(false);
-                            if (!string.IsNullOrEmpty(_currentDevice) && IsWirelessSerial(_currentDevice))
+                            // Already up over WD? Use it without an mDNS round-trip. This
+                            // is the cheap path that runs every poll off the probe above.
+                            var live = FindConnectedWirelessSerial(deviceList);
+                            if (!string.IsNullOrWhiteSpace(live))
                             {
+                                _currentDevice = live;
                                 _currentDeviceIsUsb = false;
-                                _wifiReconnectPromptShown = false;
                                 _wifiNeedsUsbReconnect = false;
+                                _wifiReconnectPromptShown = false;
+                                _wifiReconnectFailurePromptShown = false;
+                                _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
                                 return;
                             }
-                        }
-                        else
-                        {
-                            // TcpIp: try a direct connect to the fixed port.
-                            await AdbHelper.RunAdbCaptureAsync($"connect {_config.SelectedDeviceWiFi}");
-                            devices = await AdbHelper.RunAdbCaptureAsync("devices");
-                            deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                            wifiConnected = IsWifiCurrentlyConnected(deviceList);
-                        }
-                    }
 
-                    if (wifiConnected)
-                    {
-                        if (deviceList.Any(l => l.StartsWith(_config.SelectedDeviceUSB) && l.EndsWith("device")))
-                        {
-                            _currentDevice = _config.SelectedDeviceUSB;
-                            _currentDeviceIsUsb = true;
-                            _wifiReconnectPromptShown = false;
+                            // Not up: throttled mDNS reconnect, the canonical WD path. The
+                            // stale last-known connect and USB-assisted recovery are NOT
+                            // run per tick; they add a blocking connect and extra adb-
+                            // devices calls every poll while the cable is out.
+                            if (mayReconnect
+                                && _config.IsWifiEnabled == true
+                                && !string.IsNullOrWhiteSpace(_config.WifiMdnsServiceName))
+                            {
+                                _lastWirelessReconnectUtc = now;
+                                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.WifiMdnsServiceName).ConfigureAwait(false);
+                                if (!string.IsNullOrWhiteSpace(ipPort))
+                                {
+                                    _currentDevice = ipPort;
+                                    _currentDeviceIsUsb = false;
+                                    _wifiNeedsUsbReconnect = false;
+                                    _wifiReconnectPromptShown = false;
+                                    _wifiReconnectFailurePromptShown = false;
+                                    _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
+
+                                    if (!string.Equals(_config.SelectedDeviceWiFi, ipPort, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        _config.SelectedDeviceWiFi = ipPort;
+                                        MusicConfigManager.Save(_config);
+                                        await _dispatcher.InvokeAsync(() => (Application.Current as App)?.UpdateConfig(_config));
+                                    }
+                                    return;
+                                }
+                            }
+
+                            // Nothing found (or throttled). In WD a lost link is just
+                            // disconnected; we never ask for a USB reconnect.
+                            Disconnect();
+                            _currentDeviceIsUsb = false;
                             _wifiNeedsUsbReconnect = false;
                             return;
                         }
 
-                        // Use the actual serial as it appears in adb devices,
-                        // not the configured ip:port. For Wireless Debugging
-                        // the serial is the mDNS service name; for TCP/IP the
-                        // serial IS the ip:port. Either way, the live serial
-                        // is what other code needs to talk to the device.
-                        var liveSerial = FindConnectedWifiSerial(deviceList);
-                        _currentDevice = string.IsNullOrEmpty(liveSerial)
-                            ? _config.SelectedDeviceWiFi
-                            : liveSerial;
-                        _currentDeviceIsUsb = false;
-                        _wifiReconnectPromptShown = false;
-                        _wifiNeedsUsbReconnect = false;
-                        return;
-                    }
-
-                    if (_config.IsWifiEnabled == true)
-                    {
-                        _wifiNeedsUsbReconnect = true;
-                        await RecoverWirelessConnectionAsync().ConfigureAwait(false);
-                        if (!string.IsNullOrEmpty(_currentDevice) && IsWirelessSerial(_currentDevice))
+                    case WirelessMode.TcpIp:
                         {
+                            bool wifiConfigured = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
+                                && _config.SelectedDeviceWiFi != "None";
+
+                            // Already up over TCP/IP? The live serial is the ip:port. Cheap
+                            // path off the probe above, runs every poll.
+                            var live = FindConnectedWirelessSerial(deviceList);
+                            if (!string.IsNullOrWhiteSpace(live))
+                            {
+                                _currentDevice = live;
+                                _currentDeviceIsUsb = false;
+                                _wifiNeedsUsbReconnect = false;
+                                _wifiReconnectPromptShown = false;
+                                _wifiReconnectFailurePromptShown = false;
+                                _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
+                                return;
+                            }
+
+                            // Not up: throttled single connect to the saved fixed port
+                            // (option B). Not run per tick; a connect to an unreachable
+                            // endpoint blocks for the TCP timeout.
+                            if (mayReconnect && wifiConfigured && _config.IsWifiEnabled == true)
+                            {
+                                _lastWirelessReconnectUtc = now;
+                                if (await WirelessDebuggingHelper.TryConnectLastKnownAsync(_config.SelectedDeviceWiFi).ConfigureAwait(false))
+                                {
+                                    _currentDevice = _config.SelectedDeviceWiFi;
+                                    _currentDeviceIsUsb = false;
+                                    _wifiNeedsUsbReconnect = false;
+                                    _wifiReconnectPromptShown = false;
+                                    _wifiReconnectFailurePromptShown = false;
+                                    _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
+                                    return;
+                                }
+                            }
+
+                            // No live link. This is the only mode that asks the user to
+                            // reconnect USB so Wi-Fi can be set up again; the reconnect
+                            // itself is handled by the USB branch above.
+                            Disconnect();
                             _currentDeviceIsUsb = false;
+                            _wifiNeedsUsbReconnect = wifiConfigured && _config.IsWifiEnabled == true;
+                            if (_wifiNeedsUsbReconnect && !_wifiReconnectPromptShown)
+                            {
+                                _wifiReconnectPromptShown = true;
+                                (Application.Current as App)?.ShowToast(
+                                    "Wireless connection lost. Reconnect your phone via USB to re-setup wireless.",
+                                    ToastLevel.Warning);
+                            }
                             return;
                         }
-                    }
-                }
-
-                if (!string.IsNullOrEmpty(_currentDevice))
-                {
-                    _currentDevice = string.Empty;
-                    _mediaController.Clear();
-                    NotifyNowPlaying(null, null, null);
-                    NotifyLyricsPlayback(null, null, null, false, 0);
-                }
-
-                _currentDeviceIsUsb = !string.IsNullOrEmpty(_config.SelectedDeviceUSB)
-                    && deviceList.Any(l => l.StartsWith(_config.SelectedDeviceUSB) && l.EndsWith("device"));
-                if (!_wifiNeedsUsbReconnect)
-                {
-                    _wifiNeedsUsbReconnect = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
-                        && _config.SelectedDeviceWiFi != "None"
-                        && _config.IsWifiEnabled == true;
                 }
             }
             catch (Exception ex)
