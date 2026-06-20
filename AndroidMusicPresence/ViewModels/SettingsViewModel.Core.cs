@@ -105,13 +105,26 @@ namespace AndroidMusicPresenceLink
         }
 
         // Mirrors the old UpdateIntervalWarningVisibility (which warns at index >= 1).
-        public bool IntervalWarningVisible => UpdateIntervalIndex >= 1;
+        public bool IntervalWarningVisible => IntervalDropdownVisible && UpdateIntervalIndex >= 1;
         public string IntervalWarningText => UpdateIntervalIndex == 1
             ? "Intervals above 1 sec may cause timing issue's in the mediaplayer"
             : "Intervals above 3 sec disable audio link hotswap recovery and may cause timing issue's in the mediaplayer.";
 
         private bool _adaptivePollingEnabled;
-        public bool AdaptivePollingEnabled { get => _adaptivePollingEnabled; set => Set(ref _adaptivePollingEnabled, value); }
+        public bool AdaptivePollingEnabled
+        {
+            get => _adaptivePollingEnabled;
+            set
+            {
+                if (!Set(ref _adaptivePollingEnabled, value)) return;
+                RaisePropertyChanged(nameof(IntervalDropdownVisible));
+                RaisePropertyChanged(nameof(IntervalWarningVisible));
+            }
+        }
+
+        // The interval dropdown is hidden when adaptive polling is on; adaptive
+        // always uses 1 sec as its base and the dropdown would be misleading.
+        public bool IntervalDropdownVisible => !_adaptivePollingEnabled;
 
         private string _adaptivePollingThresholdText = "5";
         public string AdaptivePollingThresholdText { get => _adaptivePollingThresholdText; set => Set(ref _adaptivePollingThresholdText, value); }
