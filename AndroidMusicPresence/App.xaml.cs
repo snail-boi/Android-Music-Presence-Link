@@ -14,6 +14,36 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 
+
+// version names:
+// v1.0: the lost version
+// v1.0.1 : initial public release
+// v1.0.2 : hotkeys update
+// v1.0.3 : the subfolder traumu update
+// v1.0.4 : settingsmode shenanigans update
+// v1.0.5 : the UI update 1
+// v1.0.6 : app elligibility update
+// v1.0.7 : the quality presets update
+// v1.0.8 : caching and tracking update
+// v1.0.9 : the forgotten update
+// v1.0.10 : cover data collection hell update
+// v1.0.11 : the cover fixer update
+// v1.1.0 : the media player window update + a some unboarding on the side
+// v1.1.1 : mediaplayer button heaven update
+// v1.2.0 : the connection update
+// v1.3.0 : paths and updates update
+// v1.3.1 : the hotfix update
+// v1.3.2 : random bulshit go update
+// v1.4.0 : lost in installer hell update
+// v1.4.1 : the dependency and installers update
+// v1.4.2 : the QR code update
+// v1.4.3 : random bulshit go 2 electric boogaloo update
+// v1.4.4 : elligable windows & audio link aditions update
+// v1.4.5 : the customizability update
+// v1.5.0 : the big boy update aka the MVVM refactor update aka the rewrite update aka nexts and previous's update
+// v1.6.0 : the embedded lyrics and metadata editing update with some adaptive poll rates on the side
+
+
 namespace AndroidMusicPresenceLink
 {
     /// <summary>
