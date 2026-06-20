@@ -19,6 +19,9 @@ namespace AndroidMusicPresenceLink
         private readonly Dispatcher dispatcher;
         private readonly Func<string> getCurrentDevice;
         private readonly Func<Task> updateCurrentSongCallback;
+        // Invoked when a transport command (play/pause/next/prev/seek) is issued, so
+        // the presence service can treat it as user activity. Optional.
+        private readonly Action? onUserInteraction;
         private string? lastSMTCTitle;
         private string? lastTimelineTrackKey;
         private string? lastSmtcPushedKey;
@@ -60,11 +63,12 @@ namespace AndroidMusicPresenceLink
         public long CurrentDurationMs =>
             lastTrackDuration.HasValue ? Math.Max(0, (long)lastTrackDuration.Value.TotalMilliseconds) : 0;
 
-        public MediaController(Dispatcher dispatcher, Func<string> getCurrentDevice, Func<Task> updateCurrentSongCallback, MusicConfig config)
+        public MediaController(Dispatcher dispatcher, Func<string> getCurrentDevice, Func<Task> updateCurrentSongCallback, MusicConfig config, Action? onUserInteraction = null)
         {
             this.dispatcher = dispatcher;
             this.getCurrentDevice = getCurrentDevice;
             this.updateCurrentSongCallback = updateCurrentSongCallback;
+            this.onUserInteraction = onUserInteraction;
 
             cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB, config.CoverArtFileNamePatterns);
             remoteRoots = GetNormalizedRemoteRoots(config);
@@ -194,6 +198,7 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
+                onUserInteraction?.Invoke();
                 var device = getCurrentDevice();
                 if (string.IsNullOrEmpty(device)) return;
                 await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 85").ConfigureAwait(false);
@@ -211,6 +216,7 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
+                onUserInteraction?.Invoke();
                 var device = getCurrentDevice();
                 if (string.IsNullOrEmpty(device)) return;
                 await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 85").ConfigureAwait(false);
@@ -228,6 +234,7 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
+                onUserInteraction?.Invoke();
                 var device = getCurrentDevice();
                 if (string.IsNullOrEmpty(device)) return;
                 await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 87").ConfigureAwait(false);
@@ -248,6 +255,7 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
+                onUserInteraction?.Invoke();
                 var device = getCurrentDevice();
                 if (string.IsNullOrEmpty(device)) return;
                 await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 88").ConfigureAwait(false);
@@ -275,6 +283,7 @@ namespace AndroidMusicPresenceLink
             {
                 if (seconds == 0) return;
 
+                onUserInteraction?.Invoke();
                 var device = getCurrentDevice();
                 if (string.IsNullOrEmpty(device)) return;
 

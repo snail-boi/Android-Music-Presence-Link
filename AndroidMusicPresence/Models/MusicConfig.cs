@@ -140,6 +140,16 @@ namespace AndroidMusicPresenceLink
         public bool SaveLyricsAsLrcInFolder { get; set; } = false;
         public List<string> MusicRemoteRoots { get; set; } = new List<string>();
         public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Extreme;
+        // When enabled, the poll interval gradually slows down after a period of no
+        // activity (no interaction and, while a single track plays, no song change)
+        // and snaps back to the configured interval on the next interaction. Off by
+        // default because it can make song changes and position lag until you interact.
+        public bool AdaptivePollingEnabled { get; set; } = false;
+        // Minutes of inactivity before the first poll slowdown. Playing tracks use
+        // double this value for the first drop; subsequent steps halve this each time.
+        public int AdaptivePollingThresholdMinutes { get; set; } = 5;
+        // Show a passive toast whenever the poll rate steps down.
+        public bool AdaptivePollingAlertEnabled { get; set; } = false;
         public string IgnoredUpdateVersion { get; set; } = string.Empty;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
@@ -258,6 +268,9 @@ namespace AndroidMusicPresenceLink
                 MusicRemoteRoot = source.MusicRemoteRoot,
                 MusicRemoteRoots = source.MusicRemoteRoots?.ToList() ?? new List<string>(),
                 UpdateIntervalMode = source.UpdateIntervalMode,
+                AdaptivePollingEnabled = source.AdaptivePollingEnabled,
+                AdaptivePollingThresholdMinutes = source.AdaptivePollingThresholdMinutes,
+                AdaptivePollingAlertEnabled = source.AdaptivePollingAlertEnabled,
                 IgnoredUpdateVersion = source.IgnoredUpdateVersion,
                 DebugMode = source.DebugMode,
                 UseDarkMode = source.UseDarkMode,
@@ -406,6 +419,9 @@ namespace AndroidMusicPresenceLink
             {
                 config.UpdateIntervalMode = UpdateIntervalMode.Extreme;
             }
+
+            if (config.AdaptivePollingThresholdMinutes < 1)
+                config.AdaptivePollingThresholdMinutes = 1;
 
             if (config.EligibleApps.Count == 0 && config.AllowedApps.Count > 0)
             {

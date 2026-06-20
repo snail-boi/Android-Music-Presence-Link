@@ -1662,6 +1662,7 @@ namespace AndroidMusicPresenceLink
 
                 // 24 = KEYCODE_VOLUME_UP, 25 = KEYCODE_VOLUME_DOWN
                 var keycode = up ? 24 : 25;
+                _presenceService?.NotifyUserInteraction();
                 await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent {keycode}").ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -1747,6 +1748,7 @@ namespace AndroidMusicPresenceLink
                 int keycode = delta > 0 ? 24 : 25;
                 var keys = string.Join(" ", Enumerable.Repeat(keycode, Math.Abs(delta)));
                 Debugger.show($"[VOLUME] Sending {Math.Abs(delta)}x keyevent {keycode} (prev={previousIndex} target={targetIndex})");
+                _presenceService?.NotifyUserInteraction();
                 await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent {keys}").ConfigureAwait(false);
             }
             catch (Exception ex)

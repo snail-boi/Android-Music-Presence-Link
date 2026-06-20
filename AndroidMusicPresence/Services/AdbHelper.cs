@@ -11,7 +11,7 @@ namespace AndroidMusicPresenceLink
     public static class AdbHelper
     {
         private const string DefaultSessionKey = "__default__";
-        private static readonly TimeSpan SessionIdleTimeout = TimeSpan.FromSeconds(20);
+        public static TimeSpan SessionIdleTimeout { get; set; } = TimeSpan.FromSeconds(20);
         private static readonly ConcurrentDictionary<string, AdbShellSession> ShellSessions = new();
         private static readonly object SessionSync = new();
         private static readonly Regex ShellArgsRegex = new(@"^\s*(?:-s\s+(?<serial>\S+)\s+)?shell\s+(?<command>[\s\S]+?)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -34,7 +34,7 @@ namespace AndroidMusicPresenceLink
         public static async Task RunAdbAsync(string args)
         {
             //in case of checking induvidual commands
-            Debugger.show("[AdbAsync]" + args);
+            //Debugger.show("[AdbAsync]" + args);
             if (!IsAdbConfigured())
                 return;
 
@@ -65,7 +65,7 @@ namespace AndroidMusicPresenceLink
         public static async Task<string> RunAdbCaptureAsync(string args)
         {
             //in case of checking induvidual commands
-            Debugger.show("[CaptureAsync]" + args);
+            //Debugger.show("[CaptureAsync]" + args);
             if (!IsAdbConfigured())
                 return string.Empty;
 

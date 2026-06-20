@@ -1105,6 +1105,32 @@
                                    Foreground="#E6A020"
                                    Margin="0,0,0,8" />
 
+                            <CheckBox Content="Adaptive polling (battery saver)"
+                                      IsChecked="{Binding AdaptivePollingEnabled, Mode=TwoWay}"
+                                      Margin="0,0,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}" />
+
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Inactivity threshold (min)"
+                                           Grid.Column="0"
+                                           Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding AdaptivePollingThresholdText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                            </Grid>
+
+                            <CheckBox Content="Alert when poll rate drops"
+                                      IsChecked="{Binding AdaptivePollingAlertEnabled, Mode=TwoWay}"
+                                      Margin="0,0,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}" />
+
+                            <TextBlock Text="Slows the poll rate after a few minutes of inactivity and snaps back when you interact. Song changes, cover art, and the position bar may lag until you interact while it's slowed."
+                                   Style="{StaticResource HintTextStyle}"
+                                   Margin="0,0,0,8" />
+
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="200" />

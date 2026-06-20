@@ -60,6 +60,25 @@ namespace AndroidMusicPresenceLink
         // rather than bailing, so a freshly plugged device isn't missed.
         private const int UsbPromotionLockWaitMs = 2000;
 
+        // ── Adaptive polling ────────────────────────────────────────────────
+        // Most recent activity: a user interaction (any `input keyevent`) or a song
+        // change. The poll interval slows down the longer this stays unchanged.
+        private DateTimeOffset _lastActivityUtc = DateTimeOffset.UtcNow;
+        // True while the interval is slowed below the user's configured base, so an
+        // interaction knows to snap straight back to base instead of waiting it out.
+        private volatile bool _adaptiveActive;
+
+        // When idle (not playing) we start slowing sooner; while a single track plays
+        // we wait longer so long songs don't trip it (normal albums reset on every
+        // track change and stay fast). After the start point we step down the ladder.
+        // Thresholds are computed from AdaptivePollingThresholdMinutes (N):
+        //   idle:    after N         -> 3s, ceil(N/2) -> 5s, ceil(N/4) -> 10s, ceil(N/8) -> 30s
+        //   playing: after 2N        -> 3s, ceil(N/2) -> 5s, ceil(N/4) -> 10s, ceil(N/8) -> 30s
+        private static readonly TimeSpan AdaptiveStage1 = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan AdaptiveStage2 = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan AdaptiveStage3 = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan AdaptiveStage4 = TimeSpan.FromSeconds(30);
+
         internal string CurrentDevice => _currentDevice;
         internal string? CurrentRemoteFilePath => _mediaController.CurrentRemoteFilePath;
         internal string? CurrentRemoteFileToken => _mediaController.CurrentRemoteFileToken;
@@ -74,7 +93,7 @@ namespace AndroidMusicPresenceLink
         {
             _dispatcher = dispatcher;
             _config = config;
-            _mediaController = new MediaController(dispatcher, () => _currentDevice, async () => { await UpdateCurrentSongAsync().ConfigureAwait(false); }, config);
+            _mediaController = new MediaController(dispatcher, () => _currentDevice, async () => { await UpdateCurrentSongAsync().ConfigureAwait(false); }, config, NotifyUserInteraction);
             _mediaController.Initialize();
 
             _timer = new DispatcherTimer
@@ -175,6 +194,10 @@ namespace AndroidMusicPresenceLink
                 }
 
                 NotifyTrayState(BuildTrayState(hasActiveSong));
+
+                // hasActiveSong reflects this tick's playing state, so use it to pick
+                // the slowdown threshold and adjust the interval for the next tick.
+                ApplyAdaptivePolling(hasActiveSong);
             }
             catch (Exception ex)
             {
@@ -978,6 +1001,9 @@ namespace AndroidMusicPresenceLink
                 if (scrambledChanged)
                 {
                     _reparseTicksRemaining = 1;
+                    // A track change counts as activity: a churning album stays on the
+                    // fast interval, while a single long or looping track does not.
+                    _lastActivityUtc = DateTimeOffset.UtcNow;
                 }
 
                 bool mustReparse = scrambledChanged || _reparseTicksRemaining > 0;
@@ -1191,6 +1217,105 @@ namespace AndroidMusicPresenceLink
                 UpdateIntervalMode.Slow => TimeSpan.FromSeconds(10),
                 _ => TimeSpan.FromSeconds(1)
             };
+        }
+
+        // Called by the media controller for transport commands (SMTC or the player
+        // window) and by the app for volume changes. Marks activity and, if we're
+        // currently slowed, hops back to the dispatcher to restore the base interval
+        // and refresh immediately. Safe to call from any thread.
+        public void NotifyUserInteraction()
+        {
+            _lastActivityUtc = DateTimeOffset.UtcNow;
+
+            if (!_config.AdaptivePollingEnabled || !_adaptiveActive)
+                return;
+
+            _adaptiveActive = false; // set synchronously so a burst doesn't queue many
+            _dispatcher.BeginInvoke(new Action(ResumeBasePolling));
+        }
+
+        private void ResumeBasePolling()
+        {
+            var baseInterval = GetInterval(_config.UpdateIntervalMode);
+            if (baseInterval.TotalSeconds <= 0)
+                return;
+
+            if (_timer.Interval != baseInterval)
+                _timer.Interval = baseInterval;
+
+            _ = TickAsync();
+        }
+
+        // Steps the poll interval down a fixed ladder the longer nothing happens, and
+        // never below the user's configured interval. Runs on the dispatcher thread.
+        private void ApplyAdaptivePolling(bool isPlaying)
+        {
+            if (!_config.AdaptivePollingEnabled)
+                return;
+
+            var baseInterval = GetInterval(_config.UpdateIntervalMode);
+            if (baseInterval.TotalSeconds <= 0)
+                return; // polling disabled entirely; nothing to scale
+
+            // Never slow down while disconnected: keep retrying at the base rate.
+            if (string.IsNullOrEmpty(_currentDevice))
+            {
+                _lastActivityUtc = DateTimeOffset.UtcNow;
+                SetAdaptiveInterval(baseInterval, baseInterval);
+                return;
+            }
+
+            // N = user threshold in minutes. Playing gets 2N for the first drop;
+            // subsequent steps use ceil(N/2), ceil(N/4), ceil(N/8).
+            double n = Math.Max(1, _config.AdaptivePollingThresholdMinutes);
+            double step1 = isPlaying ? n * 2 : n;
+            double step2 = step1 + Math.Ceiling(n / 2.0);
+            double step3 = step2 + Math.Ceiling(n / 4.0);
+            double step4 = step3 + Math.Ceiling(n / 8.0);
+
+            double elapsedMinutes = (DateTimeOffset.UtcNow - _lastActivityUtc).TotalMinutes;
+
+            TimeSpan target;
+            if (elapsedMinutes < step1)
+                target = baseInterval;
+            else if (elapsedMinutes < step2)
+                target = AdaptiveStage1;
+            else if (elapsedMinutes < step3)
+                target = AdaptiveStage2;
+            else if (elapsedMinutes < step4)
+                target = AdaptiveStage3;
+            else
+                target = AdaptiveStage4;
+
+            if (target < baseInterval)
+                target = baseInterval; // never poll faster than the user asked
+
+            SetAdaptiveInterval(target, baseInterval);
+        }
+
+        private void SetAdaptiveInterval(TimeSpan target, TimeSpan baseInterval)
+        {
+            if (_timer.Interval != target)
+            {
+                if (target > baseInterval)
+                {
+                    Debugger.show($"[ADAPTIVE] Poll interval slowed: {_timer.Interval.TotalSeconds:0}s -> {target.TotalSeconds:0}s (inactive for {(DateTimeOffset.UtcNow - _lastActivityUtc).TotalMinutes:0.0} min).");
+                    if (_config.AdaptivePollingAlertEnabled)
+                        (Application.Current as App)?.ShowToast($"Poll rate slowed to {target.TotalSeconds:0}s due to inactivity.", ToastLevel.Info);
+                    // Extend the shell session idle timeout when we reach the 30s stage
+                    // so the persistent session doesn't expire between polls.
+                    if (target == AdaptiveStage4)
+                        AdbHelper.SessionIdleTimeout = TimeSpan.FromSeconds(40);
+                }
+                else
+                {
+                    Debugger.show($"[ADAPTIVE] Poll interval restored to base: {target.TotalSeconds:0}s.");
+                    AdbHelper.SessionIdleTimeout = TimeSpan.FromSeconds(20);
+                }
+                _timer.Interval = target;
+            }
+
+            _adaptiveActive = target > baseInterval;
         }
 
         public void Dispose()

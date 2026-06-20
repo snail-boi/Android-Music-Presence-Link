@@ -110,6 +110,15 @@ namespace AndroidMusicPresenceLink
             ? "Intervals above 1 sec may cause timing issue's in the mediaplayer"
             : "Intervals above 3 sec disable audio link hotswap recovery and may cause timing issue's in the mediaplayer.";
 
+        private bool _adaptivePollingEnabled;
+        public bool AdaptivePollingEnabled { get => _adaptivePollingEnabled; set => Set(ref _adaptivePollingEnabled, value); }
+
+        private string _adaptivePollingThresholdText = "5";
+        public string AdaptivePollingThresholdText { get => _adaptivePollingThresholdText; set => Set(ref _adaptivePollingThresholdText, value); }
+
+        private bool _adaptivePollingAlertEnabled;
+        public bool AdaptivePollingAlertEnabled { get => _adaptivePollingAlertEnabled; set => Set(ref _adaptivePollingAlertEnabled, value); }
+
         private string _cacheClearText = "10";
         public string CacheClearText { get => _cacheClearText; set => Set(ref _cacheClearText, value); }
 
@@ -270,6 +279,10 @@ namespace AndroidMusicPresenceLink
             if (mode < 1 || mode > 4) mode = 1;
             _updateIntervalIndex = mode - 1;
 
+            _adaptivePollingEnabled = _config.AdaptivePollingEnabled;
+            _adaptivePollingThresholdText = _config.AdaptivePollingThresholdMinutes.ToString();
+            _adaptivePollingAlertEnabled = _config.AdaptivePollingAlertEnabled;
+
             _cacheClearText = _config.CachClearInMB.ToString();
             _pauseClearDelayText = _config.SmtcPauseClearDelayMinutes.ToString();
             _coverPatterns = _config.CoverArtFileNamePatterns ?? string.Empty;
@@ -294,6 +307,12 @@ namespace AndroidMusicPresenceLink
             config.StartWithWindows = StartWithWindows;
 
             config.UpdateIntervalMode = (UpdateIntervalMode)(Math.Clamp(UpdateIntervalIndex, 0, 3) + 1);
+            config.AdaptivePollingEnabled = AdaptivePollingEnabled;
+            if (int.TryParse(AdaptivePollingThresholdText.Trim(), out var threshold) && threshold >= 1)
+                config.AdaptivePollingThresholdMinutes = threshold;
+            else
+                config.AdaptivePollingThresholdMinutes = 5;
+            config.AdaptivePollingAlertEnabled = AdaptivePollingAlertEnabled;
 
             if (int.TryParse(CacheClearText.Trim(), out var cache))
             {
@@ -449,6 +468,9 @@ namespace AndroidMusicPresenceLink
             if (!leftRoots.SequenceEqual(rightRoots, StringComparer.OrdinalIgnoreCase)) return false;
 
             if (left.UpdateIntervalMode != right.UpdateIntervalMode) return false;
+            if (left.AdaptivePollingEnabled != right.AdaptivePollingEnabled) return false;
+            if (left.AdaptivePollingThresholdMinutes != right.AdaptivePollingThresholdMinutes) return false;
+            if (left.AdaptivePollingAlertEnabled != right.AdaptivePollingAlertEnabled) return false;
             if (left.DebugMode != right.DebugMode) return false;
             if (left.UseDarkMode != right.UseDarkMode) return false;
             if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
