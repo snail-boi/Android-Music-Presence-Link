@@ -108,6 +108,8 @@ namespace AndroidMusicPresenceLink
         // other unexpected exit) we can automatically reconnect on the new transport
         // instead of leaving audio off forever. Cleared only by an explicit user stop
         // or app exit.
+        private bool _audioQualityWindowOpen;
+        private bool _metadataEditWindowOpen;
         private bool _audioLinkDesired;
         // Cancels any pending recovery delay when scrcpy has died and we're waiting
         // for a device to come back so we can restart the audio link. Tied to
@@ -452,6 +454,9 @@ namespace AndroidMusicPresenceLink
 
         private void OpenAudioQualityWindow(bool showPresets, bool calledFromMediaPlayer)
         {
+            if (_audioQualityWindowOpen)
+                return;
+
             Window? owner = calledFromMediaPlayer ? (Window?)_mediaPlayerWindow : _settingsWindow;
             // Only assign Owner if the window has a live HWND; a window that was
             // created but never shown (e.g. hidden on startup) throws otherwise.
@@ -462,17 +467,25 @@ namespace AndroidMusicPresenceLink
             if (owner != null)
                 window.Owner = owner;
 
-            if (window.ShowDialog() == true && window.ResultConfig.HasValue)
+            _audioQualityWindowOpen = true;
+            try
             {
-                var (codec, bitrate, bufferMs, flacLevel) = window.ResultConfig.Value;
-                AudioQualityPresets.ApplyCustomToConfig(Config, codec, bitrate, bufferMs, flacLevel);
-                MusicConfigManager.Save(Config);
+                if (window.ShowDialog() == true && window.ResultConfig.HasValue)
+                {
+                    var (codec, bitrate, bufferMs, flacLevel) = window.ResultConfig.Value;
+                    AudioQualityPresets.ApplyCustomToConfig(Config, codec, bitrate, bufferMs, flacLevel);
+                    MusicConfigManager.Save(Config);
 
-                bool wasRunning = _scrcpyProcess != null && !_scrcpyProcess.HasExited;
-                UpdateConfig(Config);
+                    bool wasRunning = _scrcpyProcess != null && !_scrcpyProcess.HasExited;
+                    UpdateConfig(Config);
 
-                if (wasRunning)
-                    _ = RestartScrcpyForPresetAsync();
+                    if (wasRunning)
+                        _ = RestartScrcpyForPresetAsync();
+                }
+            }
+            finally
+            {
+                _audioQualityWindowOpen = false;
             }
         }
 
@@ -694,40 +707,51 @@ namespace AndroidMusicPresenceLink
 
             try
             {
+                if (_metadataEditWindowOpen)
+                    return;
+
                 var window = new MetadataEditWindow(meta, System.IO.Path.GetFileName(remotePath))
                 {
                     Owner = _mediaPlayerWindow
                 };
 
-                if (window.ShowDialog() == true && window.Result != null)
+                _metadataEditWindowOpen = true;
+                try
                 {
-                    if (Config != null)
+                    if (window.ShowDialog() == true && window.Result != null)
                     {
-                        Config.RetainDateModifiedOnTagEdit = window.Result.RetainDateModified;
-                        // Don't let WAV's forced-on value poison the default for other formats.
-                        if (ext != ".wav")
-                            Config.SaveLyricsAsLrcInFolder = window.Result.SaveLyricsAsLrc;
-                        MusicConfigManager.Save(Config);
+                        if (Config != null)
+                        {
+                            Config.RetainDateModifiedOnTagEdit = window.Result.RetainDateModified;
+                            // Don't let WAV's forced-on value poison the default for other formats.
+                            if (ext != ".wav")
+                                Config.SaveLyricsAsLrcInFolder = window.Result.SaveLyricsAsLrc;
+                            MusicConfigManager.Save(Config);
+                        }
+
+                        var (ok, message) = await MetadataEditService.WriteAsync(device, remotePath, window.Result, ffmpeg, tempDir, window.Result.RetainDateModified);
+                        ShowToast(message, ok ? ToastLevel.Info : ToastLevel.Warning);
+
+                        if (ok)
+                        {
+                            // We just wrote this file and know its new lyrics, so update the cache
+                            // directly (no re-pull needed) and nudge the resolver to re-read the
+                            // current track so the change shows without switching songs.
+                            var dk = LyricsCache.DeviceKey(Config?.SelectedDeviceName, device);
+                            var fk = LyricsCache.FileKey(dk, remotePath);
+                            var newLyrics = window.Result.Lyrics;
+                            if (!string.IsNullOrWhiteSpace(newLyrics))
+                                LyricsCache.Save(fk, LyricsCache.Source.Embed, newLyrics);
+                            else
+                                LyricsCache.Invalidate(fk);
+
+                            _lyricsOverlayManager?.MarkCurrentTrackDirty();
+                        }
                     }
-
-                    var (ok, message) = await MetadataEditService.WriteAsync(device, remotePath, window.Result, ffmpeg, tempDir, window.Result.RetainDateModified);
-                    ShowToast(message, ok ? ToastLevel.Info : ToastLevel.Warning);
-
-                    if (ok)
-                    {
-                        // We just wrote this file and know its new lyrics, so update the cache
-                        // directly (no re-pull needed) and nudge the resolver to re-read the
-                        // current track so the change shows without switching songs.
-                        var dk = LyricsCache.DeviceKey(Config?.SelectedDeviceName, device);
-                        var fk = LyricsCache.FileKey(dk, remotePath);
-                        var newLyrics = window.Result.Lyrics;
-                        if (!string.IsNullOrWhiteSpace(newLyrics))
-                            LyricsCache.Save(fk, LyricsCache.Source.Embed, newLyrics);
-                        else
-                            LyricsCache.Invalidate(fk);
-
-                        _lyricsOverlayManager?.MarkCurrentTrackDirty();
-                    }
+                }
+                finally
+                {
+                    _metadataEditWindowOpen = false;
                 }
             }
             finally

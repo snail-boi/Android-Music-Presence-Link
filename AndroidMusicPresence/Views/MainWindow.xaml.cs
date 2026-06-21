@@ -23,6 +23,7 @@ namespace AndroidMusicPresenceLink
     {
         private readonly SettingsViewModel _vm;
         private bool _allowClose;
+        private bool _appsManagerOpen;
 
         // Hotkey capture state (window keyboard concern).
         private bool _isRecordingHotkey;
@@ -190,13 +191,24 @@ namespace AndroidMusicPresenceLink
 
         private void ShowAppsManagerDialog(MusicConfig config, Action<MusicConfig> onUpdated)
         {
+            if (_appsManagerOpen)
+                return;
+
             var window = new AppsManagerWindow(config, updated => onUpdated(updated));
 
             var owner = Window.GetWindow(this);
             if (owner != null && owner.IsLoaded)
                 window.Owner = owner;
 
-            window.ShowDialog();
+            _appsManagerOpen = true;
+            try
+            {
+                window.ShowDialog();
+            }
+            finally
+            {
+                _appsManagerOpen = false;
+            }
         }
 
         // ── Update status ────────────────────────────────────────────────────
