@@ -361,7 +361,12 @@ namespace AndroidMusicPresenceLink
 
             // Template: "Artist - Title [Album]"
             string text = $"{artist} - {title} [{album}]".Trim(' ', '-', '[', ']').Trim();
-            try { Clipboard.SetText(text); } catch { }
+            try
+            {
+                Clipboard.SetText(text);
+                (Application.Current as App)?.ShowToast("Copied: " + text);
+            }
+            catch { }
         }
 
         // Opens the tag editor for the current track. Orchestration lives in App via the

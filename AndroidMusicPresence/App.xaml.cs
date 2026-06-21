@@ -121,6 +121,7 @@ namespace AndroidMusicPresenceLink
         private const int AudioLinkRecoveryWindowMs = 8000;
         private TrayIconState _lastTrayState = TrayIconState.NoDevice;
         private TrayIconState? _lastLoggedTrayState;
+        private string? _lastToastedTransport;
         private string? _lastNowPlayingArtist;
         private string? _lastNowPlayingTitle;
         private string? _lastNowPlayingAlbum;
@@ -254,6 +255,41 @@ namespace AndroidMusicPresenceLink
             _trayIconManager?.SetState(state);
             ApplyConnectionStateToMediaPlayer();
             _mediaPlayerWindow?.SetAudioLinkState(_isScrcpyRunning);
+
+            // Toast when the transport category changes (USB / TCP-IP / WD / no device).
+            // Scrcpy variants and Active/Inactive variants within the same transport are
+            // intentionally ignored so toggling the audio link doesn't re-announce the
+            // connection and spurious no-device blips during transport switches don't spam.
+            string transport = _lastTrayState switch
+            {
+                TrayIconState.ActiveUsb or TrayIconState.InactiveUsb or
+                TrayIconState.ActiveUsbScrcpy or TrayIconState.InactiveUsbScrcpy => "usb",
+                TrayIconState.ActiveWifi or TrayIconState.InactiveWifi or
+                TrayIconState.ActiveWifiScrcpy or TrayIconState.InactiveWifiScrcpy => "wifi",
+                TrayIconState.ActiveWifiDebug or TrayIconState.InactiveWifiDebug or
+                TrayIconState.ActiveWifiDebugScrcpy or TrayIconState.InactiveWifiDebugScrcpy => "wd",
+                TrayIconState.NeedsUsbReconnect => "reconnect",
+                _ => "none"
+            };
+            if (transport != _lastToastedTransport)
+            {
+                string? prevTransport = _lastToastedTransport;
+                _lastToastedTransport = transport;
+                string? msg = transport switch
+                {
+                    "usb" => "Connected via USB",
+                    "wifi" => "Connected via TCP/IP",
+                    "wd" => "Connected via Wireless Debugging",
+                    "reconnect" => "Wi-Fi port lost, reconnect USB to restore",
+                    "none" => prevTransport != null ? "Device disconnected" : null,
+                    _ => null
+                };
+                if (msg != null)
+                {
+                    var lvl = transport == "none" || transport == "reconnect" ? ToastLevel.Warning : ToastLevel.Info;
+                    ShowToast(msg, lvl);
+                }
+            }
 
             // If the audio link is active and the device's transport (USB vs Wi-Fi)
             // changed since we started scrcpy, migrate the audio link to the new
@@ -403,6 +439,7 @@ namespace AndroidMusicPresenceLink
                     if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
                     {
                         _ = StopScrcpyAsync();
+                        ShowToast("Audio link stopped");
                     }
                 }
             }
@@ -1172,6 +1209,7 @@ namespace AndroidMusicPresenceLink
                 _audioLinkRecoveryAttempts = 0;
                 CancelAudioLinkRecovery();
                 _ = StopScrcpyAsync();
+                ShowToast("Audio link stopped");
             }
             else
             {
@@ -1221,6 +1259,7 @@ namespace AndroidMusicPresenceLink
                 _trayIconManager?.SetScrcpyRunning(true);
                 UpdateTrayAudioSettings();
                 ApplyTrayState();
+                ShowToast("Audio link started");
             }
             catch (Exception ex)
             {
@@ -1526,6 +1565,7 @@ namespace AndroidMusicPresenceLink
                 _trayIconManager?.SetScrcpyRunning(true);
                 UpdateTrayAudioSettings();
                 ApplyTrayState();
+                ShowToast("Audio link reconnected");
             }
             catch (Exception ex)
             {
@@ -1895,6 +1935,7 @@ namespace AndroidMusicPresenceLink
             try
             {
                 Dispatcher.Invoke(() => Clipboard.SetText(text));
+                ShowToast("Copied: " + text);
                 return true;
             }
             catch
