@@ -380,5 +380,20 @@ namespace AndroidMusicPresenceLink
                 (Application.Current as App)?.ShowToast("Edit metadata failed: " + ex.Message, ToastLevel.Warning);
             }
         }
+
+        private async void SaveTrackMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_saveTrackAction == null)
+            {
+                (Application.Current as App)?.ShowToast("Save song is not available right now.", ToastLevel.Warning);
+                return;
+            }
+
+            try { await _saveTrackAction(); }
+            catch (Exception ex)
+            {
+                (Application.Current as App)?.ShowToast("Save song failed: " + ex.Message, ToastLevel.Warning);
+            }
+        }
     }
 }

@@ -84,6 +84,7 @@ namespace AndroidMusicPresenceLink
 
         private readonly Func<MusicConfig>? _getConfig;
         private readonly Func<Task>? _editMetadataAction;
+        private readonly Func<Task>? _saveTrackAction;
         private readonly Action<AudioQualityPresets.Preset>? _applyAudioQualityPreset;
         private readonly Action? _openCustomQualityWindow;
 
@@ -133,7 +134,8 @@ namespace AndroidMusicPresenceLink
             Action? openCustomQualityWindow = null,
             Func<Task<(int current, int max)>>? getPhoneVolume = null,
             Func<int, int, int, Task>? setPhoneVolume = null,
-            Func<Task>? editMetadataAction = null)
+            Func<Task>? editMetadataAction = null,
+            Func<Task>? saveTrackAction = null)
         {
             InitializeComponent();
             PlayerPaneBorder.DataContext = _vm;
@@ -154,6 +156,7 @@ namespace AndroidMusicPresenceLink
             _getPhoneVolume = getPhoneVolume;
             _setPhoneVolume = setPhoneVolume;
             _editMetadataAction = editMetadataAction;
+            _saveTrackAction = saveTrackAction;
 
             if (_lyricsManager != null)
             {

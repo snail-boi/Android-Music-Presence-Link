@@ -110,6 +110,7 @@ namespace AndroidMusicPresenceLink
         // or app exit.
         private bool _audioQualityWindowOpen;
         private bool _metadataEditWindowOpen;
+        private bool _saveTrackOpen;
         private bool _audioLinkDesired;
         // Cancels any pending recovery delay when scrcpy has died and we're waiting
         // for a device to come back so we can restart the audio link. Tied to
@@ -768,6 +769,63 @@ namespace AndroidMusicPresenceLink
             catch { }
         }
 
+        internal async Task SaveCurrentTrackAsync()
+        {
+            if (_saveTrackOpen)
+                return;
+
+            var device = _presenceService?.CurrentDevice ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(device))
+            {
+                ShowToast("No device is connected.", ToastLevel.Warning);
+                return;
+            }
+
+            var remotePath = _presenceService?.CurrentRemoteFilePath;
+            if (string.IsNullOrWhiteSpace(remotePath))
+            {
+                ShowToast("No track file has been resolved yet.", ToastLevel.Warning);
+                return;
+            }
+
+            string fileName = System.IO.Path.GetFileName(remotePath);
+            string ext = System.IO.Path.GetExtension(fileName);
+            if (string.IsNullOrWhiteSpace(ext)) ext = ".mp3";
+
+            _saveTrackOpen = true;
+            try
+            {
+                var dialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "Save song",
+                    FileName = fileName,
+                    Filter = $"Audio Files|*{ext}|All Files|*.*",
+                    DefaultExt = ext
+                };
+
+                if (dialog.ShowDialog(_mediaPlayerWindow) != true)
+                    return;
+
+                string dest = dialog.FileName;
+
+                ShowToast("Pulling file from device...", ToastLevel.Info);
+                await AdbHelper.RunAdbAsync($"-s {device} pull \"{remotePath}\" \"{dest}\"").ConfigureAwait(true);
+
+                if (System.IO.File.Exists(dest) && new System.IO.FileInfo(dest).Length > 0)
+                    ShowToast("Saved: " + System.IO.Path.GetFileName(dest), ToastLevel.Info);
+                else
+                    ShowToast("Pull failed or file is empty.", ToastLevel.Warning);
+            }
+            catch (Exception ex)
+            {
+                ShowToast("Failed to save song: " + ex.Message, ToastLevel.Warning);
+            }
+            finally
+            {
+                _saveTrackOpen = false;
+            }
+        }
+
         internal void ShowMediaPlayerWindowNow()
         {
             Debugger.show("[MEDIAPLAYER] Opening media player window.");
@@ -791,7 +849,8 @@ namespace AndroidMusicPresenceLink
                     () => OpenAudioQualityWindow(showPresets: false, calledFromMediaPlayer: true),
                     GetPhoneVolumeAsync,
                     (prev, target, max) => SetPhoneVolumeAsync(prev, target, max),
-                    EditCurrentTrackMetadataAsync);
+                    EditCurrentTrackMetadataAsync,
+                    SaveCurrentTrackAsync);
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
                 _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask, () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
 
