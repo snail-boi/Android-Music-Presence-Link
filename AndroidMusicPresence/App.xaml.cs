@@ -1474,6 +1474,7 @@ namespace AndroidMusicPresenceLink
             if (_audioLinkRecoveryAttempts > AudioLinkRecoveryMaxAttempts)
             {
                 Debugger.show($"Audio-link recovery: reached {AudioLinkRecoveryMaxAttempts} attempts, giving up. Toggle audio link to retry.");
+                ShowToast("Audio link lost, reconnect manually", ToastLevel.Warning);
                 _audioLinkDesired = false;
                 _audioLinkRecoveryAttempts = 0;
                 return;
@@ -1577,12 +1578,49 @@ namespace AndroidMusicPresenceLink
                 _trayIconManager?.SetScrcpyRunning(true);
                 UpdateTrayAudioSettings();
                 ApplyTrayState();
-                ShowToast("Audio link reconnected");
+
+                // Don't announce success yet. A relaunch during a USB/Wi-Fi flap can die
+                // again within a second or two, so we only consider the link reconnected
+                // once this process has survived a short grace period.
+                _ = ConfirmAudioLinkReconnectAsync(process);
             }
             catch (Exception ex)
             {
                 Debugger.show("Audio-link recovery: launch failed: " + ex.Message);
             }
+        }
+
+        // How long a recovery-relaunched scrcpy must stay alive before we treat the audio
+        // link as genuinely reconnected (and announce it). Dying relaunches never reach
+        // this point, so a flapping transition stays silent.
+        private const int AudioLinkReconnectGraceMs = 2500;
+
+        /// <summary>
+        /// Waits a short grace period after a recovery relaunch and, if the process is
+        /// still the live audio-link process, announces a successful reconnect and clears
+        /// the recovery attempt budget. Stays silent if the process died in the meantime
+        /// (the flap case) or was replaced by a transport switch.
+        /// </summary>
+        private async Task ConfirmAudioLinkReconnectAsync(Process process)
+        {
+            try
+            {
+                await Task.Delay(AudioLinkReconnectGraceMs).ConfigureAwait(true);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (_isExiting) return;
+            if (!_audioLinkDesired) return;
+            if (!ReferenceEquals(_scrcpyProcess, process)) return;
+            if (process.HasExited) return;
+
+            // Held long enough to count as a real reconnect: reset the budget so a future
+            // genuine drop gets a fresh set of attempts, and announce it once.
+            _audioLinkRecoveryAttempts = 0;
+            ShowToast("Audio link reconnected");
         }
 
         private void OnSessionEnding(object sender, SessionEndingCancelEventArgs e)
