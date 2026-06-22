@@ -608,9 +608,70 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- ====== FOLDERS ====== -->
-                    <Expander Header="Folders" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <!-- ====== POLLING ====== -->
+                    <Expander Header="Polling" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
+                            <CheckBox Content="Adaptive polling (battery saver)"
+                                      IsChecked="{Binding AdaptivePollingEnabled, Mode=TwoWay}"
+                                      Margin="0,0,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}" />
+
+                            <Grid Margin="0,0,0,4"
+                                  Visibility="{Binding AdaptivePollingEnabled, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Inactivity threshold (min)"
+                                           Grid.Column="0"
+                                           Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding AdaptivePollingThresholdText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                            </Grid>
+
+                            <CheckBox Content="Alert when poll rate drops"
+                                      IsChecked="{Binding AdaptivePollingAlertEnabled, Mode=TwoWay}"
+                                      Margin="0,0,0,4"
+                                      Visibility="{Binding AdaptivePollingEnabled, Converter={StaticResource BoolToVis}}"
+                                      Style="{StaticResource ToggleSwitchStyle}" />
+
+                            <TextBlock Text="Slows the poll rate after a few minutes of inactivity and snaps back when you interact. Song changes, cover art, and the position bar may lag until you interact while it's slowed."
+                                   Visibility="{Binding AdaptivePollingEnabled, Converter={StaticResource BoolToVis}}"
+                                   Style="{StaticResource HintTextStyle}"
+                                   Margin="0,0,0,8" />
+
+                            <Grid Margin="0,0,0,8"
+                                  Visibility="{Binding IntervalDropdownVisible, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Update interval"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <ComboBox Grid.Column="1"
+                                      SelectedIndex="{Binding UpdateIntervalIndex, Mode=TwoWay}">
+                                    <ComboBoxItem>1 sec</ComboBoxItem>
+                                    <ComboBoxItem>3 sec</ComboBoxItem>
+                                    <ComboBoxItem>5 sec</ComboBoxItem>
+                                    <ComboBoxItem>10 sec</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+
+                            <TextBlock Visibility="{Binding IntervalWarningVisible, Converter={StaticResource BoolToVis}}"
+                                   Text="{Binding IntervalWarningText}"
+                                   Style="{StaticResource HintTextStyle}"
+                                   Foreground="#E6A020"
+                                   Margin="0,0,0,8" />
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- ====== FOLDERS & CACHE ====== -->
+                    <Expander Header="Library &amp; Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Library"
+                                   Style="{StaticResource HeaderTitleStyle}" />
+                            <Separator/>
                             <TextBlock Text="Tell the app where to find your music and lyrics on the device."
                                    Style="{StaticResource HintTextStyle}" />
 
@@ -673,12 +734,25 @@
                                     Margin="8,0,0,0"
                                     Command="{Binding BrowseLyricsCommand}" />
                             </Grid>
-                        </StackPanel>
-                    </Expander>
+                            
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Cover filename patterns"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox Text="{Binding CoverPatterns, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Grid.Column="1"
+                                     ToolTip="Semicolon separated, e.g. cover.jpg;folder.jpg;front.png" />
+                            </Grid>
 
-                    <!-- ====== CACHING ====== -->
-                    <Expander Header="Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
-                        <StackPanel>
+                            <!-- Caching -->
+
+                            <TextBlock Text="Caching"
+                                   Style="{StaticResource HeaderTitleStyle}" />
+                            <Separator/>
                             <TextBlock Text="Album art and embedded lyrics are cached locally so they load faster."
                                    Style="{StaticResource HintTextStyle}" />
 
@@ -718,7 +792,7 @@
                     </Expander>
 
                     <!-- ====== ELIGIBLE APPS ====== -->
-                    <Expander Header="Eligible apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <Expander Header="Apps" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
                             <TextBlock Text="Saved apps and their current settings. Use Manage apps to add or configure."
                                    Style="{StaticResource HintTextStyle}" />
@@ -931,6 +1005,7 @@
                                     Width="90"
                                     Margin="8,0,0,6"
                                     Command="{Binding RecordCopyTrackInfoCommand}" />
+                                
 
                                 <TextBlock Text="Audio quality"
                                        Grid.Row="6" Grid.Column="0"
@@ -944,12 +1019,29 @@
                                     Margin="8,0,0,0"
                                     Command="{Binding RecordAudioQualityCommand}" />
                             </Grid>
+
+                            <Separator/>
+                            <Grid Margin="0,8,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Copy template"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox Text="{Binding CopyTrackTemplate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Grid.Column="1"
+                                     ToolTip="Use {artist}, {title}, {album}" />
+                            </Grid>
                         </StackPanel>
                     </Expander>
 
-                    <!-- ====== AUDIO ====== -->
-                    <Expander Header="Audio" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <!-- ====== AUDIO Q&L ====== -->
+                    <Expander Header="Audio Quality &amp; Link" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
+                            <TextBlock Text="Quality"
+                                   Style="{StaticResource HeaderTitleStyle}" />
+                            <Separator/>
                             <TextBlock Text="Quality settings used when streaming audio from your phone."
                                    Style="{StaticResource HintTextStyle}" />
 
@@ -1024,6 +1116,54 @@
                                        Style="{StaticResource FieldLabelStyle}" />
                                 <TextBox Text="{Binding FlacCompressionLevel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" />
                             </Grid>
+
+                            <TextBlock Text="Link"
+                                   Style="{StaticResource HeaderTitleStyle}" />
+                            <Separator/>
+                            <!-- Audio link behaviour -->
+                            <TextBlock Text="Audio link"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,0,0,4" />
+                            <CheckBox Content="Auto-restart on connection change"
+                                      IsChecked="{Binding AudioLinkConnectionAutoRestart, Mode=TwoWay}"
+                                      Margin="0,0,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      ToolTip="Automatically restarts audio link when the connection transport changes (USB to Wi-Fi or vice versa), or when scrcpy exits unexpectedly." />
+                            <TextBlock Text="Audio link will not switch transports. Audio may keep routing over Wi-Fi even after USB is plugged in."
+                                       Style="{StaticResource HintTextStyle}"
+                                       Foreground="#E6A020"
+                                       Margin="0,0,0,4"
+                                       Visibility="{Binding AudioLinkConnectionAutoRestartWarningVisible, Converter={StaticResource BoolToVis}}" />
+                            <CheckBox Content="Auto-restart on quality change"
+                                      IsChecked="{Binding AudioLinkQualityAutoRestart, Mode=TwoWay}"
+                                      Margin="0,0,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      ToolTip="Automatically restarts audio link when the audio quality preset is changed." />
+                            <TextBlock Text="Quality changes will not take effect until audio link is manually restarted."
+                                       Style="{StaticResource HintTextStyle}"
+                                       Foreground="#E6A020"
+                                       Margin="0,0,0,4"
+                                       Visibility="{Binding AudioLinkQualityAutoRestartWarningVisible, Converter={StaticResource BoolToVis}}" />
+                            <CheckBox Content="Bleedless restarts"
+                                      IsChecked="{Binding AudioLinkBleedless, Mode=TwoWay}"
+                                      Margin="0,0,0,12"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      ToolTip="Mutes the device before stopping audio link and resumes playback after it restarts. Disable if mute/unmute interferes with your player." />
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- ====== STARTUP ====== -->
+                    <Expander Header="Startup" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                        <StackPanel>
+                            <Button Content="{Binding MediaPlayerViewButtonText}"
+                                     Style="{StaticResource SecondaryButtonStyle}"
+                                     Width="200"
+                                     HorizontalAlignment="Left"
+                                     Margin="0,0,0,12"
+                                     Command="{Binding ToggleMediaPlayerViewCommand}" />
+
+                            <CheckBox Content="Start minimized to tray" IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
+                            <CheckBox Content="Start when Windows starts" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
                         </StackPanel>
                     </Expander>
 
@@ -1081,85 +1221,8 @@
                         <StackPanel>
                             <TextBlock Text="miscellaneous options."
                                 Style="{StaticResource HintTextStyle}" />
+                            
 
-                            <CheckBox Content="Adaptive polling (battery saver)"
-                                      IsChecked="{Binding AdaptivePollingEnabled, Mode=TwoWay}"
-                                      Margin="0,0,0,4"
-                                      Style="{StaticResource ToggleSwitchStyle}" />
-
-                            <Grid Margin="0,0,0,4"
-                                  Visibility="{Binding AdaptivePollingEnabled, Converter={StaticResource BoolToVis}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Inactivity threshold (min)"
-                                           Grid.Column="0"
-                                           Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Grid.Column="1"
-                                         Text="{Binding AdaptivePollingThresholdText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-                            </Grid>
-
-                            <CheckBox Content="Alert when poll rate drops"
-                                      IsChecked="{Binding AdaptivePollingAlertEnabled, Mode=TwoWay}"
-                                      Margin="0,0,0,4"
-                                      Visibility="{Binding AdaptivePollingEnabled, Converter={StaticResource BoolToVis}}"
-                                      Style="{StaticResource ToggleSwitchStyle}" />
-
-                            <TextBlock Text="Slows the poll rate after a few minutes of inactivity and snaps back when you interact. Song changes, cover art, and the position bar may lag until you interact while it's slowed."
-                                   Visibility="{Binding AdaptivePollingEnabled, Converter={StaticResource BoolToVis}}"
-                                   Style="{StaticResource HintTextStyle}"
-                                   Margin="0,0,0,8" />
-
-                            <Grid Margin="0,0,0,8"
-                                  Visibility="{Binding IntervalDropdownVisible, Converter={StaticResource BoolToVis}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Update interval"
-                                       Grid.Column="0"
-                                       Style="{StaticResource FieldLabelStyle}" />
-                                <ComboBox Grid.Column="1"
-                                      SelectedIndex="{Binding UpdateIntervalIndex, Mode=TwoWay}">
-                                    <ComboBoxItem>1 sec</ComboBoxItem>
-                                    <ComboBoxItem>3 sec</ComboBoxItem>
-                                    <ComboBoxItem>5 sec</ComboBoxItem>
-                                    <ComboBoxItem>10 sec</ComboBoxItem>
-                                </ComboBox>
-                            </Grid>
-
-                            <TextBlock Visibility="{Binding IntervalWarningVisible, Converter={StaticResource BoolToVis}}"
-                                   Text="{Binding IntervalWarningText}"
-                                   Style="{StaticResource HintTextStyle}"
-                                   Foreground="#E6A020"
-                                   Margin="0,0,0,8" />
-
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Cover filename patterns"
-                                       Grid.Column="0"
-                                       Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding CoverPatterns, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     Grid.Column="1"
-                                     ToolTip="Semicolon separated, e.g. cover.jpg;folder.jpg;front.png" />
-                            </Grid>
-
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Copy template"
-                                       Grid.Column="0"
-                                       Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding CopyTrackTemplate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     Grid.Column="1"
-                                     ToolTip="Use {artist}, {title}, {album}" />
-                            </Grid>
 
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -1176,46 +1239,6 @@
                                        Margin="8,0,0,0"
                                        Style="{StaticResource FieldLabelStyle}" />
                             </Grid>
-
-                            <Button Content="{Binding MediaPlayerViewButtonText}"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Width="200"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,12"
-                                Command="{Binding ToggleMediaPlayerViewCommand}" />
-
-                            <CheckBox Content="Start minimized to tray" IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
-                            <CheckBox Content="Start when Windows starts" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
-
-                            <!-- Audio link behaviour -->
-                            <TextBlock Text="Audio link"
-                                       Style="{StaticResource FieldLabelStyle}"
-                                       Margin="0,0,0,4" />
-                            <CheckBox Content="Auto-restart on connection change"
-                                      IsChecked="{Binding AudioLinkConnectionAutoRestart, Mode=TwoWay}"
-                                      Margin="0,0,0,4"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      ToolTip="Automatically restarts audio link when the connection transport changes (USB to Wi-Fi or vice versa), or when scrcpy exits unexpectedly." />
-                            <TextBlock Text="Audio link will not switch transports. Audio may keep routing over Wi-Fi even after USB is plugged in."
-                                       Style="{StaticResource HintTextStyle}"
-                                       Foreground="#E6A020"
-                                       Margin="0,0,0,4"
-                                       Visibility="{Binding AudioLinkConnectionAutoRestartWarningVisible, Converter={StaticResource BoolToVis}}" />
-                            <CheckBox Content="Auto-restart on quality change"
-                                      IsChecked="{Binding AudioLinkQualityAutoRestart, Mode=TwoWay}"
-                                      Margin="0,0,0,4"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      ToolTip="Automatically restarts audio link when the audio quality preset is changed." />
-                            <TextBlock Text="Quality changes will not take effect until audio link is manually restarted."
-                                       Style="{StaticResource HintTextStyle}"
-                                       Foreground="#E6A020"
-                                       Margin="0,0,0,4"
-                                       Visibility="{Binding AudioLinkQualityAutoRestartWarningVisible, Converter={StaticResource BoolToVis}}" />
-                            <CheckBox Content="Bleedless restarts"
-                                      IsChecked="{Binding AudioLinkBleedless, Mode=TwoWay}"
-                                      Margin="0,0,0,12"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      ToolTip="Mutes the device before stopping audio link and resumes playback after it restarts. Disable if mute/unmute interferes with your player." />
 
                             <!-- No-cover icon -->
                             <TextBlock Text="No-cover icon"
