@@ -246,6 +246,14 @@ namespace AndroidMusicPresenceLink
         public int HotkeyAudioQualityKey { get; set; } = 0x51;   // Q
         public int HotkeyModifier { get; set; } = 0x0001;
 
+        // Audio link auto-restart and bleedless behaviour
+        // When false, scrcpy will not automatically restart on connection/transport change or crash.
+        public bool AudioLinkConnectionAutoRestart { get; set; } = true;
+        // When false, scrcpy will not automatically restart when the audio quality preset changes.
+        public bool AudioLinkQualityAutoRestart { get; set; } = true;
+        // When false, the mute/unmute keyevents around scrcpy restarts are skipped.
+        public bool AudioLinkBleedless { get; set; } = true;
+
         public MusicConfig Clone()
         {
             var source = this;
@@ -342,7 +350,10 @@ namespace AndroidMusicPresenceLink
                 HotkeyToggleLyricsOverlayKey = source.HotkeyToggleLyricsOverlayKey,
                 HotkeyCopyTrackInfoKey = source.HotkeyCopyTrackInfoKey,
                 HotkeyAudioQualityKey = source.HotkeyAudioQualityKey,
-                HotkeyModifier = source.HotkeyModifier
+                HotkeyModifier = source.HotkeyModifier,
+                AudioLinkConnectionAutoRestart = source.AudioLinkConnectionAutoRestart,
+                AudioLinkQualityAutoRestart = source.AudioLinkQualityAutoRestart,
+                AudioLinkBleedless = source.AudioLinkBleedless
             };
         }
     }

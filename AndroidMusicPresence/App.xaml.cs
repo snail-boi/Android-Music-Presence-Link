@@ -317,6 +317,7 @@ namespace AndroidMusicPresenceLink
             if (string.IsNullOrEmpty(_scrcpyDeviceId)) return;
             // Auto-switching requires a fast enough update cycle to be reliable.
             if (Config.UpdateIntervalMode > UpdateIntervalMode.Fast) return;
+            if (!Config.AudioLinkConnectionAutoRestart) return;
 
             var liveDevice = _presenceService?.CurrentDevice ?? string.Empty;
 
@@ -359,7 +360,7 @@ namespace AndroidMusicPresenceLink
                 bool wasPlaying = _lastMediaPlayerIsPlaying;
                 var oldDevice = _scrcpyDeviceId;
 
-                if (!string.IsNullOrWhiteSpace(oldDevice))
+                if (Config.AudioLinkBleedless && !string.IsNullOrWhiteSpace(oldDevice))
                     await AdbHelper.RunAdbAsync($"-s {oldDevice} shell input keyevent 164").ConfigureAwait(true);
 
                 await StopScrcpyAsync().ConfigureAwait(true);
@@ -378,7 +379,7 @@ namespace AndroidMusicPresenceLink
                     _trayIconManager?.SetScrcpyRunning(false);
                     UpdateTrayAudioSettings();
                     ApplyTrayState();
-                    if (!string.IsNullOrWhiteSpace(newDevice))
+                    if (Config.AudioLinkBleedless && !string.IsNullOrWhiteSpace(newDevice))
                         await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 164").ConfigureAwait(true);
                     return;
                 }
@@ -394,10 +395,13 @@ namespace AndroidMusicPresenceLink
                 ApplyTrayState();
 
                 await Task.Delay(1000).ConfigureAwait(true);
-                await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 164").ConfigureAwait(true);
+                if (Config.AudioLinkBleedless)
+                {
+                    await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 164").ConfigureAwait(true);
 
-                if (wasPlaying)
-                    await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 126").ConfigureAwait(true);
+                    if (wasPlaying)
+                        await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 126").ConfigureAwait(true);
+                }
             }
             catch (Exception ex)
             {
@@ -472,7 +476,8 @@ namespace AndroidMusicPresenceLink
                 {
                     // Restart scrcpy so the new codec/bitrate/buffer take effect.
                     // StopScrcpyAsync runs asynchronously; chain Start once it's gone.
-                    _ = RestartScrcpyForPresetAsync();
+                    if (Config.AudioLinkQualityAutoRestart)
+                        _ = RestartScrcpyForPresetAsync();
                 }
             }
             catch (Exception ex)
@@ -518,7 +523,10 @@ namespace AndroidMusicPresenceLink
                     UpdateConfig(Config);
 
                     if (wasRunning)
-                        _ = RestartScrcpyForPresetAsync();
+                    {
+                        if (Config.AudioLinkQualityAutoRestart)
+                            _ = RestartScrcpyForPresetAsync();
+                    }
                 }
             }
             finally
@@ -533,7 +541,7 @@ namespace AndroidMusicPresenceLink
             {
                 var device = _presenceService?.CurrentDevice;
 
-                if (!string.IsNullOrWhiteSpace(device))
+                if (Config.AudioLinkBleedless && !string.IsNullOrWhiteSpace(device))
                     await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 164").ConfigureAwait(true);
 
                 await StopScrcpyAsync().ConfigureAwait(true);
@@ -541,7 +549,7 @@ namespace AndroidMusicPresenceLink
                 StartScrcpyNoAudio();
                 await Task.Delay(1000).ConfigureAwait(true);
 
-                if (!string.IsNullOrWhiteSpace(device))
+                if (Config.AudioLinkBleedless && !string.IsNullOrWhiteSpace(device))
                     await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 164").ConfigureAwait(true);
             }
             catch (Exception ex)
@@ -645,7 +653,7 @@ namespace AndroidMusicPresenceLink
 
             // Restart the audio link if it is running and the codec/bitrate/buffer changed,
             // so the new settings take effect immediately without needing a manual restart.
-            if (audioChanged && _scrcpyProcess != null && !_scrcpyProcess.HasExited)
+            if (audioChanged && _scrcpyProcess != null && !_scrcpyProcess.HasExited && Config.AudioLinkQualityAutoRestart)
                 _ = RestartScrcpyForPresetAsync();
 
             // When the no-cover icon changes, force the next tick to re-push the image and
@@ -1431,7 +1439,11 @@ namespace AndroidMusicPresenceLink
                 // the recovery wait for the device to be present and start fresh.
                 if (wasDesired && !_isExiting && !_scrcpySwitchInProgress)
                 {
-                    if (Config.UpdateIntervalMode > UpdateIntervalMode.Fast)
+                    if (!Config.AudioLinkConnectionAutoRestart)
+                    {
+                        Debugger.show($"Audio-link: scrcpy exited unexpectedly (was on {(wasUsb ? "USB" : "WiFi")} as {oldDevice ?? "<null>"}), connection auto-restart disabled.");
+                    }
+                    else if (Config.UpdateIntervalMode > UpdateIntervalMode.Fast)
                     {
                         Debugger.show($"Audio-link: scrcpy exited unexpectedly (was on {(wasUsb ? "USB" : "WiFi")} as {oldDevice ?? "<null>"}), auto-recovery disabled at this update interval.");
                     }

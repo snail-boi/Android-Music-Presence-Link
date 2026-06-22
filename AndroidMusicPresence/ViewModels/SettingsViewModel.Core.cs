@@ -275,6 +275,35 @@ namespace AndroidMusicPresenceLink
             });
         private RelayCommand? _cycleMediaPlayerToastModeCommand;
 
+        // ── Audio link behaviour ──────────────────────────────────────────────
+
+        private bool _audioLinkConnectionAutoRestart;
+        public bool AudioLinkConnectionAutoRestart
+        {
+            get => _audioLinkConnectionAutoRestart;
+            set
+            {
+                if (!Set(ref _audioLinkConnectionAutoRestart, value)) return;
+                RaisePropertyChanged(nameof(AudioLinkConnectionAutoRestartWarningVisible));
+            }
+        }
+        public bool AudioLinkConnectionAutoRestartWarningVisible => !_audioLinkConnectionAutoRestart;
+
+        private bool _audioLinkQualityAutoRestart;
+        public bool AudioLinkQualityAutoRestart
+        {
+            get => _audioLinkQualityAutoRestart;
+            set
+            {
+                if (!Set(ref _audioLinkQualityAutoRestart, value)) return;
+                RaisePropertyChanged(nameof(AudioLinkQualityAutoRestartWarningVisible));
+            }
+        }
+        public bool AudioLinkQualityAutoRestartWarningVisible => !_audioLinkQualityAutoRestart;
+
+        private bool _audioLinkBleedless;
+        public bool AudioLinkBleedless { get => _audioLinkBleedless; set => Set(ref _audioLinkBleedless, value); }
+
         private void InitCore()
         {
             SaveCommand = new RelayCommand(() => Save(true));
@@ -310,6 +339,10 @@ namespace AndroidMusicPresenceLink
             _headlessToastEnabled = _config.HeadlessToastEnabled;
             _headlessToastPositionIndex = (int)_config.HeadlessToastPosition;
             _mediaPlayerToastModeIndex = (int)_config.MediaPlayerToastMode;
+
+            _audioLinkConnectionAutoRestart = _config.AudioLinkConnectionAutoRestart;
+            _audioLinkQualityAutoRestart = _config.AudioLinkQualityAutoRestart;
+            _audioLinkBleedless = _config.AudioLinkBleedless;
         }
 
         private void ApplyCoreToConfig(MusicConfig config)
@@ -367,6 +400,10 @@ namespace AndroidMusicPresenceLink
             config.HeadlessToastEnabled = HeadlessToastEnabled;
             config.HeadlessToastPosition = (HeadlessToastPosition)Math.Clamp(HeadlessToastPositionIndex, 0, 5);
             config.MediaPlayerToastMode = (MediaPlayerToastMode)Math.Clamp(MediaPlayerToastModeIndex, 0, 2);
+
+            config.AudioLinkConnectionAutoRestart = AudioLinkConnectionAutoRestart;
+            config.AudioLinkQualityAutoRestart = AudioLinkQualityAutoRestart;
+            config.AudioLinkBleedless = AudioLinkBleedless;
         }
 
         // ── Build / Save / Dirty / Revert / Sync ─────────────────────────────
@@ -512,6 +549,9 @@ namespace AndroidMusicPresenceLink
             if (left.HeadlessToastEnabled != right.HeadlessToastEnabled) return false;
             if (left.HeadlessToastPosition != right.HeadlessToastPosition) return false;
             if (left.MediaPlayerToastMode != right.MediaPlayerToastMode) return false;
+            if (left.AudioLinkConnectionAutoRestart != right.AudioLinkConnectionAutoRestart) return false;
+            if (left.AudioLinkQualityAutoRestart != right.AudioLinkQualityAutoRestart) return false;
+            if (left.AudioLinkBleedless != right.AudioLinkBleedless) return false;
 
             var eligibleLeft = (left.EligibleApps ?? new List<EligibleAppConfig>())
                 .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))

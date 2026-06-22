@@ -1187,6 +1187,36 @@
                             <CheckBox Content="Start minimized to tray" IsChecked="{Binding OpenInTaskbar, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
                             <CheckBox Content="Start when Windows starts" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" Margin="0,0,0,12" Style="{StaticResource ToggleSwitchStyle}"/>
 
+                            <!-- Audio link behaviour -->
+                            <TextBlock Text="Audio link"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,0,0,4" />
+                            <CheckBox Content="Auto-restart on connection change"
+                                      IsChecked="{Binding AudioLinkConnectionAutoRestart, Mode=TwoWay}"
+                                      Margin="0,0,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      ToolTip="Automatically restarts audio link when the connection transport changes (USB to Wi-Fi or vice versa), or when scrcpy exits unexpectedly." />
+                            <TextBlock Text="Audio link will not switch transports. Audio may keep routing over Wi-Fi even after USB is plugged in."
+                                       Style="{StaticResource HintTextStyle}"
+                                       Foreground="#E6A020"
+                                       Margin="0,0,0,4"
+                                       Visibility="{Binding AudioLinkConnectionAutoRestartWarningVisible, Converter={StaticResource BoolToVis}}" />
+                            <CheckBox Content="Auto-restart on quality change"
+                                      IsChecked="{Binding AudioLinkQualityAutoRestart, Mode=TwoWay}"
+                                      Margin="0,0,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      ToolTip="Automatically restarts audio link when the audio quality preset is changed." />
+                            <TextBlock Text="Quality changes will not take effect until audio link is manually restarted."
+                                       Style="{StaticResource HintTextStyle}"
+                                       Foreground="#E6A020"
+                                       Margin="0,0,0,4"
+                                       Visibility="{Binding AudioLinkQualityAutoRestartWarningVisible, Converter={StaticResource BoolToVis}}" />
+                            <CheckBox Content="Bleedless restarts"
+                                      IsChecked="{Binding AudioLinkBleedless, Mode=TwoWay}"
+                                      Margin="0,0,0,12"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      ToolTip="Mutes the device before stopping audio link and resumes playback after it restarts. Disable if mute/unmute interferes with your player." />
+
                             <!-- No-cover icon -->
                             <TextBlock Text="No-cover icon"
                                        Style="{StaticResource FieldLabelStyle}"
