@@ -68,6 +68,28 @@ namespace AndroidMusicPresenceLink
         Full = 2
     }
 
+    // Battery indicator visual styles.
+    //   Classic  = horizontal icon with proportional fill bar + terminal cap (original).
+    //   Pill     = One UI 7 style solid rounded pill, percentage centred, no fill bar/cap.
+    //   Vertical = Classic rotated 90 degrees; percentage is always rendered outside.
+    public enum BatteryVisualStyle
+    {
+        Classic = 0,
+        Pill = 1,
+        Vertical = 2
+    }
+
+    // Battery color behaviour.
+    //   Enabled   = green at full, red when critical, theme brush otherwise (original).
+    //   TextColor = always the theme/icon brush, no green/red threshold overrides.
+    //   Disabled  = neutral, no color emphasis at all.
+    public enum BatteryColorMode
+    {
+        Enabled = 0,
+        TextColor = 1,
+        Disabled = 2
+    }
+
     public enum NextSongMode
     {
         Off = 0,
@@ -175,6 +197,22 @@ namespace AndroidMusicPresenceLink
         public bool PlayerShowVolumeButton { get; set; } = true;
         public bool PlayerShowLyricsButton { get; set; } = true;
         public bool PlayerShowBattery { get; set; } = true;
+
+        // ── Battery indicator customization ──────────────────────────────────
+        // Visual style of the battery glyph (see BatteryVisualStyle).
+        public BatteryVisualStyle BatteryVisualStyle { get; set; } = BatteryVisualStyle.Classic;
+        // Show the numeric percentage at all.
+        public bool BatteryShowPercent { get; set; } = true;
+        // Percentage placement: true = inside the glyph, false = outside (to the right).
+        // Ignored for the Vertical style, which always renders the percentage outside.
+        public bool BatteryPercentInside { get; set; } = true;
+        // Show the charging lightning bolt at all.
+        public bool BatteryShowBolt { get; set; } = true;
+        // Bolt placement: true = inside the glyph, false = outside.
+        public bool BatteryBoltInside { get; set; } = true;
+        // Color behaviour (see BatteryColorMode).
+        public BatteryColorMode BatteryColorMode { get; set; } = BatteryColorMode.Enabled;
+
         public bool PlayerShowHelpButton { get; set; } = true;
         public bool PlayerShowFullscreenButton { get; set; } = true;
         // When false the seek buttons are always hidden.
@@ -300,6 +338,12 @@ namespace AndroidMusicPresenceLink
                 PlayerShowVolumeButton = source.PlayerShowVolumeButton,
                 PlayerShowLyricsButton = source.PlayerShowLyricsButton,
                 PlayerShowBattery = source.PlayerShowBattery,
+                BatteryVisualStyle = source.BatteryVisualStyle,
+                BatteryShowPercent = source.BatteryShowPercent,
+                BatteryPercentInside = source.BatteryPercentInside,
+                BatteryShowBolt = source.BatteryShowBolt,
+                BatteryBoltInside = source.BatteryBoltInside,
+                BatteryColorMode = source.BatteryColorMode,
                 PlayerShowHelpButton = source.PlayerShowHelpButton,
                 PlayerShowFullscreenButton = source.PlayerShowFullscreenButton,
                 PlayerShowSeekButtons = source.PlayerShowSeekButtons,
@@ -552,6 +596,11 @@ namespace AndroidMusicPresenceLink
             var allowedGradientPoints = new[] { 2, 4, 6, 8 };
             if (!allowedGradientPoints.Contains(config.PlayerGradientSamplePoints))
                 config.PlayerGradientSamplePoints = 8;
+
+            if (!Enum.IsDefined(typeof(BatteryVisualStyle), config.BatteryVisualStyle))
+                config.BatteryVisualStyle = BatteryVisualStyle.Classic;
+            if (!Enum.IsDefined(typeof(BatteryColorMode), config.BatteryColorMode))
+                config.BatteryColorMode = BatteryColorMode.Enabled;
 
             // Sanity: WirelessDebugging without a service name is functionally broken,
             // but we don't auto-rewrite to TcpIp because the user may be mid-pairing.

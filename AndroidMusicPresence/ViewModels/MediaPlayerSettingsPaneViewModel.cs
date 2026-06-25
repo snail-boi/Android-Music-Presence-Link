@@ -32,6 +32,11 @@ namespace AndroidMusicPresenceLink
             CycleNextSongModeCommand = new RelayCommand(CycleNextSongMode);
             CycleNextSongSortCommand = new RelayCommand(CycleNextSongSort);
             RescanLibraryCommand = new RelayCommand(RescanLibrary);
+
+            CycleBatteryStyleCommand = new RelayCommand(CycleBatteryStyle);
+            CycleBatteryPercentPlacementCommand = new RelayCommand(CycleBatteryPercentPlacement);
+            CycleBatteryBoltPlacementCommand = new RelayCommand(CycleBatteryBoltPlacement);
+            CycleBatteryColorModeCommand = new RelayCommand(CycleBatteryColorMode);
         }
 
         // ── Checkboxes ────────────────────────────────────────────────────────
@@ -68,6 +73,69 @@ namespace AndroidMusicPresenceLink
 
         private bool _playerShowBattery;
         public bool PlayerShowBattery { get => _playerShowBattery; set { if (!Set(ref _playerShowBattery, value)) return; App.Config.PlayerShowBattery = value; if (!_loading) SaveAndNotify(); } }
+
+        // ── Battery customization ─────────────────────────────────────────────
+
+        private bool _batteryShowPercent;
+        public bool BatteryShowPercent { get => _batteryShowPercent; set { if (!Set(ref _batteryShowPercent, value)) return; App.Config.BatteryShowPercent = value; RaisePropertyChanged(nameof(BatteryPercentPlacementVisible)); if (!_loading) SaveAndNotify(); } }
+
+        private bool _batteryShowBolt;
+        public bool BatteryShowBolt { get => _batteryShowBolt; set { if (!Set(ref _batteryShowBolt, value)) return; App.Config.BatteryShowBolt = value; RaisePropertyChanged(nameof(BatteryBoltPlacementVisible)); if (!_loading) SaveAndNotify(); } }
+
+        public RelayCommand CycleBatteryStyleCommand { get; }
+        public RelayCommand CycleBatteryPercentPlacementCommand { get; }
+        public RelayCommand CycleBatteryBoltPlacementCommand { get; }
+        public RelayCommand CycleBatteryColorModeCommand { get; }
+
+        private static readonly string[] BatteryStyleLabels = { "Classic", "Pill", "Vertical" };
+        private static readonly string[] BatteryColorModeLabels = { "Enabled", "Text color", "Disabled" };
+
+        public string BatteryStyleLabel => BatteryStyleLabels[Math.Clamp((int)App.Config.BatteryVisualStyle, 0, 2)];
+        public string BatteryColorModeLabel => BatteryColorModeLabels[Math.Clamp((int)App.Config.BatteryColorMode, 0, 2)];
+
+        // Inside/outside placement labels for the cycle buttons.
+        public string BatteryPercentPlacementLabel => App.Config.BatteryPercentInside ? "Inside" : "Outside";
+        public string BatteryBoltPlacementLabel => App.Config.BatteryBoltInside ? "Inside" : "Outside";
+
+        // The percentage placement control is hidden when the percentage is off, or when the
+        // Vertical style forces it outside (no choice to make).
+        public bool BatteryPercentPlacementVisible
+            => App.Config.BatteryShowPercent && App.Config.BatteryVisualStyle != BatteryVisualStyle.Vertical;
+
+        // The bolt placement control is only meaningful when the bolt is shown.
+        public bool BatteryBoltPlacementVisible => App.Config.BatteryShowBolt;
+
+        private void CycleBatteryStyle()
+        {
+            int next = ((int)App.Config.BatteryVisualStyle + 1) % 3;
+            App.Config.BatteryVisualStyle = (BatteryVisualStyle)next;
+            RaisePropertyChanged(nameof(BatteryStyleLabel));
+            RaisePropertyChanged(nameof(BatteryPercentPlacementVisible));
+            RaisePropertyChanged(nameof(BatteryPercentPlacementLabel));
+            SaveAndNotify();
+        }
+
+        private void CycleBatteryPercentPlacement()
+        {
+            App.Config.BatteryPercentInside = !App.Config.BatteryPercentInside;
+            RaisePropertyChanged(nameof(BatteryPercentPlacementLabel));
+            SaveAndNotify();
+        }
+
+        private void CycleBatteryBoltPlacement()
+        {
+            App.Config.BatteryBoltInside = !App.Config.BatteryBoltInside;
+            RaisePropertyChanged(nameof(BatteryBoltPlacementLabel));
+            SaveAndNotify();
+        }
+
+        private void CycleBatteryColorMode()
+        {
+            int next = ((int)App.Config.BatteryColorMode + 1) % 3;
+            App.Config.BatteryColorMode = (BatteryColorMode)next;
+            RaisePropertyChanged(nameof(BatteryColorModeLabel));
+            SaveAndNotify();
+        }
 
         private bool _playerShowHelpButton;
         public bool PlayerShowHelpButton { get => _playerShowHelpButton; set { if (!Set(ref _playerShowHelpButton, value)) return; App.Config.PlayerShowHelpButton = value; if (!_loading) SaveAndNotify(); } }
@@ -337,6 +405,8 @@ namespace AndroidMusicPresenceLink
                 _playerShowVolumeButton = c.PlayerShowVolumeButton;
                 _playerShowLyricsButton = c.PlayerShowLyricsButton;
                 _playerShowBattery = c.PlayerShowBattery;
+                _batteryShowPercent = c.BatteryShowPercent;
+                _batteryShowBolt = c.BatteryShowBolt;
                 _playerShowHelpButton = c.PlayerShowHelpButton;
                 _playerShowFullscreenButton = c.PlayerShowFullscreenButton;
                 _playerShowSeekButtons = c.PlayerShowSeekButtons;

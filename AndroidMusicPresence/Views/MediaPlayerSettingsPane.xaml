@@ -461,6 +461,100 @@
                     </StackPanel>
                 </Expander>
 
+                <!-- ── Battery ──────────────────────────────────────── -->
+                <Expander Header="Battery" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Battery indicator" Style="{StaticResource RowLabel}" />
+                            <CheckBox Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  IsChecked="{Binding PlayerShowBattery, Mode=TwoWay}" />
+                        </Grid>
+
+                        <!-- Battery sub-options: only meaningful when the indicator is shown. -->
+                        <StackPanel Margin="14,0,0,8"
+                                    Visibility="{Binding PlayerShowBattery, Converter={StaticResource BoolToVis}}">
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Style" Style="{StaticResource RowLabel}" />
+                                <Button Grid.Column="1"
+                                    Style="{StaticResource CycleButtonStyle}"
+                                    Content="{Binding BatteryStyleLabel}"
+                                    Command="{Binding CycleBatteryStyleCommand}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Show percentage" Style="{StaticResource RowLabel}" />
+                                <CheckBox Grid.Column="1"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      IsChecked="{Binding BatteryShowPercent, Mode=TwoWay}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8"
+                                  Visibility="{Binding BatteryPercentPlacementVisible, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Percentage position" Style="{StaticResource RowLabel}" />
+                                <Button Grid.Column="1"
+                                    Style="{StaticResource CycleButtonStyle}"
+                                    Content="{Binding BatteryPercentPlacementLabel}"
+                                    Command="{Binding CycleBatteryPercentPlacementCommand}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Show charging bolt" Style="{StaticResource RowLabel}" />
+                                <CheckBox Grid.Column="1"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      IsChecked="{Binding BatteryShowBolt, Mode=TwoWay}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8"
+                                  Visibility="{Binding BatteryBoltPlacementVisible, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Bolt position" Style="{StaticResource RowLabel}" />
+                                <Button Grid.Column="1"
+                                    Style="{StaticResource CycleButtonStyle}"
+                                    Content="{Binding BatteryBoltPlacementLabel}"
+                                    Command="{Binding CycleBatteryBoltPlacementCommand}" />
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Color" Style="{StaticResource RowLabel}" />
+                                <Button Grid.Column="1"
+                                    Style="{StaticResource CycleButtonStyle}"
+                                    Content="{Binding BatteryColorModeLabel}"
+                                    Command="{Binding CycleBatteryColorModeCommand}" />
+                            </Grid>
+
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+
                 <!-- ── CONTROLS ───────────────────────────────────────────────────── -->
                 <Expander Header="Controls" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                     <StackPanel>
@@ -487,16 +581,7 @@
                                   IsChecked="{Binding PlayerShowLyricsButton, Mode=TwoWay}" />
                         </Grid>
 
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Battery indicator" Style="{StaticResource RowLabel}" />
-                            <CheckBox Grid.Column="1"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  IsChecked="{Binding PlayerShowBattery, Mode=TwoWay}" />
-                        </Grid>
+
 
                         <Grid Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>

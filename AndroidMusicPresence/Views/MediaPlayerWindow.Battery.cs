@@ -119,79 +119,218 @@ namespace AndroidMusicPresenceLink
         }
 
         /// <summary>
-        /// Re-renders the battery glyph using the last polled values. Safe to call
-        /// before the first poll completes; in that case it renders a placeholder.
+        /// Re-renders the battery glyph using the last polled values and the current
+        /// config-driven style. Safe to call before the first poll completes; in that
+        /// case it renders a placeholder.
         /// </summary>
         private void RenderBatteryButtonIcon()
         {
             if (BtnBattery == null) return;
 
+            var cfg = App.Config;
+            var opts = new BatteryRenderOptions
+            {
+                Style = cfg.BatteryVisualStyle,
+                ShowPercent = cfg.BatteryShowPercent,
+                PercentInside = cfg.BatteryPercentInside,
+                ShowBolt = cfg.BatteryShowBolt,
+                BoltInside = cfg.BatteryBoltInside,
+                ColorMode = cfg.BatteryColorMode
+            };
+
+            int level = _batteryLevel;
+            bool charging = _batteryLevel >= 0 && _batteryCharging;
+
+            // Widen the button when the percentage or bolt sits outside the glyph, so the
+            // uniform Viewbox isn't squeezed into the default icon-only footprint. The button
+            // height stays at the standard 32px for every style so it lines up vertically with
+            // the fullscreen toggle and the rest of the top-row icons; the tall vertical glyph
+            // simply scales down to fit that height via its uniform Viewbox.
+            bool percentInside = opts.Style != BatteryVisualStyle.Vertical && opts.PercentInside;
+            bool percentOutside = opts.ShowPercent && level >= 0 && !percentInside;
+            bool boltOutside = opts.ShowBolt && charging && !opts.BoltInside;
+
+            double width = 56;
+            if (opts.Style == BatteryVisualStyle.Vertical)
+            {
+                width = 30;             // narrow glyph-only footprint
+                if (percentOutside) width += 28;
+                if (boltOutside) width += 16;
+            }
+            else
+            {
+                if (percentOutside) width += 22;
+                if (boltOutside) width += 16;
+            }
+            BtnBattery.Width = width;
+
+            // The vertical glyph is intrinsically tall, so a 32px button height would force it
+            // to scale down a lot. Give it a taller button, but keep its CENTER aligned with the
+            // 32px fullscreen toggle (center at y=16) by pulling the top margin up by the extra
+            // half-height. Horizontal styles keep the standard 32px box anchored at the top.
+            const double normalH = 32;
+            const double verticalH = 46;
+            if (opts.Style == BatteryVisualStyle.Vertical)
+            {
+                BtnBattery.Height = verticalH;
+                double extraTop = (verticalH - normalH) / 2.0;   // 7
+                BtnBattery.Margin = new Thickness(0, -extraTop, 32, 0);
+            }
+            else
+            {
+                BtnBattery.Height = normalH;
+                BtnBattery.Margin = new Thickness(0, 0, 32, 0);
+            }
+
+            BtnBattery.Content = BuildBatteryIcon(ResolveIconBrush(), level, charging, opts);
+
             if (_batteryLevel < 0)
             {
-                // No data yet. Render a faint outline so the slot isn't visually empty.
-                BtnBattery.Content = BuildBatteryIcon(ResolveIconBrush(), level: -1, charging: false);
                 BtnBattery.ToolTip = "Battery: reading...";
                 return;
             }
 
-            BtnBattery.Content = BuildBatteryIcon(ResolveIconBrush(), _batteryLevel, _batteryCharging);
             BtnBattery.ToolTip = _batteryCharging
                 ? $"Battery: {_batteryLevel}% (charging)"
                 : $"Battery: {_batteryLevel}%";
         }
 
         /// <summary>
-        /// Horizontal battery glyph with the percentage rendered inside the body and an
-        /// optional lightning-bolt overlay when charging.
-        /// <para/>
-        /// Color rules:
-        /// <list type="bullet">
-        ///   <item>Outline + cap: adaptive (white in dark mode, dark in light mode), or green/red overrides</item>
-        ///   <item>Fill (charge bar): white normally, green at 100%, red at 20% or below</item>
-        ///   <item>Empty portion behind the fill: light grey so text/bolt stay legible</item>
-        ///   <item>Text + bolt: always dark grey for contrast against both the white fill and the light grey empty area</item>
-        /// </list>
+        /// Bundles the config-driven battery display options so the render method
+        /// signature stays manageable.
         /// </summary>
-        private static Viewbox BuildBatteryIcon(Brush themeBrush, int level, bool charging)
+        private struct BatteryRenderOptions
+        {
+            public BatteryVisualStyle Style;
+            public bool ShowPercent;
+            public bool PercentInside;   // ignored for Vertical (always outside)
+            public bool ShowBolt;
+            public bool BoltInside;
+            public BatteryColorMode ColorMode;
+        }
+
+        // Fixed palette shared by every style. Only the theme-driven brush changes.
+        private static readonly Brush BatWhiteFill = Brushes.White;
+        private static readonly Brush BatGreenFill = new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59));
+        private static readonly Brush BatRedFill = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
+        private static readonly Brush BatLightGrey = new SolidColorBrush(Color.FromRgb(0xD0, 0xD0, 0xD0));
+        private static readonly Brush BatDarkGrey = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+
+        /// <summary>
+        /// Builds the battery glyph for the current style and options. Dispatches to one
+        /// of the three style builders, then horizontally stacks any "outside" percentage
+        /// or bolt next to the glyph inside a single Viewbox.
+        /// </summary>
+        private static Viewbox BuildBatteryIcon(Brush themeBrush, int level, bool charging, BatteryRenderOptions opts)
+        {
+            // Vertical style ignores the inside-percentage flag: percentage is always outside.
+            bool percentInside = opts.Style != BatteryVisualStyle.Vertical && opts.PercentInside;
+            bool wantPercent = opts.ShowPercent && level >= 0;
+            bool wantBolt = opts.ShowBolt && charging;
+
+            bool percentOutside = wantPercent && !percentInside;
+            bool boltOutside = wantBolt && !opts.BoltInside;
+
+            // The glyph itself, with whatever lands inside it.
+            var glyph = opts.Style switch
+            {
+                BatteryVisualStyle.Pill => BuildPillGlyph(themeBrush, level, charging, opts, percentInside),
+                BatteryVisualStyle.Vertical => BuildVerticalGlyph(themeBrush, level, charging, opts),
+                _ => BuildClassicGlyph(themeBrush, level, charging, opts, percentInside),
+            };
+
+            // Fast path: nothing sits outside, so the glyph canvas is the whole picture.
+            if (!percentOutside && !boltOutside)
+                return WrapGlyph(glyph);
+
+            // Otherwise lay the glyph and the outside elements side by side. Each piece is a
+            // sized Viewbox so the horizontal StackPanel can measure it reliably (a bare Canvas
+            // can report a zero desired size during layout). Heights are matched so the row
+            // baseline-aligns; the outer Viewbox then scales the whole row into the button.
+            var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+            // Target on-screen height for the glyph within the row, before the outer scale.
+            double glyphH = opts.Style == BatteryVisualStyle.Vertical ? 40 : 22;
+            double glyphW = glyphH * (glyph.Width / glyph.Height);
+
+            if (boltOutside)
+            {
+                Brush boltBrush = ResolveBatteryTextBrush(themeBrush, level, opts.ColorMode);
+                row.Children.Add(new Viewbox
+                {
+                    Width = glyphH * 0.5,
+                    Height = glyphH,
+                    Margin = new Thickness(0, 0, 2, 0),
+                    Child = BuildBoltCanvas(boltBrush)
+                });
+            }
+
+            row.Children.Add(new Viewbox
+            {
+                Width = glyphW,
+                Height = glyphH,
+                Child = glyph
+            });
+
+            if (percentOutside)
+            {
+                Brush textBrush = ResolveBatteryTextBrush(themeBrush, level, opts.ColorMode);
+                // Vertical glyph is tall, so a larger number balances it; horizontal stays compact.
+                double fontSize = opts.Style == BatteryVisualStyle.Vertical ? 20 : 14;
+                row.Children.Add(new TextBlock
+                {
+                    Text = level + "%",
+                    FontSize = fontSize,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = textBrush,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 0, 0)
+                });
+            }
+
+            return new Viewbox { Stretch = Stretch.Uniform, Margin = new Thickness(2), Child = row };
+        }
+
+        // Wrap a glyph canvas in a Viewbox that scales uniformly to whatever space the
+        // host button provides. We deliberately do NOT pin Width/Height here: a fixed size
+        // larger than the button would overflow and clip (notably the tall vertical glyph).
+        // A small margin keeps the glyph off the hover-highlight edges.
+        private static Viewbox WrapGlyph(Canvas glyph)
+            => new Viewbox { Stretch = Stretch.Uniform, Margin = new Thickness(2), Child = glyph };
+
+        // ── Color resolution ─────────────────────────────────────────────────
+
+        /// <summary>
+        /// Resolves the structural (outline/fill) brush honoring the color mode.
+        /// Enabled  -> green at full, red when critical, theme brush otherwise.
+        /// TextColor -> always the theme brush.
+        /// Disabled -> always the theme brush (no emphasis).
+        /// </summary>
+        private static Brush ResolveBatteryStructureBrush(Brush themeBrush, int level, BatteryColorMode mode)
+        {
+            if (level < 0 || mode != BatteryColorMode.Enabled)
+                return themeBrush;
+            if (level >= 100) return BatGreenFill;
+            if (level <= 20) return BatRedFill;
+            return themeBrush;
+        }
+
+        /// <summary>
+        /// Brush for percentage text and outside bolts. Matches the structural color when
+        /// Enabled so a critical battery reads red everywhere, otherwise the theme brush.
+        /// </summary>
+        private static Brush ResolveBatteryTextBrush(Brush themeBrush, int level, BatteryColorMode mode)
+            => ResolveBatteryStructureBrush(themeBrush, level, mode);
+
+        // ── Classic horizontal glyph ─────────────────────────────────────────
+
+        private static Canvas BuildClassicGlyph(Brush themeBrush, int level, bool charging, BatteryRenderOptions opts, bool percentInside)
         {
             const double canvasW = 52;
             const double canvasH = 24;
-
             var canvas = new Canvas { Width = canvasW, Height = canvasH };
 
-            // Fixed palette. These don't change with theme; only the outline does.
-            Brush whiteFill = Brushes.White;
-            Brush greenFill = new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59));
-            Brush redFill = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
-            Brush lightGrey = new SolidColorBrush(Color.FromRgb(0xD0, 0xD0, 0xD0));
-            Brush darkGrey = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
-
-            // Decide outline/cap and fill colors based on level
-            Brush outlineBrush;
-            Brush fillBrush;
-            if (level < 0)
-            {
-                // Unknown state, render as a faint outline with no fill content
-                outlineBrush = themeBrush;
-                fillBrush = whiteFill;
-            }
-            else if (level >= 100)
-            {
-                // Full: whole icon goes green for clear at-a-glance readout
-                outlineBrush = greenFill;
-                fillBrush = greenFill;
-            }
-            else if (level <= 20)
-            {
-                // Critical: whole icon goes red
-                outlineBrush = redFill;
-                fillBrush = redFill;
-            }
-            else
-            {
-                outlineBrush = themeBrush;
-                fillBrush = whiteFill;
-            }
+            Brush structureBrush = ResolveBatteryStructureBrush(themeBrush, level, opts.ColorMode);
 
             const double bodyX = 2;
             const double bodyY = 3;
@@ -199,16 +338,15 @@ namespace AndroidMusicPresenceLink
             const double bodyH = 18;
             const double inset = 2.5;
 
-            // Light grey "empty" background. Sits inside the outline so the text and
-            // bolt have a legible surface to land on, regardless of how full the
-            // proportional fill bar is. Rendered first so everything else stacks on top.
+            bool boltInside = opts.ShowBolt && charging && opts.BoltInside;
+
             if (level >= 0)
             {
                 var emptyBg = new Rectangle
                 {
                     Width = bodyW - inset * 2,
                     Height = bodyH - inset * 2,
-                    Fill = lightGrey,
+                    Fill = BatLightGrey,
                     RadiusX = 2,
                     RadiusY = 2
                 };
@@ -217,7 +355,6 @@ namespace AndroidMusicPresenceLink
                 canvas.Children.Add(emptyBg);
             }
 
-            // Proportional fill, overlaid on the light-grey bg
             if (level > 0)
             {
                 double fillMaxW = bodyW - inset * 2;
@@ -227,7 +364,7 @@ namespace AndroidMusicPresenceLink
                 {
                     Width = fillW,
                     Height = bodyH - inset * 2,
-                    Fill = fillBrush,
+                    Fill = structureBrush,
                     RadiusX = 2,
                     RadiusY = 2
                 };
@@ -236,12 +373,11 @@ namespace AndroidMusicPresenceLink
                 canvas.Children.Add(fill);
             }
 
-            // Body outline, drawn after the fills so its stroke sits on top cleanly
             var body = new Rectangle
             {
                 Width = bodyW,
                 Height = bodyH,
-                Stroke = outlineBrush,
+                Stroke = structureBrush,
                 StrokeThickness = 1.8,
                 RadiusX = 3,
                 RadiusY = 3,
@@ -251,12 +387,11 @@ namespace AndroidMusicPresenceLink
             Canvas.SetTop(body, bodyY);
             canvas.Children.Add(body);
 
-            // Positive terminal cap
             var cap = new Rectangle
             {
                 Width = 4,
                 Height = 8,
-                Fill = outlineBrush,
+                Fill = structureBrush,
                 RadiusX = 1,
                 RadiusY = 1
             };
@@ -264,42 +399,24 @@ namespace AndroidMusicPresenceLink
             Canvas.SetTop(cap, bodyY + (bodyH - 8) / 2.0);
             canvas.Children.Add(cap);
 
-            // Lightning bolt, sits on the left portion of the body
-            if (charging)
+            if (boltInside)
             {
                 double cx = bodyX + bodyW * 0.22;
                 double cy = bodyY + bodyH / 2.0;
-
-                var bolt = new Polygon
-                {
-                    Fill = darkGrey,
-                    Stroke = Brushes.Transparent,
-                    StrokeThickness = 0,
-                    Points = new PointCollection
-                    {
-                        new Point(cx + 0.5, cy - 7),
-                        new Point(cx - 3.5, cy + 0.5),
-                        new Point(cx - 0.5, cy + 0.5),
-                        new Point(cx - 1.5, cy + 7),
-                        new Point(cx + 3.5, cy - 1),
-                        new Point(cx + 0.5, cy - 1)
-                    }
-                };
-                canvas.Children.Add(bolt);
+                canvas.Children.Add(BuildBoltPolygon(cx, cy, BatDarkGrey));
             }
 
-            // Percentage text, nudged right when the bolt is visible so they don't overlap
-            if (level >= 0)
+            if (opts.ShowPercent && percentInside && level >= 0)
             {
-                double textX = bodyX + (charging ? 10 : 0);
-                double textW = bodyW - (charging ? 10 : 0);
+                double textX = bodyX + (boltInside ? 10 : 0);
+                double textW = bodyW - (boltInside ? 10 : 0);
 
                 var text = new TextBlock
                 {
                     Text = level + "%",
                     FontSize = 10,
                     FontWeight = FontWeights.Bold,
-                    Foreground = darkGrey,
+                    Foreground = BatDarkGrey,
                     TextAlignment = TextAlignment.Center,
                     Width = textW,
                     Height = bodyH,
@@ -310,7 +427,215 @@ namespace AndroidMusicPresenceLink
                 canvas.Children.Add(text);
             }
 
-            return new Viewbox { Width = canvasW * 1.1, Height = canvasH * 1.1, Child = canvas };
+            return canvas;
+        }
+
+        // ── One UI 7 style solid pill ────────────────────────────────────────
+
+        private static Canvas BuildPillGlyph(Brush themeBrush, int level, bool charging, BatteryRenderOptions opts, bool percentInside)
+        {
+            const double canvasW = 44;
+            const double canvasH = 22;
+            var canvas = new Canvas { Width = canvasW, Height = canvasH };
+
+            Brush fillBrush = ResolveBatteryStructureBrush(themeBrush, level, opts.ColorMode);
+
+            const double pillX = 2;
+            const double pillY = 2;
+            const double pillW = 40;
+            const double pillH = 18;
+            const double radius = pillH / 2.0;
+
+            // Empty/background pill in grey. The proportional fill is layered on top, so the
+            // remaining (uncharged) portion stays grey, matching the classic and vertical styles.
+            var emptyPill = new Rectangle
+            {
+                Width = pillW,
+                Height = pillH,
+                Fill = BatLightGrey,
+                RadiusX = radius,
+                RadiusY = radius
+            };
+            Canvas.SetLeft(emptyPill, pillX);
+            Canvas.SetTop(emptyPill, pillY);
+            canvas.Children.Add(emptyPill);
+
+            // Proportional fill. We draw a full-width rounded pill but clip it to the charged
+            // width so the left cap stays nicely rounded and the right edge is a clean cut.
+            if (level > 0)
+            {
+                double fillW = pillW * (Math.Min(level, 100) / 100.0);
+
+                var fill = new Rectangle
+                {
+                    Width = pillW,
+                    Height = pillH,
+                    Fill = fillBrush,
+                    RadiusX = radius,
+                    RadiusY = radius,
+                    Clip = new RectangleGeometry(new Rect(0, 0, fillW, pillH))
+                };
+                Canvas.SetLeft(fill, pillX);
+                Canvas.SetTop(fill, pillY);
+                canvas.Children.Add(fill);
+            }
+
+            // Content sits on top. Dark grey keeps it legible against both the grey empty
+            // portion and the colored fill, matching the classic style's inside text.
+            Brush contentBrush = BatDarkGrey;
+
+            bool boltInside = opts.ShowBolt && charging && opts.BoltInside;
+
+            if (boltInside)
+            {
+                double cx = pillX + pillW * (percentInside && opts.ShowPercent && level >= 0 ? 0.20 : 0.5);
+                double cy = pillY + pillH / 2.0;
+                canvas.Children.Add(BuildBoltPolygon(cx, cy, contentBrush));
+            }
+
+            if (opts.ShowPercent && percentInside && level >= 0)
+            {
+                double textX = pillX + (boltInside ? 10 : 0);
+                double textW = pillW - (boltInside ? 10 : 0);
+
+                // Wrap the text in a pill-tall Grid so it centers vertically regardless of
+                // the font's line metrics; a bare TextBlock on a Canvas would top-align.
+                var holder = new Grid { Width = textW, Height = pillH };
+                holder.Children.Add(new TextBlock
+                {
+                    Text = level.ToString(),
+                    FontSize = 11,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = contentBrush,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Padding = new Thickness(0)
+                });
+                Canvas.SetLeft(holder, textX);
+                Canvas.SetTop(holder, pillY);
+                canvas.Children.Add(holder);
+            }
+
+            return canvas;
+        }
+
+        // ── Vertical glyph (Classic rotated; percentage always outside) ──────
+
+        private static Canvas BuildVerticalGlyph(Brush themeBrush, int level, bool charging, BatteryRenderOptions opts)
+        {
+            const double canvasW = 26;
+            const double canvasH = 52;
+            var canvas = new Canvas { Width = canvasW, Height = canvasH };
+
+            Brush structureBrush = ResolveBatteryStructureBrush(themeBrush, level, opts.ColorMode);
+
+            const double bodyX = 3;
+            const double bodyW = 20;
+            const double bodyH = 44;
+            const double bodyY = 6;   // leave room above for the terminal cap
+            const double inset = 2.8;
+
+            bool boltInside = opts.ShowBolt && charging && opts.BoltInside;
+
+            // Empty light-grey interior
+            if (level >= 0)
+            {
+                var emptyBg = new Rectangle
+                {
+                    Width = bodyW - inset * 2,
+                    Height = bodyH - inset * 2,
+                    Fill = BatLightGrey,
+                    RadiusX = 2,
+                    RadiusY = 2
+                };
+                Canvas.SetLeft(emptyBg, bodyX + inset);
+                Canvas.SetTop(emptyBg, bodyY + inset);
+                canvas.Children.Add(emptyBg);
+            }
+
+            // Proportional fill grows from the bottom up.
+            if (level > 0)
+            {
+                double fillMaxH = bodyH - inset * 2;
+                double fillH = fillMaxH * (Math.Min(level, 100) / 100.0);
+
+                var fill = new Rectangle
+                {
+                    Width = bodyW - inset * 2,
+                    Height = fillH,
+                    Fill = structureBrush,
+                    RadiusX = 2,
+                    RadiusY = 2
+                };
+                Canvas.SetLeft(fill, bodyX + inset);
+                Canvas.SetTop(fill, bodyY + (fillMaxH - fillH) + inset);
+                canvas.Children.Add(fill);
+            }
+
+            var body = new Rectangle
+            {
+                Width = bodyW,
+                Height = bodyH,
+                Stroke = structureBrush,
+                StrokeThickness = 1.8,
+                RadiusX = 3,
+                RadiusY = 3,
+                Fill = Brushes.Transparent
+            };
+            Canvas.SetLeft(body, bodyX);
+            Canvas.SetTop(body, bodyY);
+            canvas.Children.Add(body);
+
+            // Terminal cap on top
+            var cap = new Rectangle
+            {
+                Width = 8,
+                Height = 4,
+                Fill = structureBrush,
+                RadiusX = 1,
+                RadiusY = 1
+            };
+            Canvas.SetLeft(cap, bodyX + (bodyW - 8) / 2.0);
+            Canvas.SetTop(cap, bodyY - 3.5);
+            canvas.Children.Add(cap);
+
+            if (boltInside)
+            {
+                double cx = bodyX + bodyW / 2.0;
+                double cy = bodyY + bodyH / 2.0;
+                canvas.Children.Add(BuildBoltPolygon(cx, cy, BatDarkGrey));
+            }
+
+            return canvas;
+        }
+
+        // ── Shared bolt geometry ─────────────────────────────────────────────
+
+        private static Polygon BuildBoltPolygon(double cx, double cy, Brush fill)
+        {
+            return new Polygon
+            {
+                Fill = fill,
+                Stroke = Brushes.Transparent,
+                StrokeThickness = 0,
+                Points = new PointCollection
+                {
+                    new Point(cx + 0.5, cy - 7),
+                    new Point(cx - 3.5, cy + 0.5),
+                    new Point(cx - 0.5, cy + 0.5),
+                    new Point(cx - 1.5, cy + 7),
+                    new Point(cx + 3.5, cy - 1),
+                    new Point(cx + 0.5, cy - 1)
+                }
+            };
+        }
+
+        // Standalone bolt on its own little canvas, for the "outside" placement.
+        private static Canvas BuildBoltCanvas(Brush fill)
+        {
+            var canvas = new Canvas { Width = 9, Height = 16 };
+            canvas.Children.Add(BuildBoltPolygon(4.5, 8, fill));
+            return canvas;
         }
     }
 }
