@@ -1132,15 +1132,63 @@ namespace AndroidMusicPresenceLink
         }
 
         internal void ApplyTheme(bool useDarkMode)
+            => ApplyThemeCore(useDarkMode, useDarkMode ? Config.DarkTheme : Config.LightTheme);
+
+        /// <summary>
+        /// Live-preview overload used by the settings window while the user edits theme
+        /// colors. The settings VM passes its in-progress (unsaved) overrides for both
+        /// modes; only the active mode's set is applied.
+        /// </summary>
+        internal void ApplyTheme(bool useDarkMode, ThemeOverrides? light, ThemeOverrides? dark)
+            => ApplyThemeCore(useDarkMode, useDarkMode ? dark : light);
+
+        private void ApplyThemeCore(bool useDarkMode, ThemeOverrides? overrides)
         {
-            Resources["ThemeBackgroundBrush"] = CreateBrush(useDarkMode ? "#1E1E1E" : "#F7F7F7");
-            Resources["ThemeForegroundBrush"] = CreateBrush(useDarkMode ? "#EAEAEA" : "#1A1A1A");
-            Resources["ThemeControlBackgroundBrush"] = CreateBrush(useDarkMode ? "#2B2B2B" : "#FFFFFF");
-            Resources["ThemeControlForegroundBrush"] = CreateBrush(useDarkMode ? "#EAEAEA" : "#1A1A1A");
-            Resources["ThemeControlBorderBrush"] = CreateBrush(useDarkMode ? "#3C3C3C" : "#C8C8C8");
-            Resources["ThemeAccentBrush"] = CreateBrush(useDarkMode ? "#3E7BFF" : "#2D6CDF");
-            Resources["ThemeAccentHoverBrush"] = CreateBrush(useDarkMode ? "#5A8BFF" : "#3E7BFF");
-            Resources["ThemeAccentPressedBrush"] = CreateBrush(useDarkMode ? "#275ED6" : "#1F5DD1");
+            // Built-in palette for the active mode. User overrides layer on top of these,
+            // and any color the user leaves blank keeps its default below.
+            var background = ParseColorOr(useDarkMode ? "#1E1E1E" : "#F7F7F7", null);
+            var foreground = ParseColorOr(useDarkMode ? "#EAEAEA" : "#1A1A1A", null);
+            var controlBackground = ParseColorOr(useDarkMode ? "#2B2B2B" : "#FFFFFF", null);
+            var controlBorder = ParseColorOr(useDarkMode ? "#3C3C3C" : "#C8C8C8", null);
+            var accent = ParseColorOr(useDarkMode ? "#3E7BFF" : "#2D6CDF", null);
+            var accentHover = ParseColorOr(useDarkMode ? "#5A8BFF" : "#3E7BFF", null);
+            var accentPressed = ParseColorOr(useDarkMode ? "#275ED6" : "#1F5DD1", null);
+
+            if (overrides != null)
+            {
+                // Background: also re-derive the surface (control) and border colors and,
+                // unless the user picked an explicit text color, an auto-contrasting one
+                // so a dark custom background never leaves dark default text unreadable.
+                if (TryParseColor(overrides.Background, out var bg))
+                {
+                    bool bgIsDark = Luminance(bg) < 0.5;
+                    background = bg;
+                    controlBackground = bgIsDark ? Lighten(bg, 0.06) : Darken(bg, 0.045);
+                    controlBorder = bgIsDark ? Lighten(bg, 0.16) : Darken(bg, 0.14);
+                    if (!TryParseColor(overrides.Foreground, out _))
+                        foreground = bgIsDark ? ParseColorOr("#EAEAEA", null) : ParseColorOr("#1A1A1A", null);
+                }
+
+                if (TryParseColor(overrides.Foreground, out var fg))
+                    foreground = fg;
+
+                // Accent: derive hover (lighter) and pressed (darker) from the picked color.
+                if (TryParseColor(overrides.Accent, out var ac))
+                {
+                    accent = ac;
+                    accentHover = Lighten(ac, 0.13);
+                    accentPressed = Darken(ac, 0.13);
+                }
+            }
+
+            Resources["ThemeBackgroundBrush"] = CreateBrush(background);
+            Resources["ThemeForegroundBrush"] = CreateBrush(foreground);
+            Resources["ThemeControlBackgroundBrush"] = CreateBrush(controlBackground);
+            Resources["ThemeControlForegroundBrush"] = CreateBrush(foreground);
+            Resources["ThemeControlBorderBrush"] = CreateBrush(controlBorder);
+            Resources["ThemeAccentBrush"] = CreateBrush(accent);
+            Resources["ThemeAccentHoverBrush"] = CreateBrush(accentHover);
+            Resources["ThemeAccentPressedBrush"] = CreateBrush(accentPressed);
             _trayIconManager?.SetDarkMode(useDarkMode);
 
             // Push the theme change into the media player window so the idle
@@ -1152,6 +1200,44 @@ namespace AndroidMusicPresenceLink
             if (File.Exists(Path.Combine(AppPaths.BaseDirectory, "devmode_snail.txt")))
                 ApplyDevTheme();
         }
+
+        // ── Color helpers used by the theming engine ─────────────────────────
+
+        private static bool TryParseColor(string? hex, out Color color)
+        {
+            color = Colors.Black;
+            if (string.IsNullOrWhiteSpace(hex))
+                return false;
+            try
+            {
+                if (ColorConverter.ConvertFromString(hex.Trim()) is Color c)
+                {
+                    color = c;
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private static Color ParseColorOr(string hex, Color? fallback)
+            => TryParseColor(hex, out var c) ? c : (fallback ?? Colors.Black);
+
+        private static Color Lighten(Color c, double amount) => Mix(c, Colors.White, amount);
+        private static Color Darken(Color c, double amount) => Mix(c, Colors.Black, amount);
+
+        private static Color Mix(Color a, Color b, double t)
+        {
+            t = Math.Clamp(t, 0.0, 1.0);
+            return Color.FromRgb(
+                (byte)Math.Round(a.R + (b.R - a.R) * t),
+                (byte)Math.Round(a.G + (b.G - a.G) * t),
+                (byte)Math.Round(a.B + (b.B - a.B) * t));
+        }
+
+        // Perceived brightness 0 (black) .. 1 (white), Rec. 709 weights.
+        private static double Luminance(Color c)
+            => (0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B) / 255.0;
 
         internal void ApplyDevTheme()
         {
@@ -1165,6 +1251,13 @@ namespace AndroidMusicPresenceLink
         private static SolidColorBrush CreateBrush(string color)
         {
             var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+            brush.Freeze();
+            return brush;
+        }
+
+        private static SolidColorBrush CreateBrush(Color color)
+        {
+            var brush = new SolidColorBrush(color);
             brush.Freeze();
             return brush;
         }

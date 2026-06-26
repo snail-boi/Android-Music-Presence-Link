@@ -126,6 +126,36 @@ namespace AndroidMusicPresenceLink
         Off = 2
     }
 
+    /// <summary>
+    /// User color overrides for a single theme mode (light or dark). Empty strings mean
+    /// "use the built-in default for this mode". Each stored value is a hex color like
+    /// "#2D6CDF". Dependent brushes (control background, border, accent hover/pressed) are
+    /// derived from these in <see cref="App.ApplyTheme(bool)"/>, so the user only ever sets
+    /// the three high-level colors.
+    /// </summary>
+    public sealed class ThemeOverrides
+    {
+        // Window / page background.
+        public string Background { get; set; } = string.Empty;
+        // Primary button / highlight color.
+        public string Accent { get; set; } = string.Empty;
+        // Text color.
+        public string Foreground { get; set; } = string.Empty;
+
+        public ThemeOverrides Clone() => new ThemeOverrides
+        {
+            Background = Background ?? string.Empty,
+            Accent = Accent ?? string.Empty,
+            Foreground = Foreground ?? string.Empty
+        };
+
+        public bool ValueEquals(ThemeOverrides? other)
+            => other != null
+            && string.Equals(Background ?? string.Empty, other.Background ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(Accent ?? string.Empty, other.Accent ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(Foreground ?? string.Empty, other.Foreground ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
     public sealed class EligibleAppConfig
     {
         public string PackageName { get; set; } = string.Empty;
@@ -175,6 +205,13 @@ namespace AndroidMusicPresenceLink
         public string IgnoredUpdateVersion { get; set; } = string.Empty;
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
+
+        // Per-mode custom theme colors. Empty fields fall back to the built-in palette,
+        // so existing configs (and fresh installs) keep the default look until the user
+        // picks colors in the Theming section.
+        public ThemeOverrides LightTheme { get; set; } = new ThemeOverrides();
+        public ThemeOverrides DarkTheme { get; set; } = new ThemeOverrides();
+
         public bool OpenInTaskbar { get; set; } = false;
         public bool StartWithWindows { get; set; } = false;
         public bool ShowMediaPlayerWindow { get; set; } = false;
@@ -320,6 +357,8 @@ namespace AndroidMusicPresenceLink
                 IgnoredUpdateVersion = source.IgnoredUpdateVersion,
                 DebugMode = source.DebugMode,
                 UseDarkMode = source.UseDarkMode,
+                LightTheme = source.LightTheme?.Clone() ?? new ThemeOverrides(),
+                DarkTheme = source.DarkTheme?.Clone() ?? new ThemeOverrides(),
                 OpenInTaskbar = source.OpenInTaskbar,
                 StartWithWindows = source.StartWithWindows,
                 ShowMediaPlayerWindow = source.ShowMediaPlayerWindow,
@@ -466,6 +505,8 @@ namespace AndroidMusicPresenceLink
         private static MusicConfig NormalizeConfig(MusicConfig config)
         {
             config.Paths ??= new PathsConfig();
+            config.LightTheme ??= new ThemeOverrides();
+            config.DarkTheme ??= new ThemeOverrides();
             config.AllowedApps ??= new List<string>();
             config.EligibleApps ??= new List<EligibleAppConfig>();
             config.MusicRemoteRoots ??= new List<string>();

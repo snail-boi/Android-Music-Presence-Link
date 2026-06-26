@@ -61,6 +61,9 @@ namespace AndroidMusicPresenceLink
         partial void InitAudioCodec();
         partial void InitHotkeys();
 
+        partial void LoadThemingFromConfig();
+        partial void ApplyThemingToConfig(MusicConfig config);
+
         partial void LoadDeviceFromConfig();
         partial void LoadFoldersFromConfig();
         partial void LoadAppsFromConfig();
@@ -343,6 +346,8 @@ namespace AndroidMusicPresenceLink
             _audioLinkConnectionAutoRestart = _config.AudioLinkConnectionAutoRestart;
             _audioLinkQualityAutoRestart = _config.AudioLinkQualityAutoRestart;
             _audioLinkBleedless = _config.AudioLinkBleedless;
+
+            LoadThemingFromConfig();
         }
 
         private void ApplyCoreToConfig(MusicConfig config)
@@ -404,6 +409,8 @@ namespace AndroidMusicPresenceLink
             config.AudioLinkConnectionAutoRestart = AudioLinkConnectionAutoRestart;
             config.AudioLinkQualityAutoRestart = AudioLinkQualityAutoRestart;
             config.AudioLinkBleedless = AudioLinkBleedless;
+
+            ApplyThemingToConfig(config);
         }
 
         // ── Build / Save / Dirty / Revert / Sync ─────────────────────────────
@@ -523,6 +530,8 @@ namespace AndroidMusicPresenceLink
             if (left.AdaptivePollingAlertEnabled != right.AdaptivePollingAlertEnabled) return false;
             if (left.DebugMode != right.DebugMode) return false;
             if (left.UseDarkMode != right.UseDarkMode) return false;
+            if (!(left.LightTheme ?? new ThemeOverrides()).ValueEquals(right.LightTheme ?? new ThemeOverrides())) return false;
+            if (!(left.DarkTheme ?? new ThemeOverrides()).ValueEquals(right.DarkTheme ?? new ThemeOverrides())) return false;
             if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
             if (left.StartWithWindows != right.StartWithWindows) return false;
             if (left.ShowMediaPlayerWindow != right.ShowMediaPlayerWindow) return false;
