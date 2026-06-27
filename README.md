@@ -5,7 +5,6 @@ Built primarily to work alongside [MusicPresence](https://github.com/ungive/disc
 
 ---
 
-<!-- Replace the paths below with actual screenshot paths once available -->
 <p>
   <img src="docs/mediaplayer_settings_collapsed.png" width="48%" />
   <img src="docs/mediaplayer_settings_opened.png" width="48%" />
@@ -33,6 +32,9 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 - Can be forwarded to Discord using MusicPresence
 - Reads title, artist, and album from the active Android media session
 - Forwards presence to Windows SMTC (System Media Transport Controls), making it available to any app that reads SMTC
+- Per-app presence modes: each allowed app can be set to Off, Half, or Full presence
+- Cover art fetching can be enabled or disabled per app
+- SMTC paused-clear delay: clears the Windows media session after a configurable number of minutes when paused (0 = disabled)
 
 ### Cover Art
 
@@ -40,16 +42,28 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 - Supports embedded cover art in audio files (extracted via ffmpeg)
 - Supports folder-level cover images (e.g. `cover.jpg`, `cover.png`, `folder.jpg`)
 - Cover filename patterns are configurable
-- Configurable cache size limit with automatic eviction
+- Configurable cache size limit with automatic LRU eviction
 
 ### Lyrics
 
 - Pulls `.lrc` lyrics files from your phone over ADB
+- Also reads lyrics embedded directly in audio file metadata
 - Displays synced (timestamped) lyrics as a floating overlay on your desktop
-- Also shows lyrics inline inside the media player window
-- Plain-text lyrics files (no timestamps) are supported as a fallback
+- Also shows lyrics inline inside the media player window, replacing the cover art area
+- Plain-text lyrics (no timestamps) are supported as a fallback
 - Lyrics are cached locally to avoid re-fetching on every track change
 - A custom lyrics folder override can be configured separately from music folders
+
+<img src="docs/lyric_scrolling_demo.gif" width="100%" />
+
+### Metadata Editing
+
+- Built-in editor for track metadata: title, artist, album, lyrics, and cover art
+- Pulls the file from the device, lets you edit locally, and writes it back over ADB
+- Lyrics can be saved embedded in the file or as a separate `.lrc` file (configurable per format; WAV always saves to `.lrc`)
+- Optionally retains the original date modified when writing back
+
+<img src="docs/metadata_edit_window.png" width="100%" />
 
 ### Audio Link
 
@@ -58,71 +72,108 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
   - Encoder selection (raw PCM, Opus, FLAC, AAC, and others detected from your device)
   - Buffer size control
   - Bitrate settings
-  - FLAC compression level
+  - FLAC compression level (1–8)
 - Built-in quality presets: Data Saver, Default, High, Lossless, Max
 - Custom values are saved and labeled as "Custom" in the UI
+- Auto-restart on transport switch (USB to Wi-Fi or vice versa)
+- Optional auto-restart when changing quality presets
+- Bleedless mode: mutes the device briefly around restarts to prevent audio artifacts
 
 ### Controls
 
 - Transport controls: play/pause, next, previous
 - Skip back/forward 30 seconds (shown for tracks longer than 10 minutes)
 - Volume control: a slider when the audio link is active, or +/- step buttons otherwise
-- Configurable global hotkeys for:
+- Configurable global hotkeys:
   - Volume up and volume down
   - Starting and stopping the audio link
   - Toggling the lyrics overlay
   - Copying current track info to the clipboard
+  - Cycling through audio quality presets
 - Hotkey modifier is configurable (Shift, Ctrl, or Alt)
 - Copy-to-clipboard template is customizable (supports `{artist}`, `{title}`, `{album}`)
+
+### Next Song Prediction
+
+- Shows the previous, current, and next track based on your library's folder structure
+- Display modes: off, text only, full cover art, or Kirsten mode
+- Sorting options: filename A–Z / Z–A, date modified newest / oldest
+- Cover art is fetched in the background for neighboring tracks
+- Manual library rescan available from the UI
 
 ### Interface
 
 - Two view modes: a full settings window and a compact media player window
-- Media player view shows cover art, animated gradient background extracted from the album art, track info, progress bar, and transport controls
+- Media player view shows cover art, animated gradient background extracted from album art, track info, progress bar, and transport controls
+- Can be run fully headless: start minimized to tray and control everything through hotkeys, never opening a window
 - Inline lyrics panel replaces the cover art area when toggled
-- Dark mode and light mode
+- Dark mode and light mode with fully customizable color overrides for both
 - Always-on-top toggle
 - Hide-decorations toggle (removes title bar and borders; window stays movable and resizable)
+- Rounded corners and shadow options for cover art and text
+- Artist and album display order is swappable
+- Elapsed or remaining time display, togglable per session
+- Animated gradient: configurable number of color sample points (2, 4, 6, or 8)
 - Connection status pill showing USB/Wi-Fi state
-- Audio quality button showing current preset, with a popup to switch presets without opening settings
+- Audio quality button showing the current preset, with a popup to switch presets without opening settings
+- Battery indicator with three styles (Classic, Pill, Vertical), configurable percentage and charging bolt placement
+- Extensive per-element visibility toggles: title, artist, album, cover, volume button, lyrics button, battery, seek buttons, and more
+- Settings pane inside the media player can be docked left or right
 - System tray icon with state-specific icons for USB, Wi-Fi, audio link active, and no device
 - Now Playing shown in the tray tooltip and tray menu
+- Toast notifications for connection changes and audio link events, with configurable position (corners or center) and display mode
 - Start minimized to tray option
 - Start with Windows option
 - Debug logging with a log folder shortcut in settings
-- SMTC paused-clear delay: clears the Windows media session after a configurable number of minutes when paused (0 = disabled)
+
+<video src="docs/customization.mp4" controls width="100%"></video>
+
+<p>
+  <img src="docs/default_theme.png" width="48%" />
+  <img src="docs/custom_theme.png" width="48%" />
+</p>
 
 ### Connection
 
 - USB connection support
 - Optional Wi-Fi connection via either classic ADB `tcpip` or Android 11+ Wireless Debugging
-- Wireless Debugging pairing support with mDNS-based reconnects after the device restarts or changes IP
+- USB-only mode
+- Wireless Debugging pairing support via QR code or pairing code with mDNS-based reconnects after the device restarts or changes IP
 - Automatic Wi-Fi recovery when the port is lost, prompting you to reconnect USB and re-establish the wireless bridge
 - Auto-detect button in setup that finds your device, optionally configures Wi-Fi, and asks for a friendly device name
+- Polling rate configurable: Extreme, Fast, Medium, or Slow
+- Adaptive polling: automatically reduces polling frequency after a configurable number of minutes of being paused
 
 ### Onboarding
 
 - Step-by-step setup wizard covering USB debugging, device connection, Wireless Debugging pairing, music folders, allowed apps, hotkeys, and startup options
+- Can be re-run at any time from settings
+
+<!-- demo: video walking through the onboarding wizard -->
+
+### Portable Mode
+
+- If a `portable.mode` file is placed next to the executable, all data is stored in the app directory instead of AppData
 
 ---
 
-## Devices tested and known working
+## Devices Tested and Known Working
 
-- Redmi note 13
-- Redmi note 15
-- Samsung s25 edge
-- Samsung s10 (Audio link doesn't work due to android 12)
+- Redmi Note 13
+- Redmi Note 15
+- Samsung S25 Edge
+- Samsung S10 (Audio Link does not work due to Android 12)
 
 ---
 
 ## Requirements
 
-- Android phone running **Android 13 or newer** (will work for 12 and 11, but audio link will not function and other parts may cease to function right)
-- Android 14 and 15 are currently untested. If you encounter any issues on those versions, please open an issue.
-- No Apple or iOS support, and no plans for it
+- Android phone running **Android 13 or newer** (Android 11 and 12 may work partially, but Audio Link will not function and other features may behave incorrectly)
+- Android 14 and 15 are currently untested — if you encounter issues, please open an issue
+- No Apple or iOS support (duh)
 - USB debugging must be enabled on your phone
 - Uses ADB (Android Debug Bridge) to establish the connection
-- Wireless Debugging mode requires Android 13+
+- Wireless Debugging mode requires Android 11+
 - scrcpy is required for the Audio Link feature
 
 Without USB debugging enabled, the app will not work.
@@ -133,7 +184,7 @@ Without USB debugging enabled, the app will not work.
 
 ### Media Player Compatibility
 
-- Fully tested with Musicolet
+- Fully tested with Musicolet and Symfonium
 - Most Android music players should work if they expose media session data
 - If a player does not work, please open an issue
 
@@ -153,7 +204,7 @@ Main Folder
 Notes:
 
 - No guarantee for deeply nested folder structures
-- of title and filename do not match then wrong or no cover will be pulled
+- If the track title and filename do not match, the wrong cover or no cover may be pulled
 - If all songs contain embedded cover art in metadata, it should work reliably
 - Multiple music root folders can be configured
 
