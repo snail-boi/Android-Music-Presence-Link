@@ -126,7 +126,7 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
 - Start with Windows option
 - Debug logging with a log folder shortcut in settings
 
-<video src="docs/customization.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/e3e81442-0b3d-4246-9e76-ede8271d60ff
 
 <p>
   <img src="docs/default_theme.png" width="48%" />
