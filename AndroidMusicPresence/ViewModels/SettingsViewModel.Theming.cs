@@ -1,167 +1,274 @@
 using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
 using System.Windows.Media;
 
 namespace AndroidMusicPresenceLink
 {
     /// <summary>
-    /// Theming section of the settings window. The user customizes three high-level colors
-    /// (background, accent/button, text) independently for light mode and dark mode; every
-    /// other brush (surface, border, accent hover/pressed) is derived from these in
-    /// <see cref="App.ApplyTheme(bool)"/>. An empty field means "use the built-in default",
-    /// which is what every existing config and fresh install gets until a color is picked.
+    /// Theming section of the settings window. Themes are now full named profiles instead of
+    /// a light/dark toggle. Three built-in profiles (Default Light, Default Dark, High
+    /// Contrast) are always present and read-only; the user can create, edit, rename and
+    /// delete their own profiles, each holding three colors (background, buttons/accent,
+    /// text). One profile is "active" — that is the one applied to the app and the one whose
+    /// colors the editor shows.
     ///
-    /// Edits preview live: each setter raises PropertyChanged, and MainWindow re-applies the
-    /// theme with the in-progress (unsaved) overrides. The values are only persisted on Save,
-    /// like every other setting in this window.
+    /// Edits preview live: selecting/cycling a theme or editing the active custom theme's
+    /// colors raises <see cref="ThemePreviewToken"/>, which MainWindow listens for and uses
+    /// to re-apply the in-progress profile. Nothing is persisted until Save, like every
+    /// other setting in this window.
     /// </summary>
     internal sealed partial class SettingsViewModel
     {
-        // Built-in defaults, shown in the swatches when a field is left blank. Kept in sync
-        // with the base palette in App.ApplyThemeCore.
-        private const string DefaultLightBackground = "#F7F7F7";
-        private const string DefaultLightAccent = "#2D6CDF";
-        private const string DefaultLightForeground = "#1A1A1A";
-        private const string DefaultDarkBackground = "#1E1E1E";
-        private const string DefaultDarkAccent = "#3E7BFF";
-        private const string DefaultDarkForeground = "#EAEAEA";
+        // All selectable themes in display/cycle order: the three built-ins first, then the
+        // user's custom profiles. Bound to the theme selector.
+        public ObservableCollection<ThemeListItem> Themes { get; } = new ObservableCollection<ThemeListItem>();
 
-        // ── Light mode ───────────────────────────────────────────────────────
-
-        private string _lightBackgroundColor = string.Empty;
-        public string LightBackgroundColor
+        private ThemeListItem? _selectedTheme;
+        public ThemeListItem? SelectedTheme
         {
-            get => _lightBackgroundColor;
-            set { if (Set(ref _lightBackgroundColor, value)) RaisePropertyChanged(nameof(LightBackgroundPreview)); }
+            get => _selectedTheme;
+            set
+            {
+                if (ReferenceEquals(_selectedTheme, value))
+                    return;
+
+                if (_selectedTheme != null)
+                    _selectedTheme.PropertyChanged -= SelectedTheme_PropertyChanged;
+
+                _selectedTheme = value;
+
+                if (_selectedTheme != null)
+                    _selectedTheme.PropertyChanged += SelectedTheme_PropertyChanged;
+
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(ActiveThemeName));
+                RaisePropertyChanged(nameof(SelectedThemeName));
+                RaisePropertyChanged(nameof(IsCustomSelected));
+                RaisePropertyChanged(nameof(IsBuiltInSelected));
+                RaisePropertyChanged(nameof(RotationToggleLabel));
+                NotifyThemePreview();
+            }
         }
 
-        private string _lightAccentColor = string.Empty;
-        public string LightAccentColor
+        // Random-theme-at-startup toggle.
+        private bool _randomThemeAtStartup;
+        public bool RandomThemeAtStartup { get => _randomThemeAtStartup; set => Set(ref _randomThemeAtStartup, value); }
+
+        // Label for the built-in theme's rotation toggle button.
+        public string RotationToggleLabel => (_selectedTheme?.InRotation ?? true) ? "Disable" : "Enable";
+
+        // Name of the active theme — shown on the header cycle button.
+        public string ActiveThemeName => _selectedTheme?.Name ?? string.Empty;
+
+        public bool IsCustomSelected => _selectedTheme != null && !_selectedTheme.IsBuiltIn;
+        public bool IsBuiltInSelected => _selectedTheme == null || _selectedTheme.IsBuiltIn;
+
+        // Editable name for the active theme. Built-ins are rejected; custom names are trimmed,
+        // capped at the limit, defaulted when blank, and de-duplicated. Validation lives here so
+        // save stays a pure serialize (no mutation during the unsaved-changes check).
+        public string SelectedThemeName
         {
-            get => _lightAccentColor;
-            set { if (Set(ref _lightAccentColor, value)) RaisePropertyChanged(nameof(LightAccentPreview)); }
+            get => _selectedTheme?.Name ?? string.Empty;
+            set
+            {
+                var item = _selectedTheme;
+                if (item == null || item.IsBuiltIn)
+                    return;
+
+                var v = (value ?? string.Empty).Trim();
+                if (v.Length > MusicConfig.ThemeNameMaxLength)
+                    v = v.Substring(0, MusicConfig.ThemeNameMaxLength).Trim();
+                if (string.IsNullOrEmpty(v))
+                    v = "Custom Theme";
+                v = MakeUniqueName(v, item);
+
+                if (!string.Equals(item.Name, v, StringComparison.Ordinal))
+                    item.Name = v; // raises Name change -> ActiveThemeName refresh + preview
+                RaisePropertyChanged();
+            }
         }
 
-        private string _lightForegroundColor = string.Empty;
-        public string LightForegroundColor
+        // Swatch/editor previews bind to SelectedTheme.* directly via a hex->brush converter,
+        // so no per-channel preview brushes are needed here.
+
+        // Bumped purely to notify MainWindow that the live preview should be re-applied.
+        public object? ThemePreviewToken => null;
+        private void NotifyThemePreview() => RaisePropertyChanged(nameof(ThemePreviewToken));
+
+        private void SelectedTheme_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            get => _lightForegroundColor;
-            set { if (Set(ref _lightForegroundColor, value)) RaisePropertyChanged(nameof(LightForegroundPreview)); }
+            if (e.PropertyName == nameof(ThemeListItem.Name))
+            {
+                RaisePropertyChanged(nameof(ActiveThemeName));
+                RaisePropertyChanged(nameof(SelectedThemeName));
+            }
+            // Any change to the active theme (color or name) re-applies the live preview.
+            NotifyThemePreview();
         }
 
-        public Brush LightBackgroundPreview => PreviewBrush(_lightBackgroundColor, DefaultLightBackground);
-        public Brush LightAccentPreview => PreviewBrush(_lightAccentColor, DefaultLightAccent);
-        public Brush LightForegroundPreview => PreviewBrush(_lightForegroundColor, DefaultLightForeground);
+        // ── Cycle / select / add / delete ─────────────────────────────────────
 
-        // ── Dark mode ────────────────────────────────────────────────────────
-
-        private string _darkBackgroundColor = string.Empty;
-        public string DarkBackgroundColor
+        private RelayCommand? _cycleThemeCommand;
+        public RelayCommand CycleThemeCommand => _cycleThemeCommand ??= new RelayCommand(() =>
         {
-            get => _darkBackgroundColor;
-            set { if (Set(ref _darkBackgroundColor, value)) RaisePropertyChanged(nameof(DarkBackgroundPreview)); }
-        }
+            // Cycle only through in-rotation themes; disabled themes are skipped. Starting
+            // from the current selection means a disabled active theme still advances to the
+            // next enabled one.
+            var rotation = Themes.Where(t => t.InRotation).ToList();
+            if (rotation.Count == 0)
+                return;
 
-        private string _darkAccentColor = string.Empty;
-        public string DarkAccentColor
-        {
-            get => _darkAccentColor;
-            set { if (Set(ref _darkAccentColor, value)) RaisePropertyChanged(nameof(DarkAccentPreview)); }
-        }
-
-        private string _darkForegroundColor = string.Empty;
-        public string DarkForegroundColor
-        {
-            get => _darkForegroundColor;
-            set { if (Set(ref _darkForegroundColor, value)) RaisePropertyChanged(nameof(DarkForegroundPreview)); }
-        }
-
-        public Brush DarkBackgroundPreview => PreviewBrush(_darkBackgroundColor, DefaultDarkBackground);
-        public Brush DarkAccentPreview => PreviewBrush(_darkAccentColor, DefaultDarkAccent);
-        public Brush DarkForegroundPreview => PreviewBrush(_darkForegroundColor, DefaultDarkForeground);
-
-        // ── Pick (color dialog) commands ─────────────────────────────────────
-
-        private RelayCommand? _pickLightBackgroundCommand;
-        public RelayCommand PickLightBackgroundCommand => _pickLightBackgroundCommand ??=
-            new RelayCommand(() => LightBackgroundColor = PickColor(LightBackgroundColor, DefaultLightBackground));
-
-        private RelayCommand? _pickLightAccentCommand;
-        public RelayCommand PickLightAccentCommand => _pickLightAccentCommand ??=
-            new RelayCommand(() => LightAccentColor = PickColor(LightAccentColor, DefaultLightAccent));
-
-        private RelayCommand? _pickLightForegroundCommand;
-        public RelayCommand PickLightForegroundCommand => _pickLightForegroundCommand ??=
-            new RelayCommand(() => LightForegroundColor = PickColor(LightForegroundColor, DefaultLightForeground));
-
-        private RelayCommand? _pickDarkBackgroundCommand;
-        public RelayCommand PickDarkBackgroundCommand => _pickDarkBackgroundCommand ??=
-            new RelayCommand(() => DarkBackgroundColor = PickColor(DarkBackgroundColor, DefaultDarkBackground));
-
-        private RelayCommand? _pickDarkAccentCommand;
-        public RelayCommand PickDarkAccentCommand => _pickDarkAccentCommand ??=
-            new RelayCommand(() => DarkAccentColor = PickColor(DarkAccentColor, DefaultDarkAccent));
-
-        private RelayCommand? _pickDarkForegroundCommand;
-        public RelayCommand PickDarkForegroundCommand => _pickDarkForegroundCommand ??=
-            new RelayCommand(() => DarkForegroundColor = PickColor(DarkForegroundColor, DefaultDarkForeground));
-
-        // ── Reset commands (back to built-in defaults for that mode) ─────────
-
-        private RelayCommand? _resetLightThemeCommand;
-        public RelayCommand ResetLightThemeCommand => _resetLightThemeCommand ??= new RelayCommand(() =>
-        {
-            LightBackgroundColor = string.Empty;
-            LightAccentColor = string.Empty;
-            LightForegroundColor = string.Empty;
+            int start = _selectedTheme != null ? Themes.IndexOf(_selectedTheme) : -1;
+            for (int step = 1; step <= Themes.Count; step++)
+            {
+                var candidate = Themes[((start + step) % Themes.Count + Themes.Count) % Themes.Count];
+                if (candidate.InRotation)
+                {
+                    SelectedTheme = candidate;
+                    return;
+                }
+            }
         });
 
-        private RelayCommand? _resetDarkThemeCommand;
-        public RelayCommand ResetDarkThemeCommand => _resetDarkThemeCommand ??= new RelayCommand(() =>
+        // Built-in themes can't be deleted, but can be removed from / added back to the cycle
+        // rotation. The last in-rotation theme can't be disabled (cycling needs a target).
+        private RelayCommand? _toggleRotationCommand;
+        public RelayCommand ToggleRotationCommand => _toggleRotationCommand ??= new RelayCommand(() =>
         {
-            DarkBackgroundColor = string.Empty;
-            DarkAccentColor = string.Empty;
-            DarkForegroundColor = string.Empty;
+            var item = _selectedTheme;
+            if (item == null)
+                return;
+
+            if (item.InRotation && Themes.Count(t => t.InRotation) <= 1)
+            {
+                Interaction?.ShowWarning("At least one theme must stay in rotation.", "Themes");
+                return;
+            }
+
+            item.InRotation = !item.InRotation;
+            RaisePropertyChanged(nameof(RotationToggleLabel));
         });
 
-        // ── Load / apply / live-preview snapshots ────────────────────────────
+        private RelayCommand? _addThemeCommand;
+        public RelayCommand AddThemeCommand => _addThemeCommand ??= new RelayCommand(() =>
+        {
+            var src = _selectedTheme;
+            var fallback = BuiltInThemes.DefaultDark;
+            var item = new ThemeListItem(new ThemeProfile
+            {
+                Name = MakeUniqueName("Custom Theme", null),
+                Background = src?.Background ?? fallback.Background,
+                Accent = src?.Accent ?? fallback.Accent,
+                Foreground = src?.Foreground ?? fallback.Foreground
+            }, isBuiltIn: false);
+
+            Themes.Add(item);
+            SelectedTheme = item;
+        });
+
+        private RelayCommand? _deleteThemeCommand;
+        public RelayCommand DeleteThemeCommand => _deleteThemeCommand ??= new RelayCommand(() =>
+        {
+            var item = _selectedTheme;
+            if (item == null || item.IsBuiltIn)
+                return;
+
+            int idx = Themes.IndexOf(item);
+            Themes.Remove(item);
+
+            int next = Math.Clamp(idx - 1, 0, Math.Max(0, Themes.Count - 1));
+            SelectedTheme = Themes.Count > 0 ? Themes[next] : null;
+        });
+
+        // ── Pick (color dialog) commands — edit the active custom theme ────────
+
+        private RelayCommand? _pickBackgroundCommand;
+        public RelayCommand PickBackgroundCommand => _pickBackgroundCommand ??= new RelayCommand(() =>
+        {
+            if (_selectedTheme == null || _selectedTheme.IsBuiltIn) return;
+            _selectedTheme.Background = PickColor(_selectedTheme.Background, BuiltInThemes.DefaultDark.Background);
+        });
+
+        private RelayCommand? _pickAccentCommand;
+        public RelayCommand PickAccentCommand => _pickAccentCommand ??= new RelayCommand(() =>
+        {
+            if (_selectedTheme == null || _selectedTheme.IsBuiltIn) return;
+            _selectedTheme.Accent = PickColor(_selectedTheme.Accent, BuiltInThemes.DefaultDark.Accent);
+        });
+
+        private RelayCommand? _pickForegroundCommand;
+        public RelayCommand PickForegroundCommand => _pickForegroundCommand ??= new RelayCommand(() =>
+        {
+            if (_selectedTheme == null || _selectedTheme.IsBuiltIn) return;
+            _selectedTheme.Foreground = PickColor(_selectedTheme.Foreground, BuiltInThemes.DefaultDark.Foreground);
+        });
+
+        // ── Load / apply / preview ────────────────────────────────────────────
 
         partial void LoadThemingFromConfig()
         {
-            var light = _config.LightTheme ?? new ThemeOverrides();
-            var dark = _config.DarkTheme ?? new ThemeOverrides();
+            if (_selectedTheme != null)
+                _selectedTheme.PropertyChanged -= SelectedTheme_PropertyChanged;
+            _selectedTheme = null;
 
-            _lightBackgroundColor = light.Background ?? string.Empty;
-            _lightAccentColor = light.Accent ?? string.Empty;
-            _lightForegroundColor = light.Foreground ?? string.Empty;
+            var disabled = new System.Collections.Generic.HashSet<string>(
+                _config.DisabledThemes ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
 
-            _darkBackgroundColor = dark.Background ?? string.Empty;
-            _darkAccentColor = dark.Accent ?? string.Empty;
-            _darkForegroundColor = dark.Foreground ?? string.Empty;
+            Themes.Clear();
+            foreach (var b in BuiltInThemes.All)
+                Themes.Add(new ThemeListItem(b, isBuiltIn: true) { InRotation = !disabled.Contains(b.Name) });
+            foreach (var c in _config.CustomThemes ?? Enumerable.Empty<ThemeProfile>())
+                Themes.Add(new ThemeListItem(c, isBuiltIn: false) { InRotation = !disabled.Contains(c.Name) });
+
+            _randomThemeAtStartup = _config.RandomThemeAtStartup;
+
+            var active = Themes.FirstOrDefault(t => string.Equals(t.Name, _config.ActiveThemeName, StringComparison.Ordinal))
+                         ?? Themes.FirstOrDefault();
+            SelectedTheme = active;
         }
 
         partial void ApplyThemingToConfig(MusicConfig config)
         {
-            config.LightTheme = BuildLightOverrides();
-            config.DarkTheme = BuildDarkOverrides();
+            config.CustomThemes = Themes.Where(t => !t.IsBuiltIn).Select(t => t.ToProfile()).ToList();
+            config.ActiveThemeName = _selectedTheme?.Name ?? BuiltInThemes.DefaultDark.Name;
+            config.DisabledThemes = Themes.Where(t => !t.InRotation).Select(t => t.Name).ToList();
+            config.RandomThemeAtStartup = RandomThemeAtStartup;
+            // Keep the legacy flag aligned with the active theme so the tray icon and the
+            // media-player icon logic (which read UseDarkMode) stay correct.
+            var activeProfile = _selectedTheme?.ToProfile() ?? BuiltInThemes.DefaultDark;
+            config.UseDarkMode = ThemeCatalog.IsDark(activeProfile);
         }
 
-        /// <summary>Current (possibly unsaved) light-mode overrides, for live preview.</summary>
-        public ThemeOverrides BuildLightOverrides() => new ThemeOverrides
-        {
-            Background = (LightBackgroundColor ?? string.Empty).Trim(),
-            Accent = (LightAccentColor ?? string.Empty).Trim(),
-            Foreground = (LightForegroundColor ?? string.Empty).Trim()
-        };
-
-        /// <summary>Current (possibly unsaved) dark-mode overrides, for live preview.</summary>
-        public ThemeOverrides BuildDarkOverrides() => new ThemeOverrides
-        {
-            Background = (DarkBackgroundColor ?? string.Empty).Trim(),
-            Accent = (DarkAccentColor ?? string.Empty).Trim(),
-            Foreground = (DarkForegroundColor ?? string.Empty).Trim()
-        };
+        /// <summary>The active profile reflecting current (possibly unsaved) edits, for live preview.</summary>
+        public ThemeProfile BuildActiveThemeProfile()
+            => _selectedTheme?.ToProfile() ?? BuiltInThemes.DefaultDark;
 
         // ── Helpers ──────────────────────────────────────────────────────────
+
+        // Returns a name not already used by any theme (case-insensitive), excluding the item
+        // being renamed. Appends " 2", " 3", ... when needed, trimming to fit the length cap.
+        private string MakeUniqueName(string candidate, ThemeListItem? exclude)
+        {
+            bool Taken(string name) => Themes.Any(t => !ReferenceEquals(t, exclude)
+                && string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+
+            if (!Taken(candidate))
+                return candidate;
+
+            for (int i = 2; ; i++)
+            {
+                var suffix = " " + i;
+                var baseName = candidate;
+                int max = MusicConfig.ThemeNameMaxLength - suffix.Length;
+                if (max > 0 && baseName.Length > max)
+                    baseName = baseName.Substring(0, max).Trim();
+                var attempt = baseName + suffix;
+                if (!Taken(attempt))
+                    return attempt;
+            }
+        }
 
         // Opens the native color dialog seeded with the current (or default) color and
         // returns the chosen color as "#RRGGBB", or the original value if cancelled.
@@ -179,16 +286,6 @@ namespace AndroidMusicPresenceLink
 
             var picked = dlg.Color;
             return $"#{picked.R:X2}{picked.G:X2}{picked.B:X2}";
-        }
-
-        private static Brush PreviewBrush(string? value, string fallback)
-        {
-            var color = TryParseMediaColor(value, out var c) ? c
-                      : TryParseMediaColor(fallback, out var f) ? f
-                      : Colors.Transparent;
-            var brush = new SolidColorBrush(color);
-            brush.Freeze();
-            return brush;
         }
 
         private static bool TryParseMediaColor(string? hex, out Color color)

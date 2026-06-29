@@ -53,23 +53,12 @@ namespace AndroidMusicPresenceLink
             _vm.SetMediaPlayerModeActive((Application.Current as App)?.IsMediaPlayerModeActive() == true);
         }
 
-        // Settings VM properties that should re-apply the theme live (so the user sees
-        // their custom colors and mode switch immediately, before saving).
-        private static readonly HashSet<string> ThemePreviewProps = new()
-        {
-            nameof(SettingsViewModel.UseDarkMode),
-            nameof(SettingsViewModel.LightBackgroundColor),
-            nameof(SettingsViewModel.LightAccentColor),
-            nameof(SettingsViewModel.LightForegroundColor),
-            nameof(SettingsViewModel.DarkBackgroundColor),
-            nameof(SettingsViewModel.DarkAccentColor),
-            nameof(SettingsViewModel.DarkForegroundColor),
-        };
-
         private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != null && ThemePreviewProps.Contains(e.PropertyName))
-                (Application.Current as App)?.ApplyTheme(_vm.UseDarkMode, _vm.BuildLightOverrides(), _vm.BuildDarkOverrides());
+            // The VM raises ThemePreviewToken whenever the active theme is selected, cycled,
+            // or edited; re-apply the in-progress profile live so the user sees it before save.
+            if (e.PropertyName == nameof(SettingsViewModel.ThemePreviewToken))
+                (Application.Current as App)?.ApplyThemePreview(_vm.BuildActiveThemeProfile());
             else if (e.PropertyName == nameof(SettingsViewModel.DebugMode))
                 Debugger.IsEnabled = _vm.DebugMode;
         }

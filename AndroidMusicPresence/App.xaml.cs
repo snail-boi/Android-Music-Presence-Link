@@ -143,7 +143,13 @@ namespace AndroidMusicPresenceLink
             ApplyStartupRegistration(Config.StartWithWindows);
             Debugger.IsEnabled = Config.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
-            ApplyTheme(Config.UseDarkMode);
+            if (Config.RandomThemeAtStartup)
+            {
+                var randomTheme = ThemeCatalog.RandomEnabledThemeName(Config);
+                if (!string.IsNullOrEmpty(randomTheme))
+                    Config.ActiveThemeName = randomTheme;
+            }
+            ApplyActiveTheme(Config);
 
             _toastManager = new NotificationToastManager(Dispatcher)
             {
@@ -632,7 +638,7 @@ namespace AndroidMusicPresenceLink
             ApplyStartupRegistration(config.StartWithWindows);
             Debugger.IsEnabled = Config.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
-            ApplyTheme(config.UseDarkMode);
+            ApplyActiveTheme(config);
             _presenceService?.UpdateConfig(config);
             _lyricsOverlayManager?.UpdateConfig(config);
             _toastManager?.UpdateConfig(config);
@@ -1131,16 +1137,59 @@ namespace AndroidMusicPresenceLink
             }
         }
 
-        internal void ApplyTheme(bool useDarkMode)
-            => ApplyThemeCore(useDarkMode, useDarkMode ? Config.DarkTheme : Config.LightTheme);
+        /// <summary>
+        /// Resolves and applies the config's active theme profile, and keeps the legacy
+        /// <see cref="MusicConfig.UseDarkMode"/> flag in sync with the active theme's
+        /// darkness so the tray icon and media-player icon logic stay correct.
+        /// </summary>
+        internal void ApplyActiveTheme(MusicConfig config)
+        {
+            var profile = ThemeCatalog.ResolveActive(config);
+            config.UseDarkMode = ThemeCatalog.IsDark(profile);
+            ApplyThemeProfile(profile);
+        }
 
         /// <summary>
-        /// Live-preview overload used by the settings window while the user edits theme
-        /// colors. The settings VM passes its in-progress (unsaved) overrides for both
-        /// modes; only the active mode's set is applied.
+        /// Live-preview entry point used by the settings window while the user selects,
+        /// cycles, or edits a theme. Applies the in-progress (unsaved) profile and updates
+        /// the running UseDarkMode flag so icons follow immediately; values are only
+        /// persisted on Save like every other setting.
         /// </summary>
-        internal void ApplyTheme(bool useDarkMode, ThemeOverrides? light, ThemeOverrides? dark)
-            => ApplyThemeCore(useDarkMode, useDarkMode ? dark : light);
+        internal void ApplyThemePreview(ThemeProfile profile)
+        {
+            if (Config != null)
+                Config.UseDarkMode = ThemeCatalog.IsDark(profile);
+            ApplyThemeProfile(profile);
+        }
+
+        /// <summary>
+        /// Applies a single theme profile to the live brushes. The built-in Default Light
+        /// and Default Dark profiles render with their pristine hand-tuned palettes (their
+        /// surface/border/accent shades are not pure derivations of the three headline
+        /// colors); High Contrast and every custom profile derive their dependent brushes
+        /// from the three colors via <see cref="ApplyThemeCore"/>.
+        /// </summary>
+        internal void ApplyThemeProfile(ThemeProfile profile)
+        {
+            if (ThemeCatalog.IsPristineDefaultLight(profile))
+            {
+                ApplyThemeCore(false, null);
+                return;
+            }
+            if (ThemeCatalog.IsPristineDefaultDark(profile))
+            {
+                ApplyThemeCore(true, null);
+                return;
+            }
+
+            var overrides = new ThemeOverrides
+            {
+                Background = profile.Background ?? string.Empty,
+                Accent = profile.Accent ?? string.Empty,
+                Foreground = profile.Foreground ?? string.Empty
+            };
+            ApplyThemeCore(ThemeCatalog.IsDark(profile), overrides);
+        }
 
         private void ApplyThemeCore(bool useDarkMode, ThemeOverrides? overrides)
         {

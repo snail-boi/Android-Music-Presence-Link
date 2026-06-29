@@ -7,7 +7,8 @@ namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// The settings window's action buttons: check for update, redo onboarding, toggle the
-    /// media-player view, clear/open the media cache, open the log folder, and toggle theme.
+    /// media-player view, clear/open the media cache, and open the log folder. (Theme cycling
+    /// lives in the Theming partial.)
     ///
     /// Commands are created lazily on first access, so this partial needs no constructor hook
     /// and the Core partial is unchanged. Dialogs and message boxes go through the interaction
@@ -36,8 +37,8 @@ namespace AndroidMusicPresenceLink
         private RelayCommand? _openLogFolderCommand;
         public RelayCommand OpenLogFolderCommand => _openLogFolderCommand ??= new RelayCommand(OpenLogFolder);
 
-        private RelayCommand? _toggleThemeCommand;
-        public RelayCommand ToggleThemeCommand => _toggleThemeCommand ??= new RelayCommand(() => UseDarkMode = !UseDarkMode);
+        // The header theme button now cycles through all themes; see CycleThemeCommand in
+        // the Theming partial.
 
         // Media-player-view button label. Depends on the app's current mode, which the window
         // pushes in via SetMediaPlayerModeActive (called from UpdateMediaPlayerModeButton).

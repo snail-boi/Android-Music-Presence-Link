@@ -156,6 +156,42 @@ namespace AndroidMusicPresenceLink
             && string.Equals(Foreground ?? string.Empty, other.Foreground ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// A named theme profile. Unlike <see cref="ThemeOverrides"/> (which layered partial
+    /// overrides on top of a light/dark base), a profile fully specifies the three
+    /// high-level colors. The built-in profiles live in <see cref="BuiltInThemes"/>; the
+    /// user's own profiles are stored in <see cref="MusicConfig.CustomThemes"/>. The active
+    /// profile is referenced by <see cref="MusicConfig.ActiveThemeName"/>. Dependent brushes
+    /// (control background, border, accent hover/pressed) are still derived in
+    /// App.ApplyThemeProfile.
+    /// </summary>
+    public sealed class ThemeProfile
+    {
+        // Display name. User-created names are capped at MusicConfig.ThemeNameMaxLength.
+        public string Name { get; set; } = string.Empty;
+        // Window / page background.
+        public string Background { get; set; } = string.Empty;
+        // Primary button / highlight color.
+        public string Accent { get; set; } = string.Empty;
+        // Text color.
+        public string Foreground { get; set; } = string.Empty;
+
+        public ThemeProfile Clone() => new ThemeProfile
+        {
+            Name = Name ?? string.Empty,
+            Background = Background ?? string.Empty,
+            Accent = Accent ?? string.Empty,
+            Foreground = Foreground ?? string.Empty
+        };
+
+        public bool ValueEquals(ThemeProfile? other)
+            => other != null
+            && string.Equals(Name ?? string.Empty, other.Name ?? string.Empty, StringComparison.Ordinal)
+            && string.Equals(Background ?? string.Empty, other.Background ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(Accent ?? string.Empty, other.Accent ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(Foreground ?? string.Empty, other.Foreground ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
     public sealed class EligibleAppConfig
     {
         public string PackageName { get; set; } = string.Empty;
@@ -206,11 +242,33 @@ namespace AndroidMusicPresenceLink
         public bool DebugMode { get; set; } = false;
         public bool UseDarkMode { get; set; } = true;
 
-        // Per-mode custom theme colors. Empty fields fall back to the built-in palette,
-        // so existing configs (and fresh installs) keep the default look until the user
-        // picks colors in the Theming section.
+        // Legacy per-mode custom theme colors. Superseded by the theme-profile system
+        // (CustomThemes + ActiveThemeName). Retained only so a one-time migration can
+        // convert a user's old light/dark overrides into named custom profiles; not read
+        // by the live theming engine anymore.
         public ThemeOverrides LightTheme { get; set; } = new ThemeOverrides();
         public ThemeOverrides DarkTheme { get; set; } = new ThemeOverrides();
+
+        // Maximum length of a user-created theme name.
+        public const int ThemeNameMaxLength = 30;
+
+        // User-created theme profiles. The built-in profiles (Default Light, Default Dark,
+        // High Contrast) are defined in code (BuiltInThemes) and are not stored here.
+        public List<ThemeProfile> CustomThemes { get; set; } = new List<ThemeProfile>();
+
+        // Name of the currently active theme (built-in or custom). Empty means "not yet
+        // migrated", which triggers the one-time conversion from UseDarkMode/LightTheme/
+        // DarkTheme in NormalizeConfig.
+        public string ActiveThemeName { get; set; } = string.Empty;
+
+        // Names of themes the user has removed from the cycle rotation (the top-corner
+        // button). Disabled themes are skipped when cycling but remain selectable directly
+        // so they can be re-enabled. Built-in themes can be disabled this way (instead of
+        // deleted); custom themes are usually deleted outright.
+        public List<string> DisabledThemes { get; set; } = new List<string>();
+
+        // When true, a random in-rotation theme is chosen and applied at every startup.
+        public bool RandomThemeAtStartup { get; set; } = false;
 
         public bool OpenInTaskbar { get; set; } = false;
         public bool StartWithWindows { get; set; } = false;
@@ -359,6 +417,10 @@ namespace AndroidMusicPresenceLink
                 UseDarkMode = source.UseDarkMode,
                 LightTheme = source.LightTheme?.Clone() ?? new ThemeOverrides(),
                 DarkTheme = source.DarkTheme?.Clone() ?? new ThemeOverrides(),
+                CustomThemes = source.CustomThemes?.Select(t => t.Clone()).ToList() ?? new List<ThemeProfile>(),
+                ActiveThemeName = source.ActiveThemeName ?? string.Empty,
+                DisabledThemes = source.DisabledThemes?.ToList() ?? new List<string>(),
+                RandomThemeAtStartup = source.RandomThemeAtStartup,
                 OpenInTaskbar = source.OpenInTaskbar,
                 StartWithWindows = source.StartWithWindows,
                 ShowMediaPlayerWindow = source.ShowMediaPlayerWindow,
@@ -507,6 +569,9 @@ namespace AndroidMusicPresenceLink
             config.Paths ??= new PathsConfig();
             config.LightTheme ??= new ThemeOverrides();
             config.DarkTheme ??= new ThemeOverrides();
+            config.CustomThemes ??= new List<ThemeProfile>();
+            config.DisabledThemes ??= new List<string>();
+            MigrateThemes(config);
             config.AllowedApps ??= new List<string>();
             config.EligibleApps ??= new List<EligibleAppConfig>();
             config.MusicRemoteRoots ??= new List<string>();
@@ -648,6 +713,35 @@ namespace AndroidMusicPresenceLink
             // The presence service handles that gracefully.
 
             return config;
+        }
+
+        // One-time migration from the old light/dark-toggle theming to the theme-profile
+        // system. Runs only when ActiveThemeName is empty (i.e. a config saved before the
+        // profile system existed). A user who had customized their light and/or dark colors
+        // gets those preserved as named custom profiles ("Custom Light" / "Custom Dark"),
+        // and the active theme is chosen to match whatever they were last looking at.
+        private static void MigrateThemes(MusicConfig config)
+        {
+            if (!string.IsNullOrWhiteSpace(config.ActiveThemeName))
+                return;
+
+            bool HasAnyColor(ThemeOverrides? o) => o != null &&
+                (!string.IsNullOrWhiteSpace(o.Background)
+                 || !string.IsNullOrWhiteSpace(o.Accent)
+                 || !string.IsNullOrWhiteSpace(o.Foreground));
+
+            bool lightCustom = HasAnyColor(config.LightTheme);
+            bool darkCustom = HasAnyColor(config.DarkTheme);
+
+            if (lightCustom)
+                config.CustomThemes.Add(BuiltInThemes.ProfileFromOverrides("Custom Light", config.LightTheme!, isDark: false));
+            if (darkCustom)
+                config.CustomThemes.Add(BuiltInThemes.ProfileFromOverrides("Custom Dark", config.DarkTheme!, isDark: true));
+
+            if (config.UseDarkMode)
+                config.ActiveThemeName = darkCustom ? "Custom Dark" : BuiltInThemes.DefaultDark.Name;
+            else
+                config.ActiveThemeName = lightCustom ? "Custom Light" : BuiltInThemes.DefaultLight.Name;
         }
 
         private static MusicConfig Finalize(MusicConfig config)

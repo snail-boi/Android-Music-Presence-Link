@@ -529,9 +529,16 @@ namespace AndroidMusicPresenceLink
             if (left.AdaptivePollingThresholdMinutes != right.AdaptivePollingThresholdMinutes) return false;
             if (left.AdaptivePollingAlertEnabled != right.AdaptivePollingAlertEnabled) return false;
             if (left.DebugMode != right.DebugMode) return false;
-            if (left.UseDarkMode != right.UseDarkMode) return false;
-            if (!(left.LightTheme ?? new ThemeOverrides()).ValueEquals(right.LightTheme ?? new ThemeOverrides())) return false;
-            if (!(left.DarkTheme ?? new ThemeOverrides()).ValueEquals(right.DarkTheme ?? new ThemeOverrides())) return false;
+            if (!string.Equals(left.ActiveThemeName ?? string.Empty, right.ActiveThemeName ?? string.Empty, StringComparison.Ordinal)) return false;
+            var leftThemes = left.CustomThemes ?? new List<ThemeProfile>();
+            var rightThemes = right.CustomThemes ?? new List<ThemeProfile>();
+            if (leftThemes.Count != rightThemes.Count) return false;
+            for (int i = 0; i < leftThemes.Count; i++)
+                if (!leftThemes[i].ValueEquals(rightThemes[i])) return false;
+            if (left.RandomThemeAtStartup != right.RandomThemeAtStartup) return false;
+            var leftDisabled = new HashSet<string>(left.DisabledThemes ?? new List<string>(), StringComparer.Ordinal);
+            var rightDisabled = new HashSet<string>(right.DisabledThemes ?? new List<string>(), StringComparer.Ordinal);
+            if (!leftDisabled.SetEquals(rightDisabled)) return false;
             if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
             if (left.StartWithWindows != right.StartWithWindows) return false;
             if (left.ShowMediaPlayerWindow != right.ShowMediaPlayerWindow) return false;

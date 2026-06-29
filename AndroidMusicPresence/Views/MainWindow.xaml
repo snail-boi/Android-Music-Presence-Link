@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AndroidMusicPresenceLink"
         mc:Ignorable="d"
         Title="Music Presence Settings" MinWidth="640" MinHeight="560" Width="720" Height="700"
         Background="{DynamicResource ThemeBackgroundBrush}"
@@ -14,6 +15,7 @@
     <Window.Resources>
 
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:ColorStringToBrushConverter x:Key="HexToBrush" />
 
         <!-- ============ TYPOGRAPHY / TEXT ============ -->
         <Style TargetType="TextBlock">
@@ -450,36 +452,31 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Music Presence" Style="{StaticResource HeaderTitleStyle}" />
+                        <TextBlock Text="AMPL" Style="{StaticResource HeaderTitleStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="{Binding VersionInfoText}"
-                                   Margin="10,0,0,0"
+                                   Margin="4,0,0,0"
                                    VerticalAlignment="Bottom"
                                    FontSize="11"
-                                   Opacity="0.7" />
+                                   Opacity="0.7" 
+                                   />
                         <TextBlock Text="{Binding UpdateStatusText}"
                                    Margin="8,0,0,0"
                                    VerticalAlignment="Bottom"
                                    FontSize="11"
                                    Opacity="0.7" />
                     </StackPanel>
-                    <TextBlock Text="Configure how your Android device shares music with your PC."
-                               Style="{StaticResource HeaderSubtitleStyle}" />
                 </StackPanel>
                 <Button Grid.Column="1"
-                        Command="{Binding ToggleThemeCommand}"
-                        Width="120"
-                        VerticalAlignment="Center">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
-                            <Setter Property="Content" Value="Switch to Dark" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding UseDarkMode}" Value="True">
-                                    <Setter Property="Content" Value="Switch to Light" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
+                        Command="{Binding CycleThemeCommand}"
+                        Content="{Binding ActiveThemeName}"
+                        MinWidth="120"
+                        MaxWidth="200"
+                        VerticalAlignment="Center"
+                        ToolTip="Click to cycle through themes"
+                        Style="{StaticResource SecondaryButtonStyle}" />
             </Grid>
         </Border>
 
@@ -1155,147 +1152,128 @@
                     <!-- ====== THEMING ====== -->
                     <Expander Header="Theming" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
-                            <TextBlock Text="Customize the colors for light and dark mode. Changes preview instantly and apply when you save. Leave a color untouched to keep the default."
+                            <TextBlock Text="Pick a theme or make a new one, the button in the header cycles between themes, built in theme's can't be removed, but can be disabled, don't forget to save."
                                        Style="{StaticResource HintTextStyle}" />
 
-                            <CheckBox Content="dark mode"
-                                      IsChecked="{Binding UseDarkMode, Mode=TwoWay}"
-                                      Margin="0,4,0,16"
+                            <!-- ── Theme selector + actions ── -->
+                            <Grid Margin="0,4,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Active theme" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding Themes}"
+                                          SelectedItem="{Binding SelectedTheme, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Name}" />
+                                                <TextBlock Text=" (disabled)" Opacity="0.6"
+                                                           Visibility="{Binding IsDisabled, Converter={StaticResource BoolToVis}}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="2" Content="New" Width="64" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding AddThemeCommand}" />
+                                <!-- Custom themes are deleted; built-in themes are toggled in/out of the cycle. -->
+                                <Button Grid.Column="3" Content="Delete" Width="80" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Visibility="{Binding IsCustomSelected, Converter={StaticResource BoolToVis}}"
+                                        Command="{Binding DeleteThemeCommand}" />
+                                <Button Grid.Column="3" Content="{Binding RotationToggleLabel}" Width="80" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Visibility="{Binding IsBuiltInSelected, Converter={StaticResource BoolToVis}}"
+                                        ToolTip="Remove this theme from / add it back to the cycle rotation"
+                                        Command="{Binding ToggleRotationCommand}" />
+                            </Grid>
+
+                            <TextBlock Text="This is a built-in theme. Click New to create an editable copy."
+                                       Style="{StaticResource HintTextStyle}"
+                                       Visibility="{Binding IsBuiltInSelected, Converter={StaticResource BoolToVis}}" />
+
+                            <!-- ── Name (custom themes only) ── -->
+                            <Grid Margin="0,0,0,8"
+                                  Visibility="{Binding IsCustomSelected, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                <TextBox Grid.Column="1" MaxLength="30"
+                                         Text="{Binding SelectedThemeName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                            </Grid>
+
+                            <!-- ── Colors (editable for custom, read-only for built-in) ── -->
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Background" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
+                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
+                                        Background="{Binding SelectedTheme.Background, Converter={StaticResource HexToBrush}}" />
+                                <TextBox Grid.Column="2" Margin="0,0,8,0"
+                                         IsEnabled="{Binding IsCustomSelected}"
+                                         Text="{Binding SelectedTheme.Background, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Grid.Column="3" Content="Pick" Width="64"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        IsEnabled="{Binding IsCustomSelected}"
+                                        Command="{Binding PickBackgroundCommand}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Buttons / accent" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
+                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
+                                        Background="{Binding SelectedTheme.Accent, Converter={StaticResource HexToBrush}}" />
+                                <TextBox Grid.Column="2" Margin="0,0,8,0"
+                                         IsEnabled="{Binding IsCustomSelected}"
+                                         Text="{Binding SelectedTheme.Accent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Grid.Column="3" Content="Pick" Width="64"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        IsEnabled="{Binding IsCustomSelected}"
+                                        Command="{Binding PickAccentCommand}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Text" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
+                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
+                                        Background="{Binding SelectedTheme.Foreground, Converter={StaticResource HexToBrush}}" />
+                                <TextBox Grid.Column="2" Margin="0,0,8,0"
+                                         IsEnabled="{Binding IsCustomSelected}"
+                                         Text="{Binding SelectedTheme.Foreground, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Grid.Column="3" Content="Pick" Width="64"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        IsEnabled="{Binding IsCustomSelected}"
+                                        Command="{Binding PickForegroundCommand}" />
+                            </Grid>
+
+                            <CheckBox Content="Pick a random theme at startup"
+                                      IsChecked="{Binding RandomThemeAtStartup, Mode=TwoWay}"
+                                      Margin="0,12,0,0"
                                       Style="{StaticResource ToggleSwitchStyle}"
-                                      ToolTip="Switches the active mode so you can edit and preview each palette." />
-
-                            <!-- ── Light mode ── -->
-                            <TextBlock Text="Light mode"
-                                       Style="{StaticResource FieldLabelStyle}"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,8" />
-
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Background" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding LightBackgroundPreview}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         Text="{Binding LightBackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding PickLightBackgroundCommand}" />
-                            </Grid>
-
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Buttons / accent" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding LightAccentPreview}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         Text="{Binding LightAccentColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding PickLightAccentCommand}" />
-                            </Grid>
-
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Text" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding LightForegroundPreview}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         Text="{Binding LightForegroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding PickLightForegroundCommand}" />
-                            </Grid>
-
-                            <Button Content="Reset light colors"
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    Width="160"
-                                    HorizontalAlignment="Left"
-                                    Margin="0,0,0,18"
-                                    Command="{Binding ResetLightThemeCommand}" />
-
-                            <!-- ── Dark mode ── -->
-                            <TextBlock Text="Dark mode"
-                                       Style="{StaticResource FieldLabelStyle}"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,8" />
-
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Background" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding DarkBackgroundPreview}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         Text="{Binding DarkBackgroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding PickDarkBackgroundCommand}" />
-                            </Grid>
-
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Buttons / accent" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding DarkAccentPreview}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         Text="{Binding DarkAccentColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding PickDarkAccentCommand}" />
-                            </Grid>
-
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Text" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding DarkForegroundPreview}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         Text="{Binding DarkForegroundColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding PickDarkForegroundCommand}" />
-                            </Grid>
-
-                            <Button Content="Reset dark colors"
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    Width="160"
-                                    HorizontalAlignment="Left"
-                                    Command="{Binding ResetDarkThemeCommand}" />
+                                      ToolTip="On each launch, a random in-rotation theme is chosen and applied." />
                         </StackPanel>
                     </Expander>
 
