@@ -2,11 +2,6 @@ using System.ComponentModel;
 
 namespace AndroidMusicPresenceLink
 {
-    /// <summary>
-    /// View-model row for a single Android package in the allowed-apps lists. Shared by the
-    /// main settings window, the apps manager and onboarding. Display formatting is delegated
-    /// to MainWindow.FormatPackageName.
-    /// </summary>
     internal sealed class AppPackageItem : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;

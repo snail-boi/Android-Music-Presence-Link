@@ -4,24 +4,14 @@ using System.Linq;
 
 namespace AndroidMusicPresenceLink
 {
-    /// <summary>
-    /// Single source of truth for the scrcpy audio quality presets.
-    /// Used by the settings window dropdown and the media player's quick quality menu.
-    ///
-    /// A preset describes a target codec/bitrate/buffer/flac-level combo. When the
-    /// user's saved config doesn't match any preset exactly we report it as "Custom".
-    /// </summary>
     public static class AudioQualityPresets
     {
         public const string CustomLabel = "Custom";
 
         public sealed class Preset
         {
-            // Display name shown in dropdowns and on the media player button.
             public string Name { get; init; } = string.Empty;
-            // Short label used on the compact media player button.
             public string ShortName { get; init; } = string.Empty;
-            // One-line description shown in the picker popup.
             public string Description { get; init; } = string.Empty;
             public string Codec { get; init; } = "raw";
             // Empty string means "no explicit bitrate" (e.g. raw, flac).
@@ -86,9 +76,6 @@ namespace AndroidMusicPresenceLink
             },
         };
 
-        /// <summary>
-        /// Finds the preset whose name matches the given display string, or null.
-        /// </summary>
         public static Preset? FindByName(string? name)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -141,17 +128,13 @@ namespace AndroidMusicPresenceLink
             return null;
         }
 
-        /// <summary>
-        /// Applies the preset's values to the given config. Caller is responsible for
-        /// persisting and propagating the change.
-        /// </summary>
         public static void ApplyToConfig(MusicConfig config, Preset preset)
         {
             if (config == null || preset == null) return;
 
             config.ScrcpyAudioCodec = preset.Codec;
             // Empty means "no explicit bitrate"; the launch code already handles that.
-            config.ScrcpyAudioBitrate = preset.Bitrate ?? string.Empty;
+            config.ScrcpyAudioBitrate = preset.Bitrate;
             config.ScrcpyAudioBuffer = preset.BufferMs > 0 ? preset.BufferMs : 80;
 
             if (preset.Codec.Equals("flac", StringComparison.OrdinalIgnoreCase))
@@ -163,10 +146,6 @@ namespace AndroidMusicPresenceLink
         }
 
 
-        /// <summary>
-        /// Writes a fully custom codec/bitrate/buffer/FLAC-level combo into config
-        /// and marks the preset name as "Custom".
-        /// </summary>
         public static void ApplyCustomToConfig(MusicConfig config,
             string codec, string bitrate, int bufferMs, int flacLevel)
         {
@@ -178,10 +157,6 @@ namespace AndroidMusicPresenceLink
             config.AudioQualityPresetName = CustomLabel;
         }
 
-        /// <summary>
-        /// Returns the short display label for the current config: either the preset's
-        /// ShortName, or "Custom" if no preset matches.
-        /// </summary>
         public static string GetShortLabelForConfig(MusicConfig config)
         {
             var matched = MatchFromConfig(config);

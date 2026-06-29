@@ -13,7 +13,6 @@ namespace AndroidMusicPresenceLink
         private const string ProductFolder = "AndroidMusicPresenceLink";
 
         internal static bool IsPortable => File.Exists(Path.Combine(BaseDirectory, "portable.mode"));
-
         internal static string BaseDirectory => Path.GetFullPath(AppContext.BaseDirectory);
 
         internal static string DataRoot => IsPortable
@@ -68,10 +67,9 @@ namespace AndroidMusicPresenceLink
         Full = 2
     }
 
-    // Battery indicator visual styles.
-    //   Classic  = horizontal icon with proportional fill bar + terminal cap (original).
-    //   Pill     = One UI 7 style solid rounded pill, percentage centred, no fill bar/cap.
-    //   Vertical = Classic rotated 90 degrees; percentage is always rendered outside.
+    // Classic  = horizontal icon with proportional fill bar + terminal cap (original).
+    // Pill     = One UI 7 style solid rounded pill, percentage centred, no fill bar/cap.
+    // Vertical = Classic rotated 90 degrees; percentage is always rendered outside.
     public enum BatteryVisualStyle
     {
         Classic = 0,
@@ -79,10 +77,9 @@ namespace AndroidMusicPresenceLink
         Vertical = 2
     }
 
-    // Battery color behaviour.
-    //   Enabled   = green at full, red when critical, theme brush otherwise (original).
-    //   TextColor = always the theme/icon brush, no green/red threshold overrides.
-    //   Disabled  = neutral, no color emphasis at all.
+    // Enabled   = green at full, red when critical, theme brush otherwise (original).
+    // TextColor = always the theme/icon brush, no green/red threshold overrides.
+    // Disabled  = neutral, no color emphasis at all.
     public enum BatteryColorMode
     {
         Enabled = 0,
@@ -116,9 +113,6 @@ namespace AndroidMusicPresenceLink
         BottomRight = 5
     }
 
-    // 0 = show inside media player window
-    // 1 = show as headless overlay (same as when media player is closed)
-    // 2 = off
     public enum MediaPlayerToastMode
     {
         InMediaPlayer = 0,
@@ -126,27 +120,17 @@ namespace AndroidMusicPresenceLink
         Off = 2
     }
 
-    /// <summary>
-    /// User color overrides for a single theme mode (light or dark). Empty strings mean
-    /// "use the built-in default for this mode". Each stored value is a hex color like
-    /// "#2D6CDF". Dependent brushes (control background, border, accent hover/pressed) are
-    /// derived from these in <see cref="App.ApplyTheme(bool)"/>, so the user only ever sets
-    /// the three high-level colors.
-    /// </summary>
     public sealed class ThemeOverrides
     {
-        // Window / page background.
         public string Background { get; set; } = string.Empty;
-        // Primary button / highlight color.
         public string Accent { get; set; } = string.Empty;
-        // Text color.
         public string Foreground { get; set; } = string.Empty;
 
         public ThemeOverrides Clone() => new ThemeOverrides
         {
-            Background = Background ?? string.Empty,
-            Accent = Accent ?? string.Empty,
-            Foreground = Foreground ?? string.Empty
+            Background = Background,
+            Accent = Accent,
+            Foreground = Foreground
         };
 
         public bool ValueEquals(ThemeOverrides? other)
@@ -156,32 +140,20 @@ namespace AndroidMusicPresenceLink
             && string.Equals(Foreground ?? string.Empty, other.Foreground ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// A named theme profile. Unlike <see cref="ThemeOverrides"/> (which layered partial
-    /// overrides on top of a light/dark base), a profile fully specifies the three
-    /// high-level colors. The built-in profiles live in <see cref="BuiltInThemes"/>; the
-    /// user's own profiles are stored in <see cref="MusicConfig.CustomThemes"/>. The active
-    /// profile is referenced by <see cref="MusicConfig.ActiveThemeName"/>. Dependent brushes
-    /// (control background, border, accent hover/pressed) are still derived in
-    /// App.ApplyThemeProfile.
-    /// </summary>
     public sealed class ThemeProfile
     {
-        // Display name. User-created names are capped at MusicConfig.ThemeNameMaxLength.
+        // Capped at ThemeConfig.NameMaxLength for user-created profiles.
         public string Name { get; set; } = string.Empty;
-        // Window / page background.
         public string Background { get; set; } = string.Empty;
-        // Primary button / highlight color.
         public string Accent { get; set; } = string.Empty;
-        // Text color.
         public string Foreground { get; set; } = string.Empty;
 
         public ThemeProfile Clone() => new ThemeProfile
         {
-            Name = Name ?? string.Empty,
-            Background = Background ?? string.Empty,
-            Accent = Accent ?? string.Empty,
-            Foreground = Foreground ?? string.Empty
+            Name = Name,
+            Background = Background,
+            Accent = Accent,
+            Foreground = Foreground
         };
 
         public bool ValueEquals(ThemeProfile? other)
@@ -195,327 +167,377 @@ namespace AndroidMusicPresenceLink
     public sealed class EligibleAppConfig
     {
         public string PackageName { get; set; } = string.Empty;
-
         // Legacy field kept for migration only. New code uses PresenceMode.
         public bool IsEnabled { get; set; } = false;
         public bool EnableCoverSearch { get; set; } = false;
         public PresenceMode PresenceMode { get; set; } = PresenceMode.Off;
     }
 
-    public class MusicConfig
-    {
-        public PathsConfig Paths { get; set; } = new PathsConfig();
-        public string SelectedDeviceUSB { get; set; } = string.Empty;
+    // ── Sub-config classes ─────────────────────────────────────────────────────
 
-        // For TcpIp mode:           "ip:5555" (or whatever fixed port)
-        // For WirelessDebugging:    last-known "ip:port" from the most recent successful connect.
-        //                           This may go stale, in which case we fall back to mDNS lookup
-        //                           via WifiMdnsServiceName.
+    public class PathsConfig
+    {
+        public string Adb { get; set; } = AppPaths.GetResourcePath("adb.exe");
+        public string FfmpegPath { get; set; } = AppPaths.GetResourcePath("ffmpeg.exe");
+        public string Scrcpy { get; set; } = AppPaths.GetResourcePath("scrcpy.exe");
+        public string CoverCachePath { get; set; } = AppPaths.GetDataPath("CoverCache");
+        // Custom image shown in the media player when no cover art is found. Empty = use no image.
+        public string NoCoverIconPath { get; set; } = string.Empty;
+    }
+
+    public class DeviceConfig
+    {
+        public string SelectedDeviceUSB { get; set; } = string.Empty;
+        // For TcpIp: "ip:5555". For WirelessDebugging: last-known "ip:port", may go stale
+        // (falls back to mDNS lookup via MdnsServiceName).
         public string SelectedDeviceWiFi { get; set; } = string.Empty;
         public string SelectedDeviceName { get; set; } = string.Empty;
-
-        // Connection mode for the wireless link. Defaults to WirelessDebugging (Android 11+).
-        // Existing configs with a saved value are unaffected; only fresh installs see this default.
+        // Defaults to WirelessDebugging (Android 11+). Existing configs with a saved value are unaffected.
         public WirelessMode WifiMode { get; set; } = WirelessMode.WirelessDebugging;
+        // mDNS service name from `adb mdns services`, e.g. "adb-XXXXXXXX-XXXXXX".
+        // Stable across reboots once paired. Only used when WifiMode is WirelessDebugging.
+        public string MdnsServiceName { get; set; } = string.Empty;
+        public bool IsWifiEnabled { get; set; } = false;
+    }
 
-        // mDNS service name reported by `adb mdns services`, e.g. "adb-XXXXXXXX-XXXXXX".
-        // Stable across reboots and IP changes once paired. Only used when WifiMode is
-        // WirelessDebugging. Empty for TcpIp.
-        public string WifiMdnsServiceName { get; set; } = string.Empty;
-
+    public class LibraryConfig
+    {
         public string MusicRemoteRoot { get; set; } = string.Empty;
+        public List<string> MusicRemoteRoots { get; set; } = new List<string>();
         public bool RetainDateModifiedOnTagEdit { get; set; } = true;
         public bool SaveLyricsAsLrcInFolder { get; set; } = false;
-        public List<string> MusicRemoteRoots { get; set; } = new List<string>();
-        public UpdateIntervalMode UpdateIntervalMode { get; set; } = UpdateIntervalMode.Extreme;
-        // When enabled, the poll interval gradually slows down after a period of no
-        // activity (no interaction and, while a single track plays, no song change)
-        // and snaps back to the configured interval on the next interaction. Off by
-        // default because it can make song changes and position lag until you interact.
-        public bool AdaptivePollingEnabled { get; set; } = false;
-        // Minutes of inactivity before the first poll slowdown. Playing tracks use
-        // double this value for the first drop; subsequent steps halve this each time.
-        public int AdaptivePollingThresholdMinutes { get; set; } = 5;
-        // Show a passive toast whenever the poll rate steps down.
-        public bool AdaptivePollingAlertEnabled { get; set; } = false;
-        public string IgnoredUpdateVersion { get; set; } = string.Empty;
-        public bool DebugMode { get; set; } = false;
-        public bool UseDarkMode { get; set; } = true;
+        public string LyricsSearchFolderOverride { get; set; } = string.Empty;
+        public string CoverArtFileNamePatterns { get; set; } = "cover.jpg;cover.png;folder.jpg";
+    }
 
-        // Legacy per-mode custom theme colors. Superseded by the theme-profile system
-        // (CustomThemes + ActiveThemeName). Retained only so a one-time migration can
-        // convert a user's old light/dark overrides into named custom profiles; not read
-        // by the live theming engine anymore.
-        public ThemeOverrides LightTheme { get; set; } = new ThemeOverrides();
-        public ThemeOverrides DarkTheme { get; set; } = new ThemeOverrides();
+    public class AppsConfig
+    {
+        public List<string> AllowedApps { get; set; } = new List<string>();
+        public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
+    }
 
-        // Maximum length of a user-created theme name.
-        public const int ThemeNameMaxLength = 30;
+    public class PollingConfig
+    {
+        public UpdateIntervalMode Interval { get; set; } = UpdateIntervalMode.Extreme;
+        // Poll rate gradually slows after inactivity; snaps back on interaction.
+        // Off by default because it can make song changes and position lag until you interact.
+        public bool AdaptiveEnabled { get; set; } = false;
+        // Minutes of inactivity before first slowdown. Playing tracks use double this value.
+        public int AdaptiveThresholdMinutes { get; set; } = 5;
+        public bool AdaptiveAlertEnabled { get; set; } = false;
+    }
 
-        // User-created theme profiles. The built-in profiles (Default Light, Default Dark,
-        // High Contrast) are defined in code (BuiltInThemes) and are not stored here.
-        public List<ThemeProfile> CustomThemes { get; set; } = new List<ThemeProfile>();
+    public class AudioLinkConfig
+    {
+        public string Codec { get; set; } = "raw";
+        public string Bitrate { get; set; } = string.Empty;
+        public int BufferMs { get; set; } = 80;
+        public int FlacCompressionLevel { get; set; } = 2;
+        public List<string> AvailableCodecs { get; set; } = new List<string> { "raw" };
+        public string QualityPresetName { get; set; } = string.Empty;
+        // When false, scrcpy will not automatically restart on connection/transport change or crash.
+        public bool AutoRestartOnConnection { get; set; } = true;
+        // When false, scrcpy will not automatically restart when the audio quality preset changes.
+        public bool AutoRestartOnQualityChange { get; set; } = true;
+        // When false, the mute/unmute keyevents around scrcpy restarts are skipped.
+        public bool Bleedless { get; set; } = true;
+    }
 
-        // Name of the currently active theme (built-in or custom). Empty means "not yet
-        // migrated", which triggers the one-time conversion from UseDarkMode/LightTheme/
-        // DarkTheme in NormalizeConfig.
-        public string ActiveThemeName { get; set; } = string.Empty;
+    public class MediaPlayerConfig
+    {
+        public bool ShowWindow { get; set; } = false;
+        public bool SettingsPaneOpen { get; set; } = false;
+        public bool InlineLyricsViewActive { get; set; } = false;
+        public bool FullscreenActive { get; set; } = false;
+        public bool PlayerSettingsPaneOpen { get; set; } = false;
 
-        // Names of themes the user has removed from the cycle rotation (the top-corner
-        // button). Disabled themes are skipped when cycling but remain selectable directly
-        // so they can be re-enabled. Built-in themes can be disabled this way (instead of
-        // deleted); custom themes are usually deleted outright.
-        public List<string> DisabledThemes { get; set; } = new List<string>();
+        public bool ShowTitle { get; set; } = true;
+        public bool ShowArtist { get; set; } = true;
+        public bool ShowAlbum { get; set; } = true;
+        public bool ShowCover { get; set; } = true;
+        public bool ShowVolumeButton { get; set; } = true;
+        public bool ShowLyricsButton { get; set; } = true;
+        public bool ShowBattery { get; set; } = true;
+        public bool ShowHelpButton { get; set; } = true;
+        public bool ShowFullscreenButton { get; set; } = true;
+        // When true, seek buttons appear only for tracks >= SeekButtonThresholdSeconds.
+        public bool ShowSeekButtons { get; set; } = true;
+        // Minimum track length in seconds before seek buttons appear (default 600 = 10 min).
+        public int SeekButtonThresholdSeconds { get; set; } = 600;
+        // false = elapsed, true = remaining.
+        public bool ShowTimeLeft { get; set; } = false;
 
-        // When true, a random in-rotation theme is chosen and applied at every startup.
-        public bool RandomThemeAtStartup { get; set; } = false;
+        public BatteryVisualStyle BatteryVisualStyle { get; set; } = BatteryVisualStyle.Classic;
+        public bool BatteryShowPercent { get; set; } = true;
+        // Ignored for the Vertical style, which always renders the percentage outside.
+        public bool BatteryPercentInside { get; set; } = true;
+        public bool BatteryShowBolt { get; set; } = true;
+        public bool BatteryBoltInside { get; set; } = true;
+        public BatteryColorMode BatteryColorMode { get; set; } = BatteryColorMode.Enabled;
 
-        public bool OpenInTaskbar { get; set; } = false;
-        public bool StartWithWindows { get; set; } = false;
-        public bool ShowMediaPlayerWindow { get; set; } = false;
-        public bool MediaPlayerSettingsPaneOpen { get; set; } = false;
-        public bool MediaPlayerInlineLyricsViewActive { get; set; } = false;
-        public bool MediaPlayerFullscreenActive { get; set; } = false;
-        public bool MediaPlayerPlayerSettingsPaneOpen { get; set; } = false;
+        public bool SwapArtistAlbum { get; set; } = false;
+        public bool CoverRoundedCorners { get; set; } = true;
+        public bool CoverShadow { get; set; } = false;
+        public bool TextShadow { get; set; } = false;
+        // Valid values: 2, 4, 6, or 8.
+        public int GradientSamplePoints { get; set; } = 8;
+        // When true, main settings pane moves to the right and player settings to the left.
+        public bool SwapSettingsLocation { get; set; } = false;
 
-        // Pill display modes: 0 = Full (icon + text), 1 = Mini (icon only), 2 = Off
+        // 0 = Full (icon + text), 1 = Mini (icon only), 2 = Off
         public int PillModeConnection { get; set; } = 0;
         public int PillModeAudioLink { get; set; } = 0;
         public int PillModeQuality { get; set; } = 0;
         public int PillModeAlwaysOnTop { get; set; } = 0;
 
-        // Track info visibility
-        public bool PlayerShowTitle { get; set; } = true;
-        public bool PlayerShowArtist { get; set; } = true;
-        public bool PlayerShowAlbum { get; set; } = true;
-        public bool PlayerShowCover { get; set; } = true;
-        public bool PlayerShowVolumeButton { get; set; } = true;
-        public bool PlayerShowLyricsButton { get; set; } = true;
-        public bool PlayerShowBattery { get; set; } = true;
-
-        // ── Battery indicator customization ──────────────────────────────────
-        // Visual style of the battery glyph (see BatteryVisualStyle).
-        public BatteryVisualStyle BatteryVisualStyle { get; set; } = BatteryVisualStyle.Classic;
-        // Show the numeric percentage at all.
-        public bool BatteryShowPercent { get; set; } = true;
-        // Percentage placement: true = inside the glyph, false = outside (to the right).
-        // Ignored for the Vertical style, which always renders the percentage outside.
-        public bool BatteryPercentInside { get; set; } = true;
-        // Show the charging lightning bolt at all.
-        public bool BatteryShowBolt { get; set; } = true;
-        // Bolt placement: true = inside the glyph, false = outside.
-        public bool BatteryBoltInside { get; set; } = true;
-        // Color behaviour (see BatteryColorMode).
-        public BatteryColorMode BatteryColorMode { get; set; } = BatteryColorMode.Enabled;
-
-        public bool PlayerShowHelpButton { get; set; } = true;
-        public bool PlayerShowFullscreenButton { get; set; } = true;
-        // When false the seek buttons are always hidden.
-        // When true they appear only for tracks >= PlayerSeekButtonThresholdSeconds.
-        public bool PlayerShowSeekButtons { get; set; } = true;
-        // Minimum track length in seconds before seek buttons appear (default 600 = 10 min).
-        public int PlayerSeekButtonThresholdSeconds { get; set; } = 600;
-        // Persisted time-display toggle: false = elapsed, true = remaining.
-        public bool PlayerShowTimeLeft { get; set; } = false;
-
-        // Shadow effects
-        public bool PlayerCoverShadow { get; set; } = false;
-        public bool PlayerTextShadow { get; set; } = false;
-
-        // Layout
-        public bool PlayerSwapArtistAlbum { get; set; } = false;
-        public bool PlayerCoverRoundedCorners { get; set; } = true;
-
-        // Gradient sample points: 2, 4, 6, or 8
-        public int PlayerGradientSamplePoints { get; set; } = 8;
-
-        // When true the main settings pane moves to the right and player settings to the left.
-        public bool SwapSettingsLocation { get; set; } = false;
-
-        // Main window geometry (migrated from the legacy config.json)
-        public double WindowWidth { get; set; } = 900;
-        public double WindowHeight { get; set; } = 600;
-        public double WindowTop { get; set; } = 100;
-        public double WindowLeft { get; set; } = 100;
-        public System.Windows.WindowState WindowState { get; set; } = System.Windows.WindowState.Normal;
-
-        public double MediaPlayerWindowWidth { get; set; } = 1080;
-        public double MediaPlayerWindowHeight { get; set; } = 760;
-        public double MediaPlayerWindowTop { get; set; } = 100;
-        public double MediaPlayerWindowLeft { get; set; } = 100;
-        public System.Windows.WindowState MediaPlayerWindowState { get; set; } = System.Windows.WindowState.Normal;
-        public string ScrcpyAudioCodec { get; set; } = "raw";
-        public string ScrcpyAudioBitrate { get; set; } = string.Empty;
-        public int ScrcpyAudioBuffer { get; set; } = 80;
-        public int ScrcpyFlacCompressionLevel { get; set; } = 2;
-        public List<string> ScrcpyAvailableAudioCodecs { get; set; } = new List<string> { "raw" };
-        public string AudioQualityPresetName { get; set; } = string.Empty;
-        public int SmtcPauseClearDelayMinutes { get; set; } = 0;
-        public bool IsWifiEnabled { get; set; } = false;
-        public bool OnboardingCompleted { get; set; } = false;
-
-        // Toast / notification popup settings
-        public bool HeadlessToastEnabled { get; set; } = true;
-        public HeadlessToastPosition HeadlessToastPosition { get; set; } = HeadlessToastPosition.TopCenter;
-        public MediaPlayerToastMode MediaPlayerToastMode { get; set; } = MediaPlayerToastMode.InMediaPlayer;
-
-        public int CachClearInMB { get; set; } = 200;
-        public string LyricsSearchFolderOverride { get; set; } = string.Empty;
-        public string CoverArtFileNamePatterns { get; set; } = "cover.jpg;cover.png;folder.jpg";
         public string CopyTrackInfoTemplate { get; set; } = "{artist} - {title}";
+        public int SmtcPauseClearDelayMinutes { get; set; } = 0;
+    }
 
-        // Next/previous song feature
-        public NextSongMode NextSongMode { get; set; } = NextSongMode.Off;
-        public NextSongSortMode NextSongSortMode { get; set; } = NextSongSortMode.FilenameAZ;
+    public class ToastConfig
+    {
+        public bool HeadlessEnabled { get; set; } = true;
+        public HeadlessToastPosition HeadlessPosition { get; set; } = HeadlessToastPosition.TopCenter;
+        public MediaPlayerToastMode MediaPlayerMode { get; set; } = MediaPlayerToastMode.InMediaPlayer;
+    }
 
-        public List<string> AllowedApps { get; set; } = new List<string> { };
-        public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
+    public class NextSongConfig
+    {
+        public NextSongMode Mode { get; set; } = NextSongMode.Off;
+        public NextSongSortMode SortMode { get; set; } = NextSongSortMode.FilenameAZ;
+    }
 
-        public int HotkeyVolumeUpKey { get; set; } = 0xAF;
-        public int HotkeyVolumeDownKey { get; set; } = 0xAE;
-        public int HotkeyToggleScrcpyKey { get; set; } = 0x53;
-        public int HotkeyToggleLyricsOverlayKey { get; set; } = 0x4C;
-        public int HotkeyCopyTrackInfoKey { get; set; } = 0x43;
-        public int HotkeyAudioQualityKey { get; set; } = 0x51;   // Q
-        public int HotkeyModifier { get; set; } = 0x0001;
+    public class ThemeConfig
+    {
+        public const int NameMaxLength = 30;
 
-        // Audio link auto-restart and bleedless behaviour
-        // When false, scrcpy will not automatically restart on connection/transport change or crash.
-        public bool AudioLinkConnectionAutoRestart { get; set; } = true;
-        // When false, scrcpy will not automatically restart when the audio quality preset changes.
-        public bool AudioLinkQualityAutoRestart { get; set; } = true;
-        // When false, the mute/unmute keyevents around scrcpy restarts are skipped.
-        public bool AudioLinkBleedless { get; set; } = true;
+        public bool UseDarkMode { get; set; } = true;
+        // Legacy per-mode overrides. Superseded by the profile system; retained for one-time migration only.
+        public ThemeOverrides LightTheme { get; set; } = new ThemeOverrides();
+        public ThemeOverrides DarkTheme { get; set; } = new ThemeOverrides();
+        // Built-in profiles (Default Light/Dark, High Contrast) are defined in code, not stored here.
+        public List<ThemeProfile> CustomProfiles { get; set; } = new List<ThemeProfile>();
+        // Empty means "not yet migrated"; triggers one-time conversion from UseDarkMode/LightTheme/DarkTheme.
+        public string ActiveProfile { get; set; } = string.Empty;
+        // Profiles removed from the cycle rotation but still selectable directly.
+        public List<string> DisabledProfiles { get; set; } = new List<string>();
+        public bool RandomAtStartup { get; set; } = false;
+    }
+
+    public class HotkeysConfig
+    {
+        public int VolumeUp { get; set; } = 0xAF;
+        public int VolumeDown { get; set; } = 0xAE;
+        public int ToggleScrcpy { get; set; } = 0x53;
+        public int ToggleLyricsOverlay { get; set; } = 0x4C;
+        public int CopyTrackInfo { get; set; } = 0x43;
+        public int AudioQuality { get; set; } = 0x51;
+        public int Modifier { get; set; } = 0x0001;
+    }
+
+    public class MainWindowConfig
+    {
+        public double Width { get; set; } = 900;
+        public double Height { get; set; } = 600;
+        public double Top { get; set; } = 100;
+        public double Left { get; set; } = 100;
+        public System.Windows.WindowState State { get; set; } = System.Windows.WindowState.Normal;
+    }
+
+    public class PlayerWindowConfig
+    {
+        public double Width { get; set; } = 1080;
+        public double Height { get; set; } = 760;
+        public double Top { get; set; } = 100;
+        public double Left { get; set; } = 100;
+        public System.Windows.WindowState State { get; set; } = System.Windows.WindowState.Normal;
+    }
+
+    public class AppSettingsConfig
+    {
+        public bool OpenInTaskbar { get; set; } = false;
+        public bool StartWithWindows { get; set; } = false;
+        public string IgnoredUpdateVersion { get; set; } = string.Empty;
+        public bool OnboardingCompleted { get; set; } = false;
+        public bool DebugMode { get; set; } = false;
+        public int CachClearInMB { get; set; } = 200;
+    }
+
+    // ── Root config ────────────────────────────────────────────────────────────
+
+    public class MusicConfig
+    {
+        public PathsConfig Paths { get; set; } = new PathsConfig();
+        public DeviceConfig Device { get; set; } = new DeviceConfig();
+        public LibraryConfig Library { get; set; } = new LibraryConfig();
+        public AppsConfig Apps { get; set; } = new AppsConfig();
+        public PollingConfig Polling { get; set; } = new PollingConfig();
+        public AudioLinkConfig AudioLink { get; set; } = new AudioLinkConfig();
+        public MediaPlayerConfig MediaPlayer { get; set; } = new MediaPlayerConfig();
+        public ToastConfig Toast { get; set; } = new ToastConfig();
+        public NextSongConfig NextSong { get; set; } = new NextSongConfig();
+        public ThemeConfig Theme { get; set; } = new ThemeConfig();
+        public HotkeysConfig Hotkeys { get; set; } = new HotkeysConfig();
+        public MainWindowConfig MainWindow { get; set; } = new MainWindowConfig();
+        public PlayerWindowConfig PlayerWindow { get; set; } = new PlayerWindowConfig();
+        public AppSettingsConfig AppSettings { get; set; } = new AppSettingsConfig();
 
         public MusicConfig Clone()
         {
-            var source = this;
-            var paths = source.Paths ?? new PathsConfig();
             return new MusicConfig
             {
                 Paths = new PathsConfig
                 {
-                    Adb = paths.Adb,
-                    FfmpegPath = paths.FfmpegPath,
-                    Scrcpy = paths.Scrcpy,
-                    CoverCachePath = paths.CoverCachePath,
-                    NoCoverIconPath = paths.NoCoverIconPath
+                    Adb = Paths.Adb,
+                    FfmpegPath = Paths.FfmpegPath,
+                    Scrcpy = Paths.Scrcpy,
+                    CoverCachePath = Paths.CoverCachePath,
+                    NoCoverIconPath = Paths.NoCoverIconPath
                 },
-                SelectedDeviceUSB = source.SelectedDeviceUSB,
-                SelectedDeviceWiFi = source.SelectedDeviceWiFi,
-                SelectedDeviceName = source.SelectedDeviceName,
-                WifiMode = source.WifiMode,
-                WifiMdnsServiceName = source.WifiMdnsServiceName ?? string.Empty,
-                MusicRemoteRoot = source.MusicRemoteRoot,
-                MusicRemoteRoots = source.MusicRemoteRoots?.ToList() ?? new List<string>(),
-                UpdateIntervalMode = source.UpdateIntervalMode,
-                AdaptivePollingEnabled = source.AdaptivePollingEnabled,
-                AdaptivePollingThresholdMinutes = source.AdaptivePollingThresholdMinutes,
-                AdaptivePollingAlertEnabled = source.AdaptivePollingAlertEnabled,
-                IgnoredUpdateVersion = source.IgnoredUpdateVersion,
-                DebugMode = source.DebugMode,
-                UseDarkMode = source.UseDarkMode,
-                LightTheme = source.LightTheme?.Clone() ?? new ThemeOverrides(),
-                DarkTheme = source.DarkTheme?.Clone() ?? new ThemeOverrides(),
-                CustomThemes = source.CustomThemes?.Select(t => t.Clone()).ToList() ?? new List<ThemeProfile>(),
-                ActiveThemeName = source.ActiveThemeName ?? string.Empty,
-                DisabledThemes = source.DisabledThemes?.ToList() ?? new List<string>(),
-                RandomThemeAtStartup = source.RandomThemeAtStartup,
-                OpenInTaskbar = source.OpenInTaskbar,
-                StartWithWindows = source.StartWithWindows,
-                ShowMediaPlayerWindow = source.ShowMediaPlayerWindow,
-                MediaPlayerSettingsPaneOpen = source.MediaPlayerSettingsPaneOpen,
-                MediaPlayerInlineLyricsViewActive = source.MediaPlayerInlineLyricsViewActive,
-                MediaPlayerFullscreenActive = source.MediaPlayerFullscreenActive,
-                MediaPlayerPlayerSettingsPaneOpen = source.MediaPlayerPlayerSettingsPaneOpen,
-                PillModeConnection = source.PillModeConnection,
-                PillModeAudioLink = source.PillModeAudioLink,
-                PillModeQuality = source.PillModeQuality,
-                PillModeAlwaysOnTop = source.PillModeAlwaysOnTop,
-                PlayerShowTitle = source.PlayerShowTitle,
-                PlayerShowArtist = source.PlayerShowArtist,
-                PlayerShowAlbum = source.PlayerShowAlbum,
-                PlayerShowCover = source.PlayerShowCover,
-                PlayerShowVolumeButton = source.PlayerShowVolumeButton,
-                PlayerShowLyricsButton = source.PlayerShowLyricsButton,
-                PlayerShowBattery = source.PlayerShowBattery,
-                BatteryVisualStyle = source.BatteryVisualStyle,
-                BatteryShowPercent = source.BatteryShowPercent,
-                BatteryPercentInside = source.BatteryPercentInside,
-                BatteryShowBolt = source.BatteryShowBolt,
-                BatteryBoltInside = source.BatteryBoltInside,
-                BatteryColorMode = source.BatteryColorMode,
-                PlayerShowHelpButton = source.PlayerShowHelpButton,
-                PlayerShowFullscreenButton = source.PlayerShowFullscreenButton,
-                PlayerShowSeekButtons = source.PlayerShowSeekButtons,
-                PlayerSeekButtonThresholdSeconds = source.PlayerSeekButtonThresholdSeconds,
-                PlayerShowTimeLeft = source.PlayerShowTimeLeft,
-                PlayerCoverShadow = source.PlayerCoverShadow,
-                PlayerTextShadow = source.PlayerTextShadow,
-                PlayerSwapArtistAlbum = source.PlayerSwapArtistAlbum,
-                PlayerCoverRoundedCorners = source.PlayerCoverRoundedCorners,
-                PlayerGradientSamplePoints = source.PlayerGradientSamplePoints,
-                SwapSettingsLocation = source.SwapSettingsLocation,
-                WindowWidth = source.WindowWidth,
-                WindowHeight = source.WindowHeight,
-                WindowTop = source.WindowTop,
-                WindowLeft = source.WindowLeft,
-                WindowState = source.WindowState,
-                MediaPlayerWindowWidth = source.MediaPlayerWindowWidth,
-                MediaPlayerWindowHeight = source.MediaPlayerWindowHeight,
-                MediaPlayerWindowTop = source.MediaPlayerWindowTop,
-                MediaPlayerWindowLeft = source.MediaPlayerWindowLeft,
-                MediaPlayerWindowState = source.MediaPlayerWindowState,
-                ScrcpyAudioCodec = source.ScrcpyAudioCodec,
-                ScrcpyAudioBitrate = source.ScrcpyAudioBitrate ?? string.Empty,
-                ScrcpyAudioBuffer = source.ScrcpyAudioBuffer,
-                ScrcpyFlacCompressionLevel = source.ScrcpyFlacCompressionLevel,
-                ScrcpyAvailableAudioCodecs = source.ScrcpyAvailableAudioCodecs?.ToList() ?? new List<string>(),
-                AudioQualityPresetName = source.AudioQualityPresetName ?? string.Empty,
-                SmtcPauseClearDelayMinutes = source.SmtcPauseClearDelayMinutes,
-                IsWifiEnabled = source.IsWifiEnabled,
-                OnboardingCompleted = source.OnboardingCompleted,
-                CachClearInMB = source.CachClearInMB,
-                LyricsSearchFolderOverride = source.LyricsSearchFolderOverride ?? string.Empty,
-                CoverArtFileNamePatterns = source.CoverArtFileNamePatterns ?? string.Empty,
-                CopyTrackInfoTemplate = source.CopyTrackInfoTemplate ?? string.Empty,
-                NextSongMode = source.NextSongMode,
-                NextSongSortMode = source.NextSongSortMode,
-                AllowedApps = source.AllowedApps?.ToList() ?? new List<string>(),
-                EligibleApps = source.EligibleApps?.Select(a => new EligibleAppConfig
+                Device = new DeviceConfig
                 {
-                    PackageName = a.PackageName,
-                    IsEnabled = a.IsEnabled,
-                    EnableCoverSearch = a.EnableCoverSearch,
-                    PresenceMode = a.PresenceMode
-                }).ToList() ?? new List<EligibleAppConfig>(),
-                HotkeyVolumeUpKey = source.HotkeyVolumeUpKey,
-                HotkeyVolumeDownKey = source.HotkeyVolumeDownKey,
-                HotkeyToggleScrcpyKey = source.HotkeyToggleScrcpyKey,
-                HotkeyToggleLyricsOverlayKey = source.HotkeyToggleLyricsOverlayKey,
-                HotkeyCopyTrackInfoKey = source.HotkeyCopyTrackInfoKey,
-                HotkeyAudioQualityKey = source.HotkeyAudioQualityKey,
-                HotkeyModifier = source.HotkeyModifier,
-                AudioLinkConnectionAutoRestart = source.AudioLinkConnectionAutoRestart,
-                AudioLinkQualityAutoRestart = source.AudioLinkQualityAutoRestart,
-                AudioLinkBleedless = source.AudioLinkBleedless
+                    SelectedDeviceUSB = Device.SelectedDeviceUSB,
+                    SelectedDeviceWiFi = Device.SelectedDeviceWiFi,
+                    SelectedDeviceName = Device.SelectedDeviceName,
+                    WifiMode = Device.WifiMode,
+                    MdnsServiceName = Device.MdnsServiceName,
+                    IsWifiEnabled = Device.IsWifiEnabled
+                },
+                Library = new LibraryConfig
+                {
+                    MusicRemoteRoot = Library.MusicRemoteRoot,
+                    MusicRemoteRoots = Library.MusicRemoteRoots?.ToList() ?? new List<string>(),
+                    RetainDateModifiedOnTagEdit = Library.RetainDateModifiedOnTagEdit,
+                    SaveLyricsAsLrcInFolder = Library.SaveLyricsAsLrcInFolder,
+                    LyricsSearchFolderOverride = Library.LyricsSearchFolderOverride,
+                    CoverArtFileNamePatterns = Library.CoverArtFileNamePatterns
+                },
+                Apps = new AppsConfig
+                {
+                    AllowedApps = Apps.AllowedApps?.ToList() ?? new List<string>(),
+                    EligibleApps = Apps.EligibleApps?.Select(a => new EligibleAppConfig
+                    {
+                        PackageName = a.PackageName,
+                        IsEnabled = a.IsEnabled,
+                        EnableCoverSearch = a.EnableCoverSearch,
+                        PresenceMode = a.PresenceMode
+                    }).ToList() ?? new List<EligibleAppConfig>()
+                },
+                Polling = new PollingConfig
+                {
+                    Interval = Polling.Interval,
+                    AdaptiveEnabled = Polling.AdaptiveEnabled,
+                    AdaptiveThresholdMinutes = Polling.AdaptiveThresholdMinutes,
+                    AdaptiveAlertEnabled = Polling.AdaptiveAlertEnabled
+                },
+                AudioLink = new AudioLinkConfig
+                {
+                    Codec = AudioLink.Codec,
+                    Bitrate = AudioLink.Bitrate,
+                    BufferMs = AudioLink.BufferMs,
+                    FlacCompressionLevel = AudioLink.FlacCompressionLevel,
+                    AvailableCodecs = AudioLink.AvailableCodecs?.ToList() ?? new List<string>(),
+                    QualityPresetName = AudioLink.QualityPresetName,
+                    AutoRestartOnConnection = AudioLink.AutoRestartOnConnection,
+                    AutoRestartOnQualityChange = AudioLink.AutoRestartOnQualityChange,
+                    Bleedless = AudioLink.Bleedless
+                },
+                MediaPlayer = new MediaPlayerConfig
+                {
+                    ShowWindow = MediaPlayer.ShowWindow,
+                    SettingsPaneOpen = MediaPlayer.SettingsPaneOpen,
+                    InlineLyricsViewActive = MediaPlayer.InlineLyricsViewActive,
+                    FullscreenActive = MediaPlayer.FullscreenActive,
+                    PlayerSettingsPaneOpen = MediaPlayer.PlayerSettingsPaneOpen,
+                    ShowTitle = MediaPlayer.ShowTitle,
+                    ShowArtist = MediaPlayer.ShowArtist,
+                    ShowAlbum = MediaPlayer.ShowAlbum,
+                    ShowCover = MediaPlayer.ShowCover,
+                    ShowVolumeButton = MediaPlayer.ShowVolumeButton,
+                    ShowLyricsButton = MediaPlayer.ShowLyricsButton,
+                    ShowBattery = MediaPlayer.ShowBattery,
+                    ShowHelpButton = MediaPlayer.ShowHelpButton,
+                    ShowFullscreenButton = MediaPlayer.ShowFullscreenButton,
+                    ShowSeekButtons = MediaPlayer.ShowSeekButtons,
+                    SeekButtonThresholdSeconds = MediaPlayer.SeekButtonThresholdSeconds,
+                    ShowTimeLeft = MediaPlayer.ShowTimeLeft,
+                    BatteryVisualStyle = MediaPlayer.BatteryVisualStyle,
+                    BatteryShowPercent = MediaPlayer.BatteryShowPercent,
+                    BatteryPercentInside = MediaPlayer.BatteryPercentInside,
+                    BatteryShowBolt = MediaPlayer.BatteryShowBolt,
+                    BatteryBoltInside = MediaPlayer.BatteryBoltInside,
+                    BatteryColorMode = MediaPlayer.BatteryColorMode,
+                    SwapArtistAlbum = MediaPlayer.SwapArtistAlbum,
+                    CoverRoundedCorners = MediaPlayer.CoverRoundedCorners,
+                    CoverShadow = MediaPlayer.CoverShadow,
+                    TextShadow = MediaPlayer.TextShadow,
+                    GradientSamplePoints = MediaPlayer.GradientSamplePoints,
+                    SwapSettingsLocation = MediaPlayer.SwapSettingsLocation,
+                    PillModeConnection = MediaPlayer.PillModeConnection,
+                    PillModeAudioLink = MediaPlayer.PillModeAudioLink,
+                    PillModeQuality = MediaPlayer.PillModeQuality,
+                    PillModeAlwaysOnTop = MediaPlayer.PillModeAlwaysOnTop,
+                    CopyTrackInfoTemplate = MediaPlayer.CopyTrackInfoTemplate,
+                    SmtcPauseClearDelayMinutes = MediaPlayer.SmtcPauseClearDelayMinutes
+                },
+                Toast = new ToastConfig
+                {
+                    HeadlessEnabled = Toast.HeadlessEnabled,
+                    HeadlessPosition = Toast.HeadlessPosition,
+                    MediaPlayerMode = Toast.MediaPlayerMode
+                },
+                NextSong = new NextSongConfig
+                {
+                    Mode = NextSong.Mode,
+                    SortMode = NextSong.SortMode
+                },
+                Theme = new ThemeConfig
+                {
+                    UseDarkMode = Theme.UseDarkMode,
+                    LightTheme = Theme.LightTheme?.Clone() ?? new ThemeOverrides(),
+                    DarkTheme = Theme.DarkTheme?.Clone() ?? new ThemeOverrides(),
+                    CustomProfiles = Theme.CustomProfiles?.Select(t => t.Clone()).ToList() ?? new List<ThemeProfile>(),
+                    ActiveProfile = Theme.ActiveProfile,
+                    DisabledProfiles = Theme.DisabledProfiles?.ToList() ?? new List<string>(),
+                    RandomAtStartup = Theme.RandomAtStartup
+                },
+                Hotkeys = new HotkeysConfig
+                {
+                    VolumeUp = Hotkeys.VolumeUp,
+                    VolumeDown = Hotkeys.VolumeDown,
+                    ToggleScrcpy = Hotkeys.ToggleScrcpy,
+                    ToggleLyricsOverlay = Hotkeys.ToggleLyricsOverlay,
+                    CopyTrackInfo = Hotkeys.CopyTrackInfo,
+                    AudioQuality = Hotkeys.AudioQuality,
+                    Modifier = Hotkeys.Modifier
+                },
+                MainWindow = new MainWindowConfig
+                {
+                    Width = MainWindow.Width,
+                    Height = MainWindow.Height,
+                    Top = MainWindow.Top,
+                    Left = MainWindow.Left,
+                    State = MainWindow.State
+                },
+                PlayerWindow = new PlayerWindowConfig
+                {
+                    Width = PlayerWindow.Width,
+                    Height = PlayerWindow.Height,
+                    Top = PlayerWindow.Top,
+                    Left = PlayerWindow.Left,
+                    State = PlayerWindow.State
+                },
+                AppSettings = new AppSettingsConfig
+                {
+                    OpenInTaskbar = AppSettings.OpenInTaskbar,
+                    StartWithWindows = AppSettings.StartWithWindows,
+                    IgnoredUpdateVersion = AppSettings.IgnoredUpdateVersion,
+                    OnboardingCompleted = AppSettings.OnboardingCompleted,
+                    DebugMode = AppSettings.DebugMode,
+                    CachClearInMB = AppSettings.CachClearInMB
+                }
             };
         }
-    }
-
-    public class PathsConfig
-    {
-        public string Adb { get; set; } = AppPaths.GetResourcePath("adb.exe");
-
-        public string FfmpegPath { get; set; } = AppPaths.GetResourcePath("ffmpeg.exe");
-
-        public string Scrcpy { get; set; } = AppPaths.GetResourcePath("scrcpy.exe");
-
-        public string CoverCachePath { get; set; } = AppPaths.GetDataPath("CoverCache");
-
-        // Custom image shown in the media player when no cover art is found.
-        // Empty string means use no image (default behaviour).
-        public string NoCoverIconPath { get; set; } = string.Empty;
     }
 
     public static class MusicConfigManager
@@ -539,8 +561,7 @@ namespace AndroidMusicPresenceLink
                         return Finalize(loaded);
                 }
 
-                var fresh = new MusicConfig();
-                return Finalize(fresh);
+                return Finalize(new MusicConfig());
             }
             catch
             {
@@ -567,26 +588,40 @@ namespace AndroidMusicPresenceLink
         private static MusicConfig NormalizeConfig(MusicConfig config)
         {
             config.Paths ??= new PathsConfig();
-            config.LightTheme ??= new ThemeOverrides();
-            config.DarkTheme ??= new ThemeOverrides();
-            config.CustomThemes ??= new List<ThemeProfile>();
-            config.DisabledThemes ??= new List<string>();
+            config.Device ??= new DeviceConfig();
+            config.Library ??= new LibraryConfig();
+            config.Apps ??= new AppsConfig();
+            config.Polling ??= new PollingConfig();
+            config.AudioLink ??= new AudioLinkConfig();
+            config.MediaPlayer ??= new MediaPlayerConfig();
+            config.Toast ??= new ToastConfig();
+            config.NextSong ??= new NextSongConfig();
+            config.Theme ??= new ThemeConfig();
+            config.Hotkeys ??= new HotkeysConfig();
+            config.MainWindow ??= new MainWindowConfig();
+            config.PlayerWindow ??= new PlayerWindowConfig();
+            config.AppSettings ??= new AppSettingsConfig();
+
+            config.Theme.LightTheme ??= new ThemeOverrides();
+            config.Theme.DarkTheme ??= new ThemeOverrides();
+            config.Theme.CustomProfiles ??= new List<ThemeProfile>();
+            config.Theme.DisabledProfiles ??= new List<string>();
             MigrateThemes(config);
-            config.AllowedApps ??= new List<string>();
-            config.EligibleApps ??= new List<EligibleAppConfig>();
-            config.MusicRemoteRoots ??= new List<string>();
-            config.WifiMdnsServiceName ??= string.Empty;
-            if (!Enum.IsDefined(typeof(UpdateIntervalMode), config.UpdateIntervalMode))
-            {
-                config.UpdateIntervalMode = UpdateIntervalMode.Extreme;
-            }
 
-            if (config.AdaptivePollingThresholdMinutes < 1)
-                config.AdaptivePollingThresholdMinutes = 1;
+            config.Apps.AllowedApps ??= new List<string>();
+            config.Apps.EligibleApps ??= new List<EligibleAppConfig>();
+            config.Library.MusicRemoteRoots ??= new List<string>();
+            config.Device.MdnsServiceName ??= string.Empty;
 
-            if (config.EligibleApps.Count == 0 && config.AllowedApps.Count > 0)
+            if (!Enum.IsDefined(typeof(UpdateIntervalMode), config.Polling.Interval))
+                config.Polling.Interval = UpdateIntervalMode.Extreme;
+
+            if (config.Polling.AdaptiveThresholdMinutes < 1)
+                config.Polling.AdaptiveThresholdMinutes = 1;
+
+            if (config.Apps.EligibleApps.Count == 0 && config.Apps.AllowedApps.Count > 0)
             {
-                config.EligibleApps = config.AllowedApps
+                config.Apps.EligibleApps = config.Apps.AllowedApps
                     .Where(a => !string.IsNullOrWhiteSpace(a))
                     .Select(a => a.Trim())
                     .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -599,9 +634,9 @@ namespace AndroidMusicPresenceLink
                     .ToList();
             }
 
-            if (config.EligibleApps.Count == 0)
+            if (config.Apps.EligibleApps.Count == 0)
             {
-                config.EligibleApps.Add(new EligibleAppConfig
+                config.Apps.EligibleApps.Add(new EligibleAppConfig
                 {
                     PackageName = "in.krosbits.musicolet",
                     PresenceMode = PresenceMode.Full,
@@ -609,7 +644,7 @@ namespace AndroidMusicPresenceLink
                 });
             }
 
-            config.EligibleApps = config.EligibleApps
+            config.Apps.EligibleApps = config.Apps.EligibleApps
                 .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
                 .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
                 .Select(g =>
@@ -629,84 +664,82 @@ namespace AndroidMusicPresenceLink
                 })
                 .ToList();
 
-            config.AllowedApps = config.EligibleApps
+            config.Apps.AllowedApps = config.Apps.EligibleApps
                 .Where(a => a.PresenceMode != PresenceMode.Off)
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            var normalizedRoots = config.MusicRemoteRoots
+            var normalizedRoots = config.Library.MusicRemoteRoots
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (normalizedRoots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
-            {
-                normalizedRoots.Add(config.MusicRemoteRoot.Trim());
-            }
+            if (normalizedRoots.Count == 0 && !string.IsNullOrWhiteSpace(config.Library.MusicRemoteRoot))
+                normalizedRoots.Add(config.Library.MusicRemoteRoot.Trim());
 
-            config.MusicRemoteRoots = normalizedRoots;
-            config.MusicRemoteRoot = normalizedRoots.FirstOrDefault() ?? string.Empty;
+            config.Library.MusicRemoteRoots = normalizedRoots;
+            config.Library.MusicRemoteRoot = normalizedRoots.FirstOrDefault() ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(config.ScrcpyAudioCodec))
-                config.ScrcpyAudioCodec = "raw";
+            if (string.IsNullOrWhiteSpace(config.AudioLink.Codec))
+                config.AudioLink.Codec = "raw";
 
-            if (config.ScrcpyAudioBitrate == null)
-                config.ScrcpyAudioBitrate = string.Empty;
+            config.AudioLink.Bitrate ??= string.Empty;
 
-            if (config.ScrcpyAudioBuffer <= 0)
-                config.ScrcpyAudioBuffer = 50;
+            if (config.AudioLink.BufferMs <= 0)
+                config.AudioLink.BufferMs = 50;
 
-            if (config.ScrcpyFlacCompressionLevel < 1)
-                config.ScrcpyFlacCompressionLevel = 1;
-            else if (config.ScrcpyFlacCompressionLevel > 8)
-                config.ScrcpyFlacCompressionLevel = 8;
+            if (config.AudioLink.FlacCompressionLevel < 1)
+                config.AudioLink.FlacCompressionLevel = 1;
+            else if (config.AudioLink.FlacCompressionLevel > 8)
+                config.AudioLink.FlacCompressionLevel = 8;
 
-            config.ScrcpyAvailableAudioCodecs ??= new List<string>();
-            if (config.ScrcpyAvailableAudioCodecs.Count == 0)
-                config.ScrcpyAvailableAudioCodecs.Add("raw");
+            config.AudioLink.AvailableCodecs ??= new List<string>();
+            if (config.AudioLink.AvailableCodecs.Count == 0)
+                config.AudioLink.AvailableCodecs.Add("raw");
 
-            config.LyricsSearchFolderOverride ??= string.Empty;
-            config.LyricsSearchFolderOverride = config.LyricsSearchFolderOverride.Trim();
+            config.Library.LyricsSearchFolderOverride ??= string.Empty;
+            config.Library.LyricsSearchFolderOverride = config.Library.LyricsSearchFolderOverride.Trim();
 
-            config.CoverArtFileNamePatterns ??= "cover.jpg;cover.png;folder.jpg";
-            config.CoverArtFileNamePatterns = config.CoverArtFileNamePatterns.Trim();
-            if (string.IsNullOrWhiteSpace(config.CoverArtFileNamePatterns))
-                config.CoverArtFileNamePatterns = "cover.jpg;cover.png;folder.jpg";
+            config.Library.CoverArtFileNamePatterns ??= "cover.jpg;cover.png;folder.jpg";
+            config.Library.CoverArtFileNamePatterns = config.Library.CoverArtFileNamePatterns.Trim();
+            if (string.IsNullOrWhiteSpace(config.Library.CoverArtFileNamePatterns))
+                config.Library.CoverArtFileNamePatterns = "cover.jpg;cover.png;folder.jpg";
 
-            config.CopyTrackInfoTemplate ??= "{artist} - {title}";
-            config.CopyTrackInfoTemplate = config.CopyTrackInfoTemplate.Trim();
-            if (string.IsNullOrWhiteSpace(config.CopyTrackInfoTemplate))
-                config.CopyTrackInfoTemplate = "{artist} - {title}";
+            config.MediaPlayer.CopyTrackInfoTemplate ??= "{artist} - {title}";
+            config.MediaPlayer.CopyTrackInfoTemplate = config.MediaPlayer.CopyTrackInfoTemplate.Trim();
+            if (string.IsNullOrWhiteSpace(config.MediaPlayer.CopyTrackInfoTemplate))
+                config.MediaPlayer.CopyTrackInfoTemplate = "{artist} - {title}";
 
-            if (config.SmtcPauseClearDelayMinutes < 0)
-                config.SmtcPauseClearDelayMinutes = 0;
+            if (config.MediaPlayer.SmtcPauseClearDelayMinutes < 0)
+                config.MediaPlayer.SmtcPauseClearDelayMinutes = 0;
 
-            if (config.HotkeyVolumeUpKey < 0 || config.HotkeyVolumeUpKey > 0xFF)
-                config.HotkeyVolumeUpKey = 0xAF;
-            if (config.HotkeyVolumeDownKey < 0 || config.HotkeyVolumeDownKey > 0xFF)
-                config.HotkeyVolumeDownKey = 0xAE;
-            if (config.HotkeyToggleScrcpyKey < 0 || config.HotkeyToggleScrcpyKey > 0xFF)
-                config.HotkeyToggleScrcpyKey = 0x53;
-            if (config.HotkeyToggleLyricsOverlayKey < 0 || config.HotkeyToggleLyricsOverlayKey > 0xFF)
-                config.HotkeyToggleLyricsOverlayKey = 0x4C;
-            if (config.HotkeyCopyTrackInfoKey < 0 || config.HotkeyCopyTrackInfoKey > 0xFF)
-                config.HotkeyCopyTrackInfoKey = 0x43;
-            if (config.HotkeyAudioQualityKey < 0 || config.HotkeyAudioQualityKey > 0xFF)
-                config.HotkeyAudioQualityKey = 0x51;
+            if (config.Hotkeys.VolumeUp < 0 || config.Hotkeys.VolumeUp > 0xFF)
+                config.Hotkeys.VolumeUp = 0xAF;
+            if (config.Hotkeys.VolumeDown < 0 || config.Hotkeys.VolumeDown > 0xFF)
+                config.Hotkeys.VolumeDown = 0xAE;
+            if (config.Hotkeys.ToggleScrcpy < 0 || config.Hotkeys.ToggleScrcpy > 0xFF)
+                config.Hotkeys.ToggleScrcpy = 0x53;
+            if (config.Hotkeys.ToggleLyricsOverlay < 0 || config.Hotkeys.ToggleLyricsOverlay > 0xFF)
+                config.Hotkeys.ToggleLyricsOverlay = 0x4C;
+            if (config.Hotkeys.CopyTrackInfo < 0 || config.Hotkeys.CopyTrackInfo > 0xFF)
+                config.Hotkeys.CopyTrackInfo = 0x43;
+            if (config.Hotkeys.AudioQuality < 0 || config.Hotkeys.AudioQuality > 0xFF)
+                config.Hotkeys.AudioQuality = 0x51;
 
             var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };
-            if (!allowedMods.Contains(config.HotkeyModifier)) config.HotkeyModifier = 0x0001;
+            if (!allowedMods.Contains(config.Hotkeys.Modifier))
+                config.Hotkeys.Modifier = 0x0001;
 
             var allowedGradientPoints = new[] { 2, 4, 6, 8 };
-            if (!allowedGradientPoints.Contains(config.PlayerGradientSamplePoints))
-                config.PlayerGradientSamplePoints = 8;
+            if (!allowedGradientPoints.Contains(config.MediaPlayer.GradientSamplePoints))
+                config.MediaPlayer.GradientSamplePoints = 8;
 
-            if (!Enum.IsDefined(typeof(BatteryVisualStyle), config.BatteryVisualStyle))
-                config.BatteryVisualStyle = BatteryVisualStyle.Classic;
-            if (!Enum.IsDefined(typeof(BatteryColorMode), config.BatteryColorMode))
-                config.BatteryColorMode = BatteryColorMode.Enabled;
+            if (!Enum.IsDefined(typeof(BatteryVisualStyle), config.MediaPlayer.BatteryVisualStyle))
+                config.MediaPlayer.BatteryVisualStyle = BatteryVisualStyle.Classic;
+            if (!Enum.IsDefined(typeof(BatteryColorMode), config.MediaPlayer.BatteryColorMode))
+                config.MediaPlayer.BatteryColorMode = BatteryColorMode.Enabled;
 
             // Sanity: WirelessDebugging without a service name is functionally broken,
             // but we don't auto-rewrite to TcpIp because the user may be mid-pairing.
@@ -715,14 +748,12 @@ namespace AndroidMusicPresenceLink
             return config;
         }
 
-        // One-time migration from the old light/dark-toggle theming to the theme-profile
-        // system. Runs only when ActiveThemeName is empty (i.e. a config saved before the
-        // profile system existed). A user who had customized their light and/or dark colors
-        // gets those preserved as named custom profiles ("Custom Light" / "Custom Dark"),
-        // and the active theme is chosen to match whatever they were last looking at.
+        // One-time migration from the old light/dark-toggle theming to the theme-profile system.
+        // Runs only when ActiveProfile is empty (configs saved before the profile system existed).
+        // Customized light/dark colors are preserved as named profiles ("Custom Light" / "Custom Dark").
         private static void MigrateThemes(MusicConfig config)
         {
-            if (!string.IsNullOrWhiteSpace(config.ActiveThemeName))
+            if (!string.IsNullOrWhiteSpace(config.Theme.ActiveProfile))
                 return;
 
             bool HasAnyColor(ThemeOverrides? o) => o != null &&
@@ -730,18 +761,18 @@ namespace AndroidMusicPresenceLink
                  || !string.IsNullOrWhiteSpace(o.Accent)
                  || !string.IsNullOrWhiteSpace(o.Foreground));
 
-            bool lightCustom = HasAnyColor(config.LightTheme);
-            bool darkCustom = HasAnyColor(config.DarkTheme);
+            bool lightCustom = HasAnyColor(config.Theme.LightTheme);
+            bool darkCustom = HasAnyColor(config.Theme.DarkTheme);
 
             if (lightCustom)
-                config.CustomThemes.Add(BuiltInThemes.ProfileFromOverrides("Custom Light", config.LightTheme!, isDark: false));
+                config.Theme.CustomProfiles.Add(BuiltInThemes.ProfileFromOverrides("Custom Light", config.Theme.LightTheme!, isDark: false));
             if (darkCustom)
-                config.CustomThemes.Add(BuiltInThemes.ProfileFromOverrides("Custom Dark", config.DarkTheme!, isDark: true));
+                config.Theme.CustomProfiles.Add(BuiltInThemes.ProfileFromOverrides("Custom Dark", config.Theme.DarkTheme!, isDark: true));
 
-            if (config.UseDarkMode)
-                config.ActiveThemeName = darkCustom ? "Custom Dark" : BuiltInThemes.DefaultDark.Name;
+            if (config.Theme.UseDarkMode)
+                config.Theme.ActiveProfile = darkCustom ? "Custom Dark" : BuiltInThemes.DefaultDark.Name;
             else
-                config.ActiveThemeName = lightCustom ? "Custom Light" : BuiltInThemes.DefaultLight.Name;
+                config.Theme.ActiveProfile = lightCustom ? "Custom Light" : BuiltInThemes.DefaultLight.Name;
         }
 
         private static MusicConfig Finalize(MusicConfig config)
@@ -751,10 +782,8 @@ namespace AndroidMusicPresenceLink
             return config;
         }
 
-        // One-time migration of the old config.json (which only ever stored the main
-        // window geometry) into the unified musicconfig.json. The legacy file is removed
-        // afterwards so this never runs twice. Losing it is harmless: it is window
-        // position data only.
+        // One-time migration of the old config.json (window geometry only) into musicconfig.json.
+        // The legacy file is removed afterwards so this never runs twice. Losing it is harmless.
         private static void MigrateLegacyWindowConfig(MusicConfig config)
         {
             try
@@ -774,21 +803,21 @@ namespace AndroidMusicPresenceLink
                     var root = doc.RootElement;
 
                     if (root.TryGetProperty("WindowWidth", out var w) && w.TryGetDouble(out var wd) && wd > 0)
-                        config.WindowWidth = wd;
+                        config.MainWindow.Width = wd;
                     if (root.TryGetProperty("WindowHeight", out var h) && h.TryGetDouble(out var hd) && hd > 0)
-                        config.WindowHeight = hd;
+                        config.MainWindow.Height = hd;
                     if (root.TryGetProperty("WindowTop", out var tp) && tp.TryGetDouble(out var tpd))
-                        config.WindowTop = tpd;
+                        config.MainWindow.Top = tpd;
                     if (root.TryGetProperty("WindowLeft", out var lf) && lf.TryGetDouble(out var lfd))
-                        config.WindowLeft = lfd;
+                        config.MainWindow.Left = lfd;
                     if (root.TryGetProperty("WindowState", out var st))
                     {
                         if (st.ValueKind == JsonValueKind.Number && st.TryGetInt32(out var si)
                             && Enum.IsDefined(typeof(System.Windows.WindowState), si))
-                            config.WindowState = (System.Windows.WindowState)si;
+                            config.MainWindow.State = (System.Windows.WindowState)si;
                         else if (st.ValueKind == JsonValueKind.String
                             && Enum.TryParse<System.Windows.WindowState>(st.GetString(), out var se))
-                            config.WindowState = se;
+                            config.MainWindow.State = se;
                     }
 
                     Save(config);
