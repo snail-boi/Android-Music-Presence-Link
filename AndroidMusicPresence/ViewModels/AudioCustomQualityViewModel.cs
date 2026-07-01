@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace AndroidMusicPresenceLink
@@ -70,17 +70,17 @@ namespace AndroidMusicPresenceLink
             Presets = options;
 
             // Seed the editable fields from current config.
-            string codec = string.IsNullOrWhiteSpace(current.ScrcpyAudioCodec)
+            string codec = string.IsNullOrWhiteSpace(current.AudioLink.Codec)
                 ? "raw"
-                : current.ScrcpyAudioCodec.Trim().ToLowerInvariant();
+                : current.AudioLink.Codec.Trim().ToLowerInvariant();
             if (codec != "opus" && codec != "flac" && codec != "raw")
                 codec = "opus";
 
             _suppressSync = true;
             _selectedCodec = codec;
-            Bitrate = current.ScrcpyAudioBitrate ?? string.Empty;
-            Buffer = (current.ScrcpyAudioBuffer > 0 ? current.ScrcpyAudioBuffer : 80).ToString();
-            FlacLevel = Math.Clamp(current.ScrcpyFlacCompressionLevel, 1, 8).ToString();
+            Bitrate = current.AudioLink.Bitrate ?? string.Empty;
+            Buffer = (current.AudioLink.BufferMs > 0 ? current.AudioLink.BufferMs : 80).ToString();
+            FlacLevel = Math.Clamp(current.AudioLink.FlacCompressionLevel, 1, 8).ToString();
 
             // Select the preset that matches the current config, or Custom if none match.
             // Done under suppression so it does not overwrite the fields we just seeded.

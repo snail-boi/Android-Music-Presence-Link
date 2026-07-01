@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -72,16 +72,16 @@ namespace AndroidMusicPresenceLink
 
             if (app.IsMediaPlayerModeActive())
             {
-                _config.ShowMediaPlayerWindow = false;
+                _config.MediaPlayer.ShowWindow = false;
                 MusicConfigManager.Save(_config);
-                _savedConfig.ShowMediaPlayerWindow = false;
+                _savedConfig.MediaPlayer.ShowWindow = false;
                 app.GoBackToSettingsWindow();
             }
             else
             {
-                _config.ShowMediaPlayerWindow = true;
+                _config.MediaPlayer.ShowWindow = true;
                 MusicConfigManager.Save(_config);
-                _savedConfig.ShowMediaPlayerWindow = true;
+                _savedConfig.MediaPlayer.ShowWindow = true;
                 app.ShowMediaPlayerWindowNow();
             }
 
@@ -95,8 +95,8 @@ namespace AndroidMusicPresenceLink
                 var manager = new CoverCacheManager(
                     _config.Paths.FfmpegPath,
                     _config.Paths.CoverCachePath,
-                    _config.CachClearInMB,
-                    _config.CoverArtFileNamePatterns);
+                    _config.AppSettings.CachClearInMB,
+                    _config.Library.CoverArtFileNamePatterns);
                 manager.ClearCache();
                 LyricsCache.ClearAll();
                 Interaction?.ShowInfo("Media cache cleared.", "Cache");

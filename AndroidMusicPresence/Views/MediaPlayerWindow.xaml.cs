@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -206,11 +206,11 @@ namespace AndroidMusicPresenceLink
             base.OnSourceInitialized(e);
 
             var config = App.Config;
-            Width = config.MediaPlayerWindowWidth;
-            Height = config.MediaPlayerWindowHeight;
-            Top = config.MediaPlayerWindowTop;
-            Left = config.MediaPlayerWindowLeft;
-            WindowState = config.MediaPlayerWindowState;
+            Width = config.PlayerWindow.Width;
+            Height = config.PlayerWindow.Height;
+            Top = config.PlayerWindow.Top;
+            Left = config.PlayerWindow.Left;
+            WindowState = config.PlayerWindow.State;
         }
 
         private void MediaPlayerWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -259,14 +259,14 @@ namespace AndroidMusicPresenceLink
                 WindowState = WindowState.Normal;
 
             var config = App.Config;
-            config.MediaPlayerSettingsPaneOpen = _panesSwapped ? _playerSettingsPaneOpen : _settingsPaneOpen;
-            config.MediaPlayerInlineLyricsViewActive = _lyricsViewActive;
-            config.MediaPlayerFullscreenActive = _isFullscreen;
-            config.MediaPlayerWindowState = WindowState;
-            config.MediaPlayerWindowWidth = SanitizeBound(RestoreBounds.Width, 1080);
-            config.MediaPlayerWindowHeight = SanitizeBound(RestoreBounds.Height, 760);
-            config.MediaPlayerWindowTop = SanitizeBound(RestoreBounds.Top, 100);
-            config.MediaPlayerWindowLeft = SanitizeBound(RestoreBounds.Left, 100);
+            config.MediaPlayer.SettingsPaneOpen = _panesSwapped ? _playerSettingsPaneOpen : _settingsPaneOpen;
+            config.MediaPlayer.InlineLyricsViewActive = _lyricsViewActive;
+            config.MediaPlayer.FullscreenActive = _isFullscreen;
+            config.PlayerWindow.State = WindowState;
+            config.PlayerWindow.Width = SanitizeBound(RestoreBounds.Width, 1080);
+            config.PlayerWindow.Height = SanitizeBound(RestoreBounds.Height, 760);
+            config.PlayerWindow.Top = SanitizeBound(RestoreBounds.Top, 100);
+            config.PlayerWindow.Left = SanitizeBound(RestoreBounds.Left, 100);
 
             MusicConfigManager.Save(config);
         }
@@ -335,7 +335,7 @@ namespace AndroidMusicPresenceLink
 
             // Main settings pane: restore saved state, mapped to the correct physical column.
             // When swapped, main settings is in the right column.
-            bool openMainSettings = config.MediaPlayerSettingsPaneOpen;
+            bool openMainSettings = config.MediaPlayer.SettingsPaneOpen;
             if (_panesSwapped)
             {
                 CollapseSettingsPane();
@@ -347,13 +347,13 @@ namespace AndroidMusicPresenceLink
                 CollapsePlayerSettingsPane();
             }
 
-            if (_lyricsViewActive != config.MediaPlayerInlineLyricsViewActive)
+            if (_lyricsViewActive != config.MediaPlayer.InlineLyricsViewActive)
                 ToggleInlineLyricsView();
 
-            _showTimeLeft = config.PlayerShowTimeLeft;
+            _showTimeLeft = config.MediaPlayer.ShowTimeLeft;
             RefreshPositionLabel();
 
-            SetFullscreenActive(config.MediaPlayerFullscreenActive);
+            SetFullscreenActive(config.MediaPlayer.FullscreenActive);
         }
 
         private void BtnCollapseSettingsPane_Click(object sender, RoutedEventArgs e)
@@ -569,9 +569,9 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
-                App.Config.MediaPlayerSettingsPaneOpen = _panesSwapped ? _playerSettingsPaneOpen : _settingsPaneOpen;
-                App.Config.MediaPlayerInlineLyricsViewActive = _lyricsViewActive;
-                App.Config.MediaPlayerFullscreenActive = _isFullscreen;
+                App.Config.MediaPlayer.SettingsPaneOpen = _panesSwapped ? _playerSettingsPaneOpen : _settingsPaneOpen;
+                App.Config.MediaPlayer.InlineLyricsViewActive = _lyricsViewActive;
+                App.Config.MediaPlayer.FullscreenActive = _isFullscreen;
                 MusicConfigManager.Save(App.Config);
                 (Application.Current as App)?.UpdateConfig(App.Config);
             }
@@ -858,46 +858,46 @@ namespace AndroidMusicPresenceLink
 
             var c = App.Config;
 
-            TxtTitle.Visibility = c.PlayerShowTitle ? Visibility.Visible : Visibility.Collapsed;
-            TxtArtist.Visibility = c.PlayerShowArtist ? Visibility.Visible : Visibility.Collapsed;
-            TxtAlbum.Visibility = c.PlayerShowAlbum ? Visibility.Visible : Visibility.Collapsed;
+            TxtTitle.Visibility = c.MediaPlayer.ShowTitle ? Visibility.Visible : Visibility.Collapsed;
+            TxtArtist.Visibility = c.MediaPlayer.ShowArtist ? Visibility.Visible : Visibility.Collapsed;
+            TxtAlbum.Visibility = c.MediaPlayer.ShowAlbum ? Visibility.Visible : Visibility.Collapsed;
 
-            Grid.SetRow(TxtArtist, c.PlayerSwapArtistAlbum ? 3 : 2);
-            Grid.SetRow(TxtAlbum, c.PlayerSwapArtistAlbum ? 2 : 3);
-            TxtArtist.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 10) : new Thickness(0, 0, 0, 2);
-            TxtAlbum.Margin = c.PlayerSwapArtistAlbum ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 0, 10);
+            Grid.SetRow(TxtArtist, c.MediaPlayer.SwapArtistAlbum ? 3 : 2);
+            Grid.SetRow(TxtAlbum, c.MediaPlayer.SwapArtistAlbum ? 2 : 3);
+            TxtArtist.Margin = c.MediaPlayer.SwapArtistAlbum ? new Thickness(0, 0, 0, 10) : new Thickness(0, 0, 0, 2);
+            TxtAlbum.Margin = c.MediaPlayer.SwapArtistAlbum ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 0, 10);
 
             if (CoverViewbox != null)
             {
-                CoverViewbox.Visibility = c.PlayerShowCover ? Visibility.Visible : Visibility.Collapsed;
-                CoverViewbox.Effect = c.PlayerCoverShadow
+                CoverViewbox.Visibility = c.MediaPlayer.ShowCover ? Visibility.Visible : Visibility.Collapsed;
+                CoverViewbox.Effect = c.MediaPlayer.CoverShadow
                     ? new DropShadowEffect { Color = Colors.Black, BlurRadius = 32, ShadowDepth = 8, Opacity = 0.55, Direction = 315 }
                     : null;
             }
-            double coverRadius = c.PlayerCoverRoundedCorners ? 10 : 0;
+            double coverRadius = c.MediaPlayer.CoverRoundedCorners ? 10 : 0;
             CoverBorder.CornerRadius = new CornerRadius(coverRadius);
             CoverImageGrid.Clip = coverRadius > 0
                 ? new RectangleGeometry(new Rect(0, 0, 420, 420), coverRadius, coverRadius)
                 : null;
 
-            var textShadow = c.PlayerTextShadow
+            var textShadow = c.MediaPlayer.TextShadow
                 ? new DropShadowEffect { Color = Colors.Black, BlurRadius = 12, ShadowDepth = 1, Opacity = 0.65, Direction = 270 }
                 : null;
             TxtTitle.Effect = textShadow;
             TxtArtist.Effect = textShadow;
             TxtAlbum.Effect = textShadow;
 
-            ApplyPillMode(BtnConnectionInfo, c.PillModeConnection);
-            ApplyPillMode(BtnAudioLink, c.PillModeAudioLink);
-            ApplyPillMode(BtnAudioQuality, c.PillModeQuality);
-            ApplyPillMode(BtnAlwaysOnTop, c.PillModeAlwaysOnTop);
-            BtnConnectionTop.Visibility = c.PillModeConnection == 3 ? Visibility.Visible : Visibility.Collapsed;
+            ApplyPillMode(BtnConnectionInfo, c.MediaPlayer.PillModeConnection);
+            ApplyPillMode(BtnAudioLink, c.MediaPlayer.PillModeAudioLink);
+            ApplyPillMode(BtnAudioQuality, c.MediaPlayer.PillModeQuality);
+            ApplyPillMode(BtnAlwaysOnTop, c.MediaPlayer.PillModeAlwaysOnTop);
+            BtnConnectionTop.Visibility = c.MediaPlayer.PillModeConnection == 3 ? Visibility.Visible : Visibility.Collapsed;
 
-            BtnVolume.Visibility = c.PlayerShowVolumeButton ? Visibility.Visible : Visibility.Collapsed;
-            BtnLyrics.Visibility = c.PlayerShowLyricsButton ? Visibility.Visible : Visibility.Collapsed;
-            BtnBattery.Visibility = c.PlayerShowBattery ? Visibility.Visible : Visibility.Collapsed;
-            BtnHelp.Visibility = c.PlayerShowHelpButton ? Visibility.Visible : Visibility.Collapsed;
-            BtnFullscreen.Visibility = c.PlayerShowFullscreenButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnVolume.Visibility = c.MediaPlayer.ShowVolumeButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnLyrics.Visibility = c.MediaPlayer.ShowLyricsButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnBattery.Visibility = c.MediaPlayer.ShowBattery ? Visibility.Visible : Visibility.Collapsed;
+            BtnHelp.Visibility = c.MediaPlayer.ShowHelpButton ? Visibility.Visible : Visibility.Collapsed;
+            BtnFullscreen.Visibility = c.MediaPlayer.ShowFullscreenButton ? Visibility.Visible : Visibility.Collapsed;
 
             RefreshSeekButtonVisibility();
 
@@ -932,7 +932,7 @@ namespace AndroidMusicPresenceLink
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ApplyPaneLayout); return; }
 
-            bool swap = App.Config.SwapSettingsLocation;
+            bool swap = App.Config.MediaPlayer.SwapSettingsLocation;
             if (swap == _panesSwapped) return;
 
             // Remember which content types were open before the swap.

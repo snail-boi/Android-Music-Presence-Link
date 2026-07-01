@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -41,19 +41,19 @@ namespace AndroidMusicPresenceLink
             foreach (var root in GetNormalizedRemoteRoots(_workingConfig))
                 RemoteRoots.Add(root);
 
-            _lyricsFolder = _workingConfig.LyricsSearchFolderOverride ?? string.Empty;
+            _lyricsFolder = _workingConfig.Library.LyricsSearchFolderOverride ?? string.Empty;
         }
 
         private void CommitFoldersToConfig()
         {
-            _workingConfig.MusicRemoteRoots = RemoteRoots
+            _workingConfig.Library.MusicRemoteRoots = RemoteRoots
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            _workingConfig.MusicRemoteRoot = _workingConfig.MusicRemoteRoots.FirstOrDefault() ?? string.Empty;
+            _workingConfig.Library.MusicRemoteRoot = _workingConfig.Library.MusicRemoteRoots.FirstOrDefault() ?? string.Empty;
 
-            _workingConfig.LyricsSearchFolderOverride = LyricsFolder.Trim();
+            _workingConfig.Library.LyricsSearchFolderOverride = LyricsFolder.Trim();
         }
 
         private async Task PickRemoteRootAsync()
@@ -101,14 +101,14 @@ namespace AndroidMusicPresenceLink
 
         private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
         {
-            var roots = (config.MusicRemoteRoots ?? new List<string>())
+            var roots = (config.Library.MusicRemoteRoots ?? new List<string>())
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
-                roots.Add(config.MusicRemoteRoot.Trim());
+            if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.Library.MusicRemoteRoot))
+                roots.Add(config.Library.MusicRemoteRoot.Trim());
 
             return roots;
         }

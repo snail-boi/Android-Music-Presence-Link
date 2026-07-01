@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -71,7 +71,7 @@ namespace AndroidMusicPresenceLink
 
             if (mediaPlayerOpen)
             {
-                switch (config.MediaPlayerToastMode)
+                switch (config.Toast.MediaPlayerMode)
                 {
                     case MediaPlayerToastMode.InMediaPlayer:
                         ShowInline(message, level, config);
@@ -85,7 +85,7 @@ namespace AndroidMusicPresenceLink
             }
             else
             {
-                if (config.HeadlessToastEnabled)
+                if (config.Toast.HeadlessEnabled)
                     ShowHeadless(message, level, config);
             }
         }
@@ -117,17 +117,17 @@ namespace AndroidMusicPresenceLink
             {
                 _headlessEntries.Remove(e);
                 _headlessHost?.RemoveToast(e.Panel);
-                RefreshHeadlessPositions(config.HeadlessToastPosition);
+                RefreshHeadlessPositions(config.Toast.HeadlessPosition);
             });
 
             _headlessEntries.Insert(0, entry);
             _headlessHost!.AddToast(entry.Panel);
-            RefreshHeadlessPositions(config.HeadlessToastPosition);
+            RefreshHeadlessPositions(config.Toast.HeadlessPosition);
             ScheduleDismiss(entry, () =>
             {
                 _headlessEntries.Remove(entry);
                 _headlessHost?.RemoveToast(entry.Panel);
-                RefreshHeadlessPositions(config.HeadlessToastPosition);
+                RefreshHeadlessPositions(config.Toast.HeadlessPosition);
             });
         }
 

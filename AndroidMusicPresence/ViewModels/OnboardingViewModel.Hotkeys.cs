@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace AndroidMusicPresenceLink
@@ -90,27 +90,27 @@ namespace AndroidMusicPresenceLink
             RecordAudioQualityCommand = new RelayCommand(() =>
                 StartHotkeyRecording?.Invoke(vk => HotkeyAudioQualityText = HotkeyHelper.VirtualKeyToDisplayName(vk)));
 
-            _hotkeyVolumeUpText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyVolumeUpKey);
-            _hotkeyVolumeDownText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyVolumeDownKey);
-            _hotkeyToggleScrcpyText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyToggleScrcpyKey);
-            _hotkeyToggleLyricsOverlayText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyToggleLyricsOverlayKey);
-            _hotkeyCopyTrackInfoText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyCopyTrackInfoKey);
-            _hotkeyAudioQualityText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.HotkeyAudioQualityKey);
+            _hotkeyVolumeUpText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.VolumeUp);
+            _hotkeyVolumeDownText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.VolumeDown);
+            _hotkeyToggleScrcpyText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.ToggleScrcpy);
+            _hotkeyToggleLyricsOverlayText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.ToggleLyricsOverlay);
+            _hotkeyCopyTrackInfoText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.CopyTrackInfo);
+            _hotkeyAudioQualityText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.AudioQuality);
 
-            int mod = _workingConfig.HotkeyModifier;
+            int mod = _workingConfig.Hotkeys.Modifier;
             _selectedModifierValue = (mod == 1 || mod == 2 || mod == 4) ? mod : 1;
         }
 
         private void CommitHotkeysToConfig()
         {
-            _workingConfig.HotkeyVolumeUpKey = HotkeyHelper.ParseVirtualKey(HotkeyVolumeUpText.Trim(), _workingConfig.HotkeyVolumeUpKey);
-            _workingConfig.HotkeyVolumeDownKey = HotkeyHelper.ParseVirtualKey(HotkeyVolumeDownText.Trim(), _workingConfig.HotkeyVolumeDownKey);
-            _workingConfig.HotkeyToggleScrcpyKey = HotkeyHelper.ParseVirtualKey(HotkeyToggleScrcpyText.Trim(), _workingConfig.HotkeyToggleScrcpyKey);
-            _workingConfig.HotkeyToggleLyricsOverlayKey = HotkeyHelper.ParseVirtualKey(HotkeyToggleLyricsOverlayText.Trim(), _workingConfig.HotkeyToggleLyricsOverlayKey);
-            _workingConfig.HotkeyCopyTrackInfoKey = HotkeyHelper.ParseVirtualKey(HotkeyCopyTrackInfoText.Trim(), _workingConfig.HotkeyCopyTrackInfoKey);
-            _workingConfig.HotkeyAudioQualityKey = HotkeyHelper.ParseVirtualKey(HotkeyAudioQualityText.Trim(), _workingConfig.HotkeyAudioQualityKey);
+            _workingConfig.Hotkeys.VolumeUp = HotkeyHelper.ParseVirtualKey(HotkeyVolumeUpText.Trim(), _workingConfig.Hotkeys.VolumeUp);
+            _workingConfig.Hotkeys.VolumeDown = HotkeyHelper.ParseVirtualKey(HotkeyVolumeDownText.Trim(), _workingConfig.Hotkeys.VolumeDown);
+            _workingConfig.Hotkeys.ToggleScrcpy = HotkeyHelper.ParseVirtualKey(HotkeyToggleScrcpyText.Trim(), _workingConfig.Hotkeys.ToggleScrcpy);
+            _workingConfig.Hotkeys.ToggleLyricsOverlay = HotkeyHelper.ParseVirtualKey(HotkeyToggleLyricsOverlayText.Trim(), _workingConfig.Hotkeys.ToggleLyricsOverlay);
+            _workingConfig.Hotkeys.CopyTrackInfo = HotkeyHelper.ParseVirtualKey(HotkeyCopyTrackInfoText.Trim(), _workingConfig.Hotkeys.CopyTrackInfo);
+            _workingConfig.Hotkeys.AudioQuality = HotkeyHelper.ParseVirtualKey(HotkeyAudioQualityText.Trim(), _workingConfig.Hotkeys.AudioQuality);
 
-            _workingConfig.HotkeyModifier = SelectedModifierValue;
+            _workingConfig.Hotkeys.Modifier = SelectedModifierValue;
         }
 
         // ── Startup step ──────────────────────────────────────────────────────
@@ -145,17 +145,17 @@ namespace AndroidMusicPresenceLink
 
         private void InitStartup()
         {
-            _openInTaskbar = _workingConfig.OpenInTaskbar;
-            _startWithWindows = _workingConfig.StartWithWindows;
+            _openInTaskbar = _workingConfig.AppSettings.OpenInTaskbar;
+            _startWithWindows = _workingConfig.AppSettings.StartWithWindows;
             // Default to media player view for new installs; existing users keep their saved preference.
-            _showMediaPlayerView = _workingConfig.OnboardingCompleted ? _workingConfig.ShowMediaPlayerWindow : true;
+            _showMediaPlayerView = _workingConfig.AppSettings.OnboardingCompleted ? _workingConfig.MediaPlayer.ShowWindow : true;
         }
 
         private void CommitStartupToConfig()
         {
-            _workingConfig.OpenInTaskbar = OpenInTaskbar;
-            _workingConfig.StartWithWindows = StartWithWindows;
-            _workingConfig.ShowMediaPlayerWindow = ShowMediaPlayerView;
+            _workingConfig.AppSettings.OpenInTaskbar = OpenInTaskbar;
+            _workingConfig.AppSettings.StartWithWindows = StartWithWindows;
+            _workingConfig.MediaPlayer.ShowWindow = ShowMediaPlayerView;
         }
     }
 }

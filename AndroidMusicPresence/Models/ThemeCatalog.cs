@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Media;
@@ -77,8 +77,8 @@ namespace AndroidMusicPresenceLink
         public static List<ThemeProfile> AllThemes(MusicConfig config)
         {
             var list = new List<ThemeProfile>(BuiltInThemes.All);
-            if (config.CustomThemes != null)
-                list.AddRange(config.CustomThemes.Where(t => t != null).Select(t => t.Clone()));
+            if (config.Theme.CustomProfiles != null)
+                list.AddRange(config.Theme.CustomProfiles.Where(t => t != null).Select(t => t.Clone()));
             return list;
         }
 
@@ -88,7 +88,7 @@ namespace AndroidMusicPresenceLink
         /// </summary>
         public static List<ThemeProfile> EnabledThemes(MusicConfig config)
         {
-            var disabled = new HashSet<string>(config.DisabledThemes ?? new List<string>(), StringComparer.Ordinal);
+            var disabled = new HashSet<string>(config.Theme.DisabledProfiles ?? new List<string>(), StringComparer.Ordinal);
             var enabled = AllThemes(config).Where(t => !disabled.Contains(t.Name)).ToList();
             return enabled.Count > 0 ? enabled : AllThemes(config);
         }
@@ -106,7 +106,7 @@ namespace AndroidMusicPresenceLink
         public static ThemeProfile ResolveActive(MusicConfig config)
         {
             var all = AllThemes(config);
-            return all.FirstOrDefault(t => string.Equals(t.Name, config.ActiveThemeName, StringComparison.Ordinal))
+            return all.FirstOrDefault(t => string.Equals(t.Name, config.Theme.ActiveProfile, StringComparison.Ordinal))
                    ?? BuiltInThemes.DefaultDark;
         }
 

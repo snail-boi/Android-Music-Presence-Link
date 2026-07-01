@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -70,7 +70,7 @@ namespace AndroidMusicPresenceLink
             {
                 if (!Set(ref _wifiMode, value)) return;
 
-                _workingConfig.WifiMode = value;
+                _workingConfig.Device.WifiMode = value;
 
                 RaisePropertyChanged(nameof(WifiModeButtonText));
                 RaisePropertyChanged(nameof(AutoOrPairButtonText));
@@ -80,8 +80,8 @@ namespace AndroidMusicPresenceLink
 
                 // Show the value relevant to the new mode, as the old code did on toggle.
                 WifiAddress = value == WirelessMode.WirelessDebugging
-                    ? (_workingConfig.WifiMdnsServiceName ?? string.Empty)
-                    : _workingConfig.SelectedDeviceWiFi;
+                    ? (_workingConfig.Device.MdnsServiceName ?? string.Empty)
+                    : _workingConfig.Device.SelectedDeviceWiFi;
             }
         }
 
@@ -115,20 +115,20 @@ namespace AndroidMusicPresenceLink
             WifiModeToggleCommand = new RelayCommand(ToggleWifiMode);
             AutoGatherOrPairCommand = new RelayCommand(async () => await AutoGatherOrPairAsync());
 
-            _usbSerial = _workingConfig.SelectedDeviceUSB;
-            _deviceName = _workingConfig.SelectedDeviceName;
-            _wifiMode = _workingConfig.WifiMode;
+            _usbSerial = _workingConfig.Device.SelectedDeviceUSB;
+            _deviceName = _workingConfig.Device.SelectedDeviceName;
+            _wifiMode = _workingConfig.Device.WifiMode;
             _wifiAddress = _wifiMode == WirelessMode.WirelessDebugging
-                ? (_workingConfig.WifiMdnsServiceName ?? string.Empty)
-                : _workingConfig.SelectedDeviceWiFi;
+                ? (_workingConfig.Device.MdnsServiceName ?? string.Empty)
+                : _workingConfig.Device.SelectedDeviceWiFi;
         }
 
         private void CommitDeviceToConfig()
         {
-            _workingConfig.SelectedDeviceUSB = UsbSerial.Trim();
-            _workingConfig.SelectedDeviceWiFi = WifiAddress.Trim();
-            _workingConfig.SelectedDeviceName = DeviceName.Trim();
-            _workingConfig.WifiMode = WifiMode;
+            _workingConfig.Device.SelectedDeviceUSB = UsbSerial.Trim();
+            _workingConfig.Device.SelectedDeviceWiFi = WifiAddress.Trim();
+            _workingConfig.Device.SelectedDeviceName = DeviceName.Trim();
+            _workingConfig.Device.WifiMode = WifiMode;
             // WifiMdnsServiceName and IsWifiEnabled are set during the pair / auto-detect flows.
         }
 
@@ -180,13 +180,13 @@ namespace AndroidMusicPresenceLink
 
             if (!string.IsNullOrWhiteSpace(result.ServiceName))
             {
-                _workingConfig.WifiMdnsServiceName = result.ServiceName;
+                _workingConfig.Device.MdnsServiceName = result.ServiceName;
                 WifiAddress = result.ServiceName;
             }
             if (!string.IsNullOrWhiteSpace(ipPort))
             {
-                _workingConfig.SelectedDeviceWiFi = ipPort;
-                _workingConfig.IsWifiEnabled = true;
+                _workingConfig.Device.SelectedDeviceWiFi = ipPort;
+                _workingConfig.Device.IsWifiEnabled = true;
             }
 
             // Read the real hardware serial over the wireless connection rather than
@@ -198,14 +198,14 @@ namespace AndroidMusicPresenceLink
             if (!string.IsNullOrWhiteSpace(usbSerial))
             {
                 UsbSerial = usbSerial;
-                _workingConfig.SelectedDeviceUSB = usbSerial;
+                _workingConfig.Device.SelectedDeviceUSB = usbSerial;
             }
 
             var name = Interaction!.AskDeviceName();
             if (!string.IsNullOrWhiteSpace(name))
             {
                 DeviceName = name.Trim();
-                _workingConfig.SelectedDeviceName = DeviceName;
+                _workingConfig.Device.SelectedDeviceName = DeviceName;
             }
 
             MusicConfigManager.Save(_workingConfig);
@@ -227,33 +227,33 @@ namespace AndroidMusicPresenceLink
             }
 
             UsbSerial = usbSerial;
-            _workingConfig.SelectedDeviceUSB = usbSerial;
+            _workingConfig.Device.SelectedDeviceUSB = usbSerial;
 
             // In Wireless Debugging mode the Wi-Fi address comes from the pair flow
             // (ip:random_port discovered via mDNS), not from service.adb.tcp.port.
-            if (_workingConfig.WifiMode == WirelessMode.WirelessDebugging)
+            if (_workingConfig.Device.WifiMode == WirelessMode.WirelessDebugging)
             {
                 Interaction!.ShowInfo(
                     "Auto-detect skipped Wi-Fi setup because Wireless Debugging mode is selected. "
                     + "Use the 'Pair phone' button to set up wireless.",
                     "Wireless Debugging Mode");
             }
-            else if (_workingConfig.WifiMode == WirelessMode.UsbOnly)
+            else if (_workingConfig.Device.WifiMode == WirelessMode.UsbOnly)
             {
                 // USB-only mode: skip all Wi-Fi setup.
-                _workingConfig.IsWifiEnabled = false;
+                _workingConfig.Device.IsWifiEnabled = false;
             }
             else
             {
                 // TcpIp mode: wifi is always the point, enable it automatically.
-                _workingConfig.IsWifiEnabled = true;
+                _workingConfig.Device.IsWifiEnabled = true;
                 var port = await DeviceQuery.GetWifiPortAsync(usbSerial);
                 var ip = await DeviceQuery.GetDeviceWifiIpAsync(usbSerial);
 
                 if (!string.IsNullOrWhiteSpace(ip))
                 {
                     WifiAddress = $"{ip}:{port}";
-                    _workingConfig.SelectedDeviceWiFi = WifiAddress;
+                    _workingConfig.Device.SelectedDeviceWiFi = WifiAddress;
                 }
                 else
                 {
@@ -265,7 +265,7 @@ namespace AndroidMusicPresenceLink
             if (!string.IsNullOrWhiteSpace(name))
             {
                 DeviceName = name.Trim();
-                _workingConfig.SelectedDeviceName = DeviceName;
+                _workingConfig.Device.SelectedDeviceName = DeviceName;
             }
         }
 

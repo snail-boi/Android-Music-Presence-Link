@@ -66,7 +66,7 @@ namespace AndroidMusicPresenceLink
             // it stays legible over both cover-art gradients and the idle theme.
             var borderColor = (brush is SolidColorBrush scb) ? scb.Color : Colors.White;
             BtnAudioQuality.BorderBrush = new SolidColorBrush(borderColor) { Opacity = 0.45 };
-            ApplyPillMode(BtnAudioQuality, App.Config?.PillModeQuality ?? 0);
+            ApplyPillMode(BtnAudioQuality, App.Config?.MediaPlayer.PillModeQuality ?? 0);
         }
         private void BtnAudioQuality_Click(object sender, RoutedEventArgs e)
         {
@@ -525,7 +525,7 @@ namespace AndroidMusicPresenceLink
                 Opacity = _audioLinkActive ? 0.85 : 0.45
             };
 
-            ApplyPillMode(BtnAudioLink, App.Config?.PillModeAudioLink ?? 0);
+            ApplyPillMode(BtnAudioLink, App.Config?.MediaPlayer.PillModeAudioLink ?? 0);
         }
     }
 }

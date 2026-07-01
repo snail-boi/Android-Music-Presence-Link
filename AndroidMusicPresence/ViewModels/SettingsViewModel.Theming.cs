@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -78,8 +78,8 @@ namespace AndroidMusicPresenceLink
                     return;
 
                 var v = (value ?? string.Empty).Trim();
-                if (v.Length > MusicConfig.ThemeNameMaxLength)
-                    v = v.Substring(0, MusicConfig.ThemeNameMaxLength).Trim();
+                if (v.Length > ThemeConfig.NameMaxLength)
+                    v = v.Substring(0, ThemeConfig.NameMaxLength).Trim();
                 if (string.IsNullOrEmpty(v))
                     v = "Custom Theme";
                 v = MakeUniqueName(v, item);
@@ -214,31 +214,31 @@ namespace AndroidMusicPresenceLink
             _selectedTheme = null;
 
             var disabled = new System.Collections.Generic.HashSet<string>(
-                _config.DisabledThemes ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
+                _config.Theme.DisabledProfiles ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
 
             Themes.Clear();
             foreach (var b in BuiltInThemes.All)
                 Themes.Add(new ThemeListItem(b, isBuiltIn: true) { InRotation = !disabled.Contains(b.Name) });
-            foreach (var c in _config.CustomThemes ?? Enumerable.Empty<ThemeProfile>())
+            foreach (var c in _config.Theme.CustomProfiles ?? Enumerable.Empty<ThemeProfile>())
                 Themes.Add(new ThemeListItem(c, isBuiltIn: false) { InRotation = !disabled.Contains(c.Name) });
 
-            _randomThemeAtStartup = _config.RandomThemeAtStartup;
+            _randomThemeAtStartup = _config.Theme.RandomAtStartup;
 
-            var active = Themes.FirstOrDefault(t => string.Equals(t.Name, _config.ActiveThemeName, StringComparison.Ordinal))
+            var active = Themes.FirstOrDefault(t => string.Equals(t.Name, _config.Theme.ActiveProfile, StringComparison.Ordinal))
                          ?? Themes.FirstOrDefault();
             SelectedTheme = active;
         }
 
         partial void ApplyThemingToConfig(MusicConfig config)
         {
-            config.CustomThemes = Themes.Where(t => !t.IsBuiltIn).Select(t => t.ToProfile()).ToList();
-            config.ActiveThemeName = _selectedTheme?.Name ?? BuiltInThemes.DefaultDark.Name;
-            config.DisabledThemes = Themes.Where(t => !t.InRotation).Select(t => t.Name).ToList();
-            config.RandomThemeAtStartup = RandomThemeAtStartup;
+            config.Theme.CustomProfiles = Themes.Where(t => !t.IsBuiltIn).Select(t => t.ToProfile()).ToList();
+            config.Theme.ActiveProfile = _selectedTheme?.Name ?? BuiltInThemes.DefaultDark.Name;
+            config.Theme.DisabledProfiles = Themes.Where(t => !t.InRotation).Select(t => t.Name).ToList();
+            config.Theme.RandomAtStartup = RandomThemeAtStartup;
             // Keep the legacy flag aligned with the active theme so the tray icon and the
             // media-player icon logic (which read UseDarkMode) stay correct.
             var activeProfile = _selectedTheme?.ToProfile() ?? BuiltInThemes.DefaultDark;
-            config.UseDarkMode = ThemeCatalog.IsDark(activeProfile);
+            config.Theme.UseDarkMode = ThemeCatalog.IsDark(activeProfile);
         }
 
         /// <summary>The active profile reflecting current (possibly unsaved) edits, for live preview.</summary>
@@ -261,7 +261,7 @@ namespace AndroidMusicPresenceLink
             {
                 var suffix = " " + i;
                 var baseName = candidate;
-                int max = MusicConfig.ThemeNameMaxLength - suffix.Length;
+                int max = ThemeConfig.NameMaxLength - suffix.Length;
                 if (max > 0 && baseName.Length > max)
                     baseName = baseName.Substring(0, max).Trim();
                 var attempt = baseName + suffix;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -315,23 +315,23 @@ namespace AndroidMusicPresenceLink
 
         private void LoadCoreFromConfig()
         {
-            _debugMode = _config.DebugMode;
-            _useDarkMode = _config.UseDarkMode;
-            _openInTaskbar = _config.OpenInTaskbar;
-            _startWithWindows = _config.StartWithWindows;
+            _debugMode = _config.AppSettings.DebugMode;
+            _useDarkMode = _config.Theme.UseDarkMode;
+            _openInTaskbar = _config.AppSettings.OpenInTaskbar;
+            _startWithWindows = _config.AppSettings.StartWithWindows;
 
-            int mode = (int)_config.UpdateIntervalMode;
+            int mode = (int)_config.Polling.Interval;
             if (mode < 1 || mode > 4) mode = 1;
             _updateIntervalIndex = mode - 1;
 
-            _adaptivePollingEnabled = _config.AdaptivePollingEnabled;
-            _adaptivePollingThresholdText = _config.AdaptivePollingThresholdMinutes.ToString();
-            _adaptivePollingAlertEnabled = _config.AdaptivePollingAlertEnabled;
+            _adaptivePollingEnabled = _config.Polling.AdaptiveEnabled;
+            _adaptivePollingThresholdText = _config.Polling.AdaptiveThresholdMinutes.ToString();
+            _adaptivePollingAlertEnabled = _config.Polling.AdaptiveAlertEnabled;
 
-            _cacheClearText = _config.CachClearInMB.ToString();
-            _pauseClearDelayText = _config.SmtcPauseClearDelayMinutes.ToString();
-            _coverPatterns = _config.CoverArtFileNamePatterns ?? string.Empty;
-            _copyTrackTemplate = _config.CopyTrackInfoTemplate ?? string.Empty;
+            _cacheClearText = _config.AppSettings.CachClearInMB.ToString();
+            _pauseClearDelayText = _config.MediaPlayer.SmtcPauseClearDelayMinutes.ToString();
+            _coverPatterns = _config.Library.CoverArtFileNamePatterns ?? string.Empty;
+            _copyTrackTemplate = _config.MediaPlayer.CopyTrackInfoTemplate ?? string.Empty;
 
             var paths = _config.Paths ?? new PathsConfig();
             _customAdbPath = paths.Adb;
@@ -339,31 +339,31 @@ namespace AndroidMusicPresenceLink
             _customFfmpegPath = paths.FfmpegPath;
             _noCoverIconPath = paths.NoCoverIconPath ?? string.Empty;
 
-            _headlessToastEnabled = _config.HeadlessToastEnabled;
-            _headlessToastPositionIndex = (int)_config.HeadlessToastPosition;
-            _mediaPlayerToastModeIndex = (int)_config.MediaPlayerToastMode;
+            _headlessToastEnabled = _config.Toast.HeadlessEnabled;
+            _headlessToastPositionIndex = (int)_config.Toast.HeadlessPosition;
+            _mediaPlayerToastModeIndex = (int)_config.Toast.MediaPlayerMode;
 
-            _audioLinkConnectionAutoRestart = _config.AudioLinkConnectionAutoRestart;
-            _audioLinkQualityAutoRestart = _config.AudioLinkQualityAutoRestart;
-            _audioLinkBleedless = _config.AudioLinkBleedless;
+            _audioLinkConnectionAutoRestart = _config.AudioLink.AutoRestartOnConnection;
+            _audioLinkQualityAutoRestart = _config.AudioLink.AutoRestartOnQualityChange;
+            _audioLinkBleedless = _config.AudioLink.Bleedless;
 
             LoadThemingFromConfig();
         }
 
         private void ApplyCoreToConfig(MusicConfig config)
         {
-            config.DebugMode = DebugMode;
-            config.UseDarkMode = UseDarkMode;
-            config.OpenInTaskbar = OpenInTaskbar;
-            config.StartWithWindows = StartWithWindows;
+            config.AppSettings.DebugMode = DebugMode;
+            config.Theme.UseDarkMode = UseDarkMode;
+            config.AppSettings.OpenInTaskbar = OpenInTaskbar;
+            config.AppSettings.StartWithWindows = StartWithWindows;
 
-            config.UpdateIntervalMode = (UpdateIntervalMode)(Math.Clamp(UpdateIntervalIndex, 0, 3) + 1);
-            config.AdaptivePollingEnabled = AdaptivePollingEnabled;
+            config.Polling.Interval = (UpdateIntervalMode)(Math.Clamp(UpdateIntervalIndex, 0, 3) + 1);
+            config.Polling.AdaptiveEnabled = AdaptivePollingEnabled;
             if (int.TryParse(AdaptivePollingThresholdText.Trim(), out var threshold) && threshold >= 1)
-                config.AdaptivePollingThresholdMinutes = threshold;
+                config.Polling.AdaptiveThresholdMinutes = threshold;
             else
-                config.AdaptivePollingThresholdMinutes = 5;
-            config.AdaptivePollingAlertEnabled = AdaptivePollingAlertEnabled;
+                config.Polling.AdaptiveThresholdMinutes = 5;
+            config.Polling.AdaptiveAlertEnabled = AdaptivePollingAlertEnabled;
 
             if (int.TryParse(CacheClearText.Trim(), out var cache))
             {
@@ -372,26 +372,26 @@ namespace AndroidMusicPresenceLink
                     cache = 10;
                     CacheClearText = cache.ToString();
                 }
-                config.CachClearInMB = cache > 0 ? cache : 10;
+                config.AppSettings.CachClearInMB = cache > 0 ? cache : 10;
             }
             else
             {
                 CacheClearText = "10";
-                config.CachClearInMB = 10;
+                config.AppSettings.CachClearInMB = 10;
             }
 
             if (int.TryParse(PauseClearDelayText.Trim(), out var pause))
             {
-                config.SmtcPauseClearDelayMinutes = Math.Max(0, pause);
+                config.MediaPlayer.SmtcPauseClearDelayMinutes = Math.Max(0, pause);
             }
             else
             {
-                config.SmtcPauseClearDelayMinutes = 3;
+                config.MediaPlayer.SmtcPauseClearDelayMinutes = 3;
                 PauseClearDelayText = "3";
             }
 
-            config.CoverArtFileNamePatterns = CoverPatterns.Trim();
-            config.CopyTrackInfoTemplate = CopyTrackTemplate.Trim();
+            config.Library.CoverArtFileNamePatterns = CoverPatterns.Trim();
+            config.MediaPlayer.CopyTrackInfoTemplate = CopyTrackTemplate.Trim();
 
             config.Paths ??= new PathsConfig();
             config.Paths.Adb = string.IsNullOrWhiteSpace(CustomAdbPath)
@@ -402,13 +402,13 @@ namespace AndroidMusicPresenceLink
                 ? AppPaths.GetResourcePath("ffmpeg.exe") : CustomFfmpegPath.Trim();
             config.Paths.NoCoverIconPath = NoCoverIconPath.Trim();
 
-            config.HeadlessToastEnabled = HeadlessToastEnabled;
-            config.HeadlessToastPosition = (HeadlessToastPosition)Math.Clamp(HeadlessToastPositionIndex, 0, 5);
-            config.MediaPlayerToastMode = (MediaPlayerToastMode)Math.Clamp(MediaPlayerToastModeIndex, 0, 2);
+            config.Toast.HeadlessEnabled = HeadlessToastEnabled;
+            config.Toast.HeadlessPosition = (HeadlessToastPosition)Math.Clamp(HeadlessToastPositionIndex, 0, 5);
+            config.Toast.MediaPlayerMode = (MediaPlayerToastMode)Math.Clamp(MediaPlayerToastModeIndex, 0, 2);
 
-            config.AudioLinkConnectionAutoRestart = AudioLinkConnectionAutoRestart;
-            config.AudioLinkQualityAutoRestart = AudioLinkQualityAutoRestart;
-            config.AudioLinkBleedless = AudioLinkBleedless;
+            config.AudioLink.AutoRestartOnConnection = AudioLinkConnectionAutoRestart;
+            config.AudioLink.AutoRestartOnQualityChange = AudioLinkQualityAutoRestart;
+            config.AudioLink.Bleedless = AudioLinkBleedless;
 
             ApplyThemingToConfig(config);
         }
@@ -428,7 +428,7 @@ namespace AndroidMusicPresenceLink
 
             // Record which quality preset (if any) the final values match, else "Custom".
             var detectedPreset = AudioQualityPresets.MatchFromConfig(config);
-            config.AudioQualityPresetName = detectedPreset?.Name ?? AudioQualityPresets.CustomLabel;
+            config.AudioLink.QualityPresetName = detectedPreset?.Name ?? AudioQualityPresets.CustomLabel;
 
             return config;
         }
@@ -503,19 +503,19 @@ namespace AndroidMusicPresenceLink
             }
 
             if (!PathsEqual(left.Paths, right.Paths)) return false;
-            if (!string.Equals(left.SelectedDeviceUSB, right.SelectedDeviceUSB, StringComparison.Ordinal)) return false;
-            if (!string.Equals(left.SelectedDeviceWiFi, right.SelectedDeviceWiFi, StringComparison.Ordinal)) return false;
-            if (!string.Equals(left.SelectedDeviceName, right.SelectedDeviceName, StringComparison.Ordinal)) return false;
-            if (left.WifiMode != right.WifiMode) return false;
-            if (!string.Equals(left.WifiMdnsServiceName ?? string.Empty, right.WifiMdnsServiceName ?? string.Empty, StringComparison.Ordinal)) return false;
+            if (!string.Equals(left.Device.SelectedDeviceUSB, right.Device.SelectedDeviceUSB, StringComparison.Ordinal)) return false;
+            if (!string.Equals(left.Device.SelectedDeviceWiFi, right.Device.SelectedDeviceWiFi, StringComparison.Ordinal)) return false;
+            if (!string.Equals(left.Device.SelectedDeviceName, right.Device.SelectedDeviceName, StringComparison.Ordinal)) return false;
+            if (left.Device.WifiMode != right.Device.WifiMode) return false;
+            if (!string.Equals(left.Device.MdnsServiceName ?? string.Empty, right.Device.MdnsServiceName ?? string.Empty, StringComparison.Ordinal)) return false;
 
-            var leftRoots = (left.MusicRemoteRoots ?? new List<string>())
+            var leftRoots = (left.Library.MusicRemoteRoots ?? new List<string>())
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            var rightRoots = (right.MusicRemoteRoots ?? new List<string>())
+            var rightRoots = (right.Library.MusicRemoteRoots ?? new List<string>())
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -524,52 +524,52 @@ namespace AndroidMusicPresenceLink
 
             if (!leftRoots.SequenceEqual(rightRoots, StringComparer.OrdinalIgnoreCase)) return false;
 
-            if (left.UpdateIntervalMode != right.UpdateIntervalMode) return false;
-            if (left.AdaptivePollingEnabled != right.AdaptivePollingEnabled) return false;
-            if (left.AdaptivePollingThresholdMinutes != right.AdaptivePollingThresholdMinutes) return false;
-            if (left.AdaptivePollingAlertEnabled != right.AdaptivePollingAlertEnabled) return false;
-            if (left.DebugMode != right.DebugMode) return false;
-            if (!string.Equals(left.ActiveThemeName ?? string.Empty, right.ActiveThemeName ?? string.Empty, StringComparison.Ordinal)) return false;
-            var leftThemes = left.CustomThemes ?? new List<ThemeProfile>();
-            var rightThemes = right.CustomThemes ?? new List<ThemeProfile>();
+            if (left.Polling.Interval != right.Polling.Interval) return false;
+            if (left.Polling.AdaptiveEnabled != right.Polling.AdaptiveEnabled) return false;
+            if (left.Polling.AdaptiveThresholdMinutes != right.Polling.AdaptiveThresholdMinutes) return false;
+            if (left.Polling.AdaptiveAlertEnabled != right.Polling.AdaptiveAlertEnabled) return false;
+            if (left.AppSettings.DebugMode != right.AppSettings.DebugMode) return false;
+            if (!string.Equals(left.Theme.ActiveProfile ?? string.Empty, right.Theme.ActiveProfile ?? string.Empty, StringComparison.Ordinal)) return false;
+            var leftThemes = left.Theme.CustomProfiles ?? new List<ThemeProfile>();
+            var rightThemes = right.Theme.CustomProfiles ?? new List<ThemeProfile>();
             if (leftThemes.Count != rightThemes.Count) return false;
             for (int i = 0; i < leftThemes.Count; i++)
                 if (!leftThemes[i].ValueEquals(rightThemes[i])) return false;
-            if (left.RandomThemeAtStartup != right.RandomThemeAtStartup) return false;
-            var leftDisabled = new HashSet<string>(left.DisabledThemes ?? new List<string>(), StringComparer.Ordinal);
-            var rightDisabled = new HashSet<string>(right.DisabledThemes ?? new List<string>(), StringComparer.Ordinal);
+            if (left.Theme.RandomAtStartup != right.Theme.RandomAtStartup) return false;
+            var leftDisabled = new HashSet<string>(left.Theme.DisabledProfiles ?? new List<string>(), StringComparer.Ordinal);
+            var rightDisabled = new HashSet<string>(right.Theme.DisabledProfiles ?? new List<string>(), StringComparer.Ordinal);
             if (!leftDisabled.SetEquals(rightDisabled)) return false;
-            if (left.OpenInTaskbar != right.OpenInTaskbar) return false;
-            if (left.StartWithWindows != right.StartWithWindows) return false;
-            if (left.ShowMediaPlayerWindow != right.ShowMediaPlayerWindow) return false;
-            if (left.MediaPlayerSettingsPaneOpen != right.MediaPlayerSettingsPaneOpen) return false;
-            if (left.MediaPlayerInlineLyricsViewActive != right.MediaPlayerInlineLyricsViewActive) return false;
-            if (left.MediaPlayerFullscreenActive != right.MediaPlayerFullscreenActive) return false;
-            if (left.OnboardingCompleted != right.OnboardingCompleted) return false;
-            if (!string.Equals(left.ScrcpyAudioCodec, right.ScrcpyAudioCodec, StringComparison.OrdinalIgnoreCase)) return false;
-            if (!string.Equals(left.ScrcpyAudioBitrate ?? string.Empty, right.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)) return false;
-            if (left.ScrcpyAudioBuffer != right.ScrcpyAudioBuffer) return false;
-            if (left.ScrcpyFlacCompressionLevel != right.ScrcpyFlacCompressionLevel) return false;
-            if (left.SmtcPauseClearDelayMinutes != right.SmtcPauseClearDelayMinutes) return false;
-            if (left.CachClearInMB != right.CachClearInMB) return false;
-            if (left.HotkeyVolumeUpKey != right.HotkeyVolumeUpKey) return false;
-            if (left.HotkeyVolumeDownKey != right.HotkeyVolumeDownKey) return false;
-            if (left.HotkeyToggleScrcpyKey != right.HotkeyToggleScrcpyKey) return false;
-            if (left.HotkeyToggleLyricsOverlayKey != right.HotkeyToggleLyricsOverlayKey) return false;
-            if (left.HotkeyCopyTrackInfoKey != right.HotkeyCopyTrackInfoKey) return false;
-            if (left.HotkeyAudioQualityKey != right.HotkeyAudioQualityKey) return false;
-            if (left.HotkeyModifier != right.HotkeyModifier) return false;
-            if (!string.Equals(left.LyricsSearchFolderOverride ?? string.Empty, right.LyricsSearchFolderOverride ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
-            if (!string.Equals(left.CoverArtFileNamePatterns ?? string.Empty, right.CoverArtFileNamePatterns ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
-            if (!string.Equals(left.CopyTrackInfoTemplate ?? string.Empty, right.CopyTrackInfoTemplate ?? string.Empty, StringComparison.Ordinal)) return false;
-            if (left.HeadlessToastEnabled != right.HeadlessToastEnabled) return false;
-            if (left.HeadlessToastPosition != right.HeadlessToastPosition) return false;
-            if (left.MediaPlayerToastMode != right.MediaPlayerToastMode) return false;
-            if (left.AudioLinkConnectionAutoRestart != right.AudioLinkConnectionAutoRestart) return false;
-            if (left.AudioLinkQualityAutoRestart != right.AudioLinkQualityAutoRestart) return false;
-            if (left.AudioLinkBleedless != right.AudioLinkBleedless) return false;
+            if (left.AppSettings.OpenInTaskbar != right.AppSettings.OpenInTaskbar) return false;
+            if (left.AppSettings.StartWithWindows != right.AppSettings.StartWithWindows) return false;
+            if (left.MediaPlayer.ShowWindow != right.MediaPlayer.ShowWindow) return false;
+            if (left.MediaPlayer.SettingsPaneOpen != right.MediaPlayer.SettingsPaneOpen) return false;
+            if (left.MediaPlayer.InlineLyricsViewActive != right.MediaPlayer.InlineLyricsViewActive) return false;
+            if (left.MediaPlayer.FullscreenActive != right.MediaPlayer.FullscreenActive) return false;
+            if (left.AppSettings.OnboardingCompleted != right.AppSettings.OnboardingCompleted) return false;
+            if (!string.Equals(left.AudioLink.Codec, right.AudioLink.Codec, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(left.AudioLink.Bitrate ?? string.Empty, right.AudioLink.Bitrate ?? string.Empty, StringComparison.Ordinal)) return false;
+            if (left.AudioLink.BufferMs != right.AudioLink.BufferMs) return false;
+            if (left.AudioLink.FlacCompressionLevel != right.AudioLink.FlacCompressionLevel) return false;
+            if (left.MediaPlayer.SmtcPauseClearDelayMinutes != right.MediaPlayer.SmtcPauseClearDelayMinutes) return false;
+            if (left.AppSettings.CachClearInMB != right.AppSettings.CachClearInMB) return false;
+            if (left.Hotkeys.VolumeUp != right.Hotkeys.VolumeUp) return false;
+            if (left.Hotkeys.VolumeDown != right.Hotkeys.VolumeDown) return false;
+            if (left.Hotkeys.ToggleScrcpy != right.Hotkeys.ToggleScrcpy) return false;
+            if (left.Hotkeys.ToggleLyricsOverlay != right.Hotkeys.ToggleLyricsOverlay) return false;
+            if (left.Hotkeys.CopyTrackInfo != right.Hotkeys.CopyTrackInfo) return false;
+            if (left.Hotkeys.AudioQuality != right.Hotkeys.AudioQuality) return false;
+            if (left.Hotkeys.Modifier != right.Hotkeys.Modifier) return false;
+            if (!string.Equals(left.Library.LyricsSearchFolderOverride ?? string.Empty, right.Library.LyricsSearchFolderOverride ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(left.Library.CoverArtFileNamePatterns ?? string.Empty, right.Library.CoverArtFileNamePatterns ?? string.Empty, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(left.MediaPlayer.CopyTrackInfoTemplate ?? string.Empty, right.MediaPlayer.CopyTrackInfoTemplate ?? string.Empty, StringComparison.Ordinal)) return false;
+            if (left.Toast.HeadlessEnabled != right.Toast.HeadlessEnabled) return false;
+            if (left.Toast.HeadlessPosition != right.Toast.HeadlessPosition) return false;
+            if (left.Toast.MediaPlayerMode != right.Toast.MediaPlayerMode) return false;
+            if (left.AudioLink.AutoRestartOnConnection != right.AudioLink.AutoRestartOnConnection) return false;
+            if (left.AudioLink.AutoRestartOnQualityChange != right.AudioLink.AutoRestartOnQualityChange) return false;
+            if (left.AudioLink.Bleedless != right.AudioLink.Bleedless) return false;
 
-            var eligibleLeft = (left.EligibleApps ?? new List<EligibleAppConfig>())
+            var eligibleLeft = (left.Apps.EligibleApps ?? new List<EligibleAppConfig>())
                 .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
                 .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
@@ -582,7 +582,7 @@ namespace AndroidMusicPresenceLink
                     },
                     StringComparer.OrdinalIgnoreCase);
 
-            var eligibleRight = (right.EligibleApps ?? new List<EligibleAppConfig>())
+            var eligibleRight = (right.Apps.EligibleApps ?? new List<EligibleAppConfig>())
                 .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
                 .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
@@ -608,8 +608,8 @@ namespace AndroidMusicPresenceLink
                     return false;
             }
 
-            var codecsLeft = new HashSet<string>(left.ScrcpyAvailableAudioCodecs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-            var codecsRight = new HashSet<string>(right.ScrcpyAvailableAudioCodecs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            var codecsLeft = new HashSet<string>(left.AudioLink.AvailableCodecs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            var codecsRight = new HashSet<string>(right.AudioLink.AvailableCodecs ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
             if (!codecsLeft.SetEquals(codecsRight)) return false;
 
             return true;

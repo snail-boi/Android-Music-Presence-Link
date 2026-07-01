@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -59,7 +59,7 @@ namespace AndroidMusicPresenceLink
                     .OrderBy(l => l)
                     .ToList();
 
-                var eligible = (_workingConfig.EligibleApps ?? new List<EligibleAppConfig>())
+                var eligible = (_workingConfig.Apps.EligibleApps ?? new List<EligibleAppConfig>())
                     .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
                     .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(
@@ -108,7 +108,7 @@ namespace AndroidMusicPresenceLink
             if (AppPackages.Count == 0)
                 return;
 
-            _workingConfig.EligibleApps = AppPackages
+            _workingConfig.Apps.EligibleApps = AppPackages
                 .Select(item => new EligibleAppConfig
                 {
                     PackageName = item.PackageName,
@@ -127,7 +127,7 @@ namespace AndroidMusicPresenceLink
                 })
                 .ToList();
 
-            _workingConfig.AllowedApps = _workingConfig.EligibleApps
+            _workingConfig.Apps.AllowedApps = _workingConfig.Apps.EligibleApps
                 .Where(a => a.PresenceMode != PresenceMode.Off || a.IsEnabled)
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -136,9 +136,9 @@ namespace AndroidMusicPresenceLink
 
         private void EnsureEligibleAppsFallback()
         {
-            if (!_workingConfig.EligibleApps.Any(a => a.PresenceMode != PresenceMode.Off || a.IsEnabled))
+            if (!_workingConfig.Apps.EligibleApps.Any(a => a.PresenceMode != PresenceMode.Off || a.IsEnabled))
             {
-                _workingConfig.EligibleApps.Add(new EligibleAppConfig
+                _workingConfig.Apps.EligibleApps.Add(new EligibleAppConfig
                 {
                     PackageName = "in.krosbits.musicolet",
                     PresenceMode = PresenceMode.Full,
@@ -147,7 +147,7 @@ namespace AndroidMusicPresenceLink
                 });
             }
 
-            _workingConfig.AllowedApps = _workingConfig.EligibleApps
+            _workingConfig.Apps.AllowedApps = _workingConfig.Apps.EligibleApps
                 .Where(a => a.PresenceMode != PresenceMode.Off || a.IsEnabled)
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)

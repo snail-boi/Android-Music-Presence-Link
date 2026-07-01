@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 
 namespace AndroidMusicPresenceLink
@@ -49,7 +49,7 @@ namespace AndroidMusicPresenceLink
             set
             {
                 if (!Set(ref _wifiMode, value)) return;
-                _config.WifiMode = value;
+                _config.Device.WifiMode = value;
                 RaisePropertyChanged(nameof(WifiModeButtonText));
                 RaisePropertyChanged(nameof(AutoOrPairButtonText));
                 RaisePropertyChanged(nameof(WifiAddressVisible));
@@ -87,35 +87,35 @@ namespace AndroidMusicPresenceLink
 
         partial void LoadDeviceFromConfig()
         {
-            _usbSerial = _config.SelectedDeviceUSB;
-            _wifiAddress = _config.SelectedDeviceWiFi;
-            _deviceName = _config.SelectedDeviceName;
-            _mdnsService = _config.WifiMdnsServiceName ?? string.Empty;
-            _wifiMode = _config.WifiMode;
+            _usbSerial = _config.Device.SelectedDeviceUSB;
+            _wifiAddress = _config.Device.SelectedDeviceWiFi;
+            _deviceName = _config.Device.SelectedDeviceName;
+            _mdnsService = _config.Device.MdnsServiceName ?? string.Empty;
+            _wifiMode = _config.Device.WifiMode;
         }
 
         partial void ApplyDeviceToConfig(MusicConfig config)
         {
-            config.SelectedDeviceUSB = UsbSerial.Trim();
-            config.SelectedDeviceWiFi = WifiAddress.Trim();
-            config.SelectedDeviceName = DeviceName.Trim();
-            config.WifiMode = WifiMode;
+            config.Device.SelectedDeviceUSB = UsbSerial.Trim();
+            config.Device.SelectedDeviceWiFi = WifiAddress.Trim();
+            config.Device.SelectedDeviceName = DeviceName.Trim();
+            config.Device.WifiMode = WifiMode;
             // WifiMdnsServiceName is already on the cloned config (set by the pair flow).
 
             // Mode cleanup so stale fields don't linger and the dirty diff reflects post-save state.
-            if (config.WifiMode == WirelessMode.TcpIp)
+            if (config.Device.WifiMode == WirelessMode.TcpIp)
             {
-                config.WifiMdnsServiceName = string.Empty;
+                config.Device.MdnsServiceName = string.Empty;
             }
-            else if (config.WifiMode == WirelessMode.UsbOnly)
+            else if (config.Device.WifiMode == WirelessMode.UsbOnly)
             {
-                config.WifiMdnsServiceName = string.Empty;
-                config.SelectedDeviceWiFi = string.Empty;
-                config.IsWifiEnabled = false;
+                config.Device.MdnsServiceName = string.Empty;
+                config.Device.SelectedDeviceWiFi = string.Empty;
+                config.Device.IsWifiEnabled = false;
             }
-            else if (string.IsNullOrWhiteSpace(config.WifiMdnsServiceName))
+            else if (string.IsNullOrWhiteSpace(config.Device.MdnsServiceName))
             {
-                config.SelectedDeviceWiFi = string.Empty;
+                config.Device.SelectedDeviceWiFi = string.Empty;
             }
         }
 
@@ -165,14 +165,14 @@ namespace AndroidMusicPresenceLink
 
             if (!string.IsNullOrWhiteSpace(result.ServiceName))
             {
-                _config.WifiMdnsServiceName = result.ServiceName;
+                _config.Device.MdnsServiceName = result.ServiceName;
                 MdnsService = result.ServiceName;
             }
             if (!string.IsNullOrWhiteSpace(ipPort))
             {
-                _config.SelectedDeviceWiFi = ipPort;
+                _config.Device.SelectedDeviceWiFi = ipPort;
                 WifiAddress = ipPort;
-                _config.IsWifiEnabled = true;
+                _config.Device.IsWifiEnabled = true;
             }
 
             // Prefer ro.serialno over the ADB transport name so the real hardware serial lands
@@ -189,14 +189,14 @@ namespace AndroidMusicPresenceLink
             if (!string.IsNullOrWhiteSpace(usbSerial))
             {
                 UsbSerial = usbSerial;
-                _config.SelectedDeviceUSB = usbSerial;
+                _config.Device.SelectedDeviceUSB = usbSerial;
             }
 
             var name = Interaction!.AskDeviceName();
             if (!string.IsNullOrWhiteSpace(name))
             {
                 DeviceName = name.Trim();
-                _config.SelectedDeviceName = DeviceName;
+                _config.Device.SelectedDeviceName = DeviceName;
             }
 
             Save(false);
@@ -238,12 +238,12 @@ namespace AndroidMusicPresenceLink
             if (WifiMode == WirelessMode.UsbOnly)
             {
                 // USB-only mode: skip all Wi-Fi setup.
-                _config.IsWifiEnabled = false;
+                _config.Device.IsWifiEnabled = false;
             }
             else
             {
                 // TcpIp mode: wifi is always the point, enable it automatically.
-                _config.IsWifiEnabled = true;
+                _config.Device.IsWifiEnabled = true;
                 var port = await DeviceQuery.GetWifiPortAsync(usbSerial);
                 var ip = await DeviceQuery.GetDeviceWifiIpAsync(usbSerial);
 
@@ -271,7 +271,7 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
-                if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi))
+                if (!string.IsNullOrWhiteSpace(_config.Device.SelectedDeviceWiFi))
                 {
                     await AdbHelper.RunAdbAsync("disconnect");
                     Debugger.show("[RESET] SUCCESFULLY RESET");
@@ -287,11 +287,11 @@ namespace AndroidMusicPresenceLink
             MdnsService = string.Empty;
             DeviceName = string.Empty;
 
-            _config.SelectedDeviceUSB = string.Empty;
-            _config.SelectedDeviceWiFi = string.Empty;
-            _config.SelectedDeviceName = string.Empty;
-            _config.WifiMdnsServiceName = string.Empty;
-            _config.IsWifiEnabled = false;
+            _config.Device.SelectedDeviceUSB = string.Empty;
+            _config.Device.SelectedDeviceWiFi = string.Empty;
+            _config.Device.SelectedDeviceName = string.Empty;
+            _config.Device.MdnsServiceName = string.Empty;
+            _config.Device.IsWifiEnabled = false;
         }
     }
 }

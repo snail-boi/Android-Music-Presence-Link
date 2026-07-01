@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 
 namespace AndroidMusicPresenceLink
@@ -148,7 +148,7 @@ namespace AndroidMusicPresenceLink
             CommitAppsToConfig();
             EnsureEligibleAppsFallback();
 
-            _workingConfig.OnboardingCompleted = true;
+            _workingConfig.AppSettings.OnboardingCompleted = true;
             RequestClose?.Invoke(true);
         }
 

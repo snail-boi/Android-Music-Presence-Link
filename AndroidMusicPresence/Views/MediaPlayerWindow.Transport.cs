@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -200,7 +200,7 @@ namespace AndroidMusicPresenceLink
         private void BtnPositionLabel_Click(object sender, RoutedEventArgs e)
         {
             _showTimeLeft = !_showTimeLeft;
-            App.Config.PlayerShowTimeLeft = _showTimeLeft;
+            App.Config.MediaPlayer.ShowTimeLeft = _showTimeLeft;
             MusicConfigManager.Save(App.Config);
             (Application.Current as App)?.UpdateConfig(App.Config);
             RefreshPositionLabel();
@@ -231,7 +231,7 @@ namespace AndroidMusicPresenceLink
         public void SyncTimeFormatFromConfig()
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(SyncTimeFormatFromConfig); return; }
-            _showTimeLeft = App.Config.PlayerShowTimeLeft;
+            _showTimeLeft = App.Config.MediaPlayer.ShowTimeLeft;
             RefreshPositionLabel();
         }
 
@@ -243,13 +243,13 @@ namespace AndroidMusicPresenceLink
 
             var c = App.Config;
             Visibility vis;
-            if (!c.PlayerShowSeekButtons)
+            if (!c.MediaPlayer.ShowSeekButtons)
             {
                 vis = Visibility.Collapsed;
             }
             else
             {
-                long thresholdMs = (long)c.PlayerSeekButtonThresholdSeconds * 1000L;
+                long thresholdMs = (long)c.MediaPlayer.SeekButtonThresholdSeconds * 1000L;
                 vis = (_lastDurationMs > 0 && _lastDurationMs >= thresholdMs)
                     ? Visibility.Visible
                     : Visibility.Collapsed;

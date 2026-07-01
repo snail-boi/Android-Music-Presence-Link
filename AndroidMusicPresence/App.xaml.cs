@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -140,14 +140,14 @@ namespace AndroidMusicPresenceLink
 
 
             Config = MusicConfigManager.Load();
-            ApplyStartupRegistration(Config.StartWithWindows);
-            Debugger.IsEnabled = Config.DebugMode;
+            ApplyStartupRegistration(Config.AppSettings.StartWithWindows);
+            Debugger.IsEnabled = Config.AppSettings.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
-            if (Config.RandomThemeAtStartup)
+            if (Config.Theme.RandomAtStartup)
             {
                 var randomTheme = ThemeCatalog.RandomEnabledThemeName(Config);
                 if (!string.IsNullOrEmpty(randomTheme))
-                    Config.ActiveThemeName = randomTheme;
+                    Config.Theme.ActiveProfile = randomTheme;
             }
             ApplyActiveTheme(Config);
 
@@ -158,24 +158,24 @@ namespace AndroidMusicPresenceLink
             };
 
             _settingsWindow = new MainWindow();
-            if (Config.OpenInTaskbar)
+            if (Config.AppSettings.OpenInTaskbar)
             {
                 _settingsWindow.Hide();
             }
-            else if (!Config.ShowMediaPlayerWindow)
+            else if (!Config.MediaPlayer.ShowWindow)
             {
                 _settingsWindow.Show();
                 _settingsWindow.Activate();
             }
 
-            if (!Config.OnboardingCompleted)
+            if (!Config.AppSettings.OnboardingCompleted)
             {
                 ShowOnboarding(forceRun: false);
             }
 
             _presenceService = new MusicPresenceService(Dispatcher, Config);
             _lyricsOverlayManager = new LyricsOverlayManager(Dispatcher, Config, () => _presenceService?.CurrentDevice ?? string.Empty, () => (_presenceService?.CurrentRemoteFilePath, _presenceService?.CurrentRemoteFileToken));
-            _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication, Config.UseDarkMode);
+            _trayIconManager = new TrayIconManager(ShowSettingsWindow, ToggleScrcpyNoAudio, ShutdownApplication, Config.Theme.UseDarkMode);
             SessionEnding += OnSessionEnding;
             _presenceService.TrayStateChanged += OnTrayStateChanged;
             _presenceService.NowPlayingChanged += OnNowPlayingChanged;
@@ -184,7 +184,7 @@ namespace AndroidMusicPresenceLink
             _presenceService.Start();
             UpdateTrayAudioSettings();
 
-            if (Config.ShowMediaPlayerWindow && !Config.OpenInTaskbar)
+            if (Config.MediaPlayer.ShowWindow && !Config.AppSettings.OpenInTaskbar)
             {
                 ShowMediaPlayerWindowNow();
             }
@@ -195,9 +195,9 @@ namespace AndroidMusicPresenceLink
 
             InitializeHotkeys();
 
-            _ = Updater.CheckForUpdateAsync(version, showPrompt: Config.OpenInTaskbar, allowRemindLater: Config.OpenInTaskbar, ignoredVersion: Config.IgnoredUpdateVersion, onDismissed: ignoredVersion =>
+            _ = Updater.CheckForUpdateAsync(version, showPrompt: Config.AppSettings.OpenInTaskbar, allowRemindLater: Config.AppSettings.OpenInTaskbar, ignoredVersion: Config.AppSettings.IgnoredUpdateVersion, onDismissed: ignoredVersion =>
             {
-                Config.IgnoredUpdateVersion = ignoredVersion;
+                Config.AppSettings.IgnoredUpdateVersion = ignoredVersion;
                 MusicConfigManager.Save(Config);
             });
         }
@@ -322,8 +322,8 @@ namespace AndroidMusicPresenceLink
             if (_scrcpyProcess == null || _scrcpyProcess.HasExited) return;
             if (string.IsNullOrEmpty(_scrcpyDeviceId)) return;
             // Auto-switching requires a fast enough update cycle to be reliable.
-            if (Config.UpdateIntervalMode > UpdateIntervalMode.Fast) return;
-            if (!Config.AudioLinkConnectionAutoRestart) return;
+            if (Config.Polling.Interval > UpdateIntervalMode.Fast) return;
+            if (!Config.AudioLink.AutoRestartOnConnection) return;
 
             var liveDevice = _presenceService?.CurrentDevice ?? string.Empty;
 
@@ -366,7 +366,7 @@ namespace AndroidMusicPresenceLink
                 bool wasPlaying = _lastMediaPlayerIsPlaying;
                 var oldDevice = _scrcpyDeviceId;
 
-                if (Config.AudioLinkBleedless && !string.IsNullOrWhiteSpace(oldDevice))
+                if (Config.AudioLink.Bleedless && !string.IsNullOrWhiteSpace(oldDevice))
                     await AdbHelper.RunAdbAsync($"-s {oldDevice} shell input keyevent 164").ConfigureAwait(true);
 
                 await StopScrcpyAsync().ConfigureAwait(true);
@@ -385,7 +385,7 @@ namespace AndroidMusicPresenceLink
                     _trayIconManager?.SetScrcpyRunning(false);
                     UpdateTrayAudioSettings();
                     ApplyTrayState();
-                    if (Config.AudioLinkBleedless && !string.IsNullOrWhiteSpace(newDevice))
+                    if (Config.AudioLink.Bleedless && !string.IsNullOrWhiteSpace(newDevice))
                         await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 164").ConfigureAwait(true);
                     return;
                 }
@@ -401,7 +401,7 @@ namespace AndroidMusicPresenceLink
                 ApplyTrayState();
 
                 await Task.Delay(1000).ConfigureAwait(true);
-                if (Config.AudioLinkBleedless)
+                if (Config.AudioLink.Bleedless)
                 {
                     await AdbHelper.RunAdbAsync($"-s {newDevice} shell input keyevent 164").ConfigureAwait(true);
 
@@ -482,7 +482,7 @@ namespace AndroidMusicPresenceLink
                 {
                     // Restart scrcpy so the new codec/bitrate/buffer take effect.
                     // StopScrcpyAsync runs asynchronously; chain Start once it's gone.
-                    if (Config.AudioLinkQualityAutoRestart)
+                    if (Config.AudioLink.AutoRestartOnQualityChange)
                         _ = RestartScrcpyForPresetAsync();
                 }
             }
@@ -530,7 +530,7 @@ namespace AndroidMusicPresenceLink
 
                     if (wasRunning)
                     {
-                        if (Config.AudioLinkQualityAutoRestart)
+                        if (Config.AudioLink.AutoRestartOnQualityChange)
                             _ = RestartScrcpyForPresetAsync();
                     }
                 }
@@ -547,7 +547,7 @@ namespace AndroidMusicPresenceLink
             {
                 var device = _presenceService?.CurrentDevice;
 
-                if (Config.AudioLinkBleedless && !string.IsNullOrWhiteSpace(device))
+                if (Config.AudioLink.Bleedless && !string.IsNullOrWhiteSpace(device))
                     await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 164").ConfigureAwait(true);
 
                 await StopScrcpyAsync().ConfigureAwait(true);
@@ -555,7 +555,7 @@ namespace AndroidMusicPresenceLink
                 StartScrcpyNoAudio();
                 await Task.Delay(1000).ConfigureAwait(true);
 
-                if (Config.AudioLinkBleedless && !string.IsNullOrWhiteSpace(device))
+                if (Config.AudioLink.Bleedless && !string.IsNullOrWhiteSpace(device))
                     await AdbHelper.RunAdbAsync($"-s {device} shell input keyevent 164").ConfigureAwait(true);
             }
             catch (Exception ex)
@@ -624,10 +624,10 @@ namespace AndroidMusicPresenceLink
 
         internal void UpdateConfig(MusicConfig config)
         {
-            bool audioChanged = !string.Equals(Config.ScrcpyAudioCodec, config.ScrcpyAudioCodec, StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(Config.ScrcpyAudioBitrate ?? string.Empty, config.ScrcpyAudioBitrate ?? string.Empty, StringComparison.Ordinal)
-                || Config.ScrcpyAudioBuffer != config.ScrcpyAudioBuffer
-                || Config.ScrcpyFlacCompressionLevel != config.ScrcpyFlacCompressionLevel;
+            bool audioChanged = !string.Equals(Config.AudioLink.Codec, config.AudioLink.Codec, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(Config.AudioLink.Bitrate ?? string.Empty, config.AudioLink.Bitrate ?? string.Empty, StringComparison.Ordinal)
+                || Config.AudioLink.BufferMs != config.AudioLink.BufferMs
+                || Config.AudioLink.FlacCompressionLevel != config.AudioLink.FlacCompressionLevel;
 
             bool noCoverChanged = !string.Equals(
                 Config.Paths?.NoCoverIconPath ?? string.Empty,
@@ -635,15 +635,15 @@ namespace AndroidMusicPresenceLink
                 StringComparison.OrdinalIgnoreCase);
 
             Config = config;
-            ApplyStartupRegistration(config.StartWithWindows);
-            Debugger.IsEnabled = Config.DebugMode;
+            ApplyStartupRegistration(config.AppSettings.StartWithWindows);
+            Debugger.IsEnabled = Config.AppSettings.DebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
             ApplyActiveTheme(config);
             _presenceService?.UpdateConfig(config);
             _lyricsOverlayManager?.UpdateConfig(config);
             _toastManager?.UpdateConfig(config);
             _settingsWindow?.SyncRuntimeConfig(config);
-            _trayIconManager?.SetDarkMode(config.UseDarkMode);
+            _trayIconManager?.SetDarkMode(config.Theme.UseDarkMode);
             UpdateTrayAudioSettings();
             EnsureMediaPlayerWindowState();
             // Push the latest preset label to the media player's quick-quality button.
@@ -659,7 +659,7 @@ namespace AndroidMusicPresenceLink
 
             // Restart the audio link if it is running and the codec/bitrate/buffer changed,
             // so the new settings take effect immediately without needing a manual restart.
-            if (audioChanged && _scrcpyProcess != null && !_scrcpyProcess.HasExited && Config.AudioLinkQualityAutoRestart)
+            if (audioChanged && _scrcpyProcess != null && !_scrcpyProcess.HasExited && Config.AudioLink.AutoRestartOnQualityChange)
                 _ = RestartScrcpyForPresetAsync();
 
             // When the no-cover icon changes, force the next tick to re-push the image and
@@ -704,14 +704,14 @@ namespace AndroidMusicPresenceLink
                 _mediaPlayerWindow.UpdateTrack(title, artist, album, coverPath, isPlaying);
                 _mediaPlayerWindow.UpdateProgress(positionMs, durationMs);
 
-                if (App.Config.NextSongMode != NextSongMode.Off && trackChanged)
+                if (App.Config.NextSong.Mode != NextSongMode.Off && trackChanged)
                     _ = UpdateNextSongNeighboursAsync(title, artist);
             });
         }
 
         private void EnsureMediaPlayerWindowState()
         {
-            if (!Config.ShowMediaPlayerWindow && _mediaPlayerWindow != null)
+            if (!Config.MediaPlayer.ShowWindow && _mediaPlayerWindow != null)
             {
                 CloseMediaPlayerWindow();
             }
@@ -748,14 +748,14 @@ namespace AndroidMusicPresenceLink
                 return;
             }
 
-            meta.RetainDateModified = Config?.RetainDateModifiedOnTagEdit ?? true;
+            meta.RetainDateModified = Config?.Library.RetainDateModifiedOnTagEdit ?? true;
 
             string ext = (System.IO.Path.GetExtension(remotePath) ?? string.Empty).ToLowerInvariant();
             // WAV can't embed lyrics, so it's always .lrc. Otherwise use the saved preference,
             // and stick with .lrc if the existing lyrics already came from one.
             meta.SaveLyricsAsLrc = ext == ".wav"
                 ? true
-                : (meta.LyricsFromLrc || (Config?.SaveLyricsAsLrcInFolder ?? false));
+                : (meta.LyricsFromLrc || (Config?.Library.SaveLyricsAsLrcInFolder ?? false));
 
             try
             {
@@ -774,10 +774,10 @@ namespace AndroidMusicPresenceLink
                     {
                         if (Config != null)
                         {
-                            Config.RetainDateModifiedOnTagEdit = window.Result.RetainDateModified;
+                            Config.Library.RetainDateModifiedOnTagEdit = window.Result.RetainDateModified;
                             // Don't let WAV's forced-on value poison the default for other formats.
                             if (ext != ".wav")
-                                Config.SaveLyricsAsLrcInFolder = window.Result.SaveLyricsAsLrc;
+                                Config.Library.SaveLyricsAsLrcInFolder = window.Result.SaveLyricsAsLrc;
                             MusicConfigManager.Save(Config);
                         }
 
@@ -789,7 +789,7 @@ namespace AndroidMusicPresenceLink
                             // We just wrote this file and know its new lyrics, so update the cache
                             // directly (no re-pull needed) and nudge the resolver to re-read the
                             // current track so the change shows without switching songs.
-                            var dk = LyricsCache.DeviceKey(Config?.SelectedDeviceName, device);
+                            var dk = LyricsCache.DeviceKey(Config?.Device.SelectedDeviceName, device);
                             var fk = LyricsCache.FileKey(dk, remotePath);
                             var newLyrics = window.Result.Lyrics;
                             if (!string.IsNullOrWhiteSpace(newLyrics))
@@ -918,11 +918,11 @@ namespace AndroidMusicPresenceLink
             }
 
             var config = Config;
-            _mediaPlayerWindow.Width = config.MediaPlayerWindowWidth;
-            _mediaPlayerWindow.Height = config.MediaPlayerWindowHeight;
-            _mediaPlayerWindow.Top = config.MediaPlayerWindowTop;
-            _mediaPlayerWindow.Left = config.MediaPlayerWindowLeft;
-            _mediaPlayerWindow.WindowState = config.MediaPlayerWindowState;
+            _mediaPlayerWindow.Width = config.PlayerWindow.Width;
+            _mediaPlayerWindow.Height = config.PlayerWindow.Height;
+            _mediaPlayerWindow.Top = config.PlayerWindow.Top;
+            _mediaPlayerWindow.Left = config.PlayerWindow.Left;
+            _mediaPlayerWindow.WindowState = config.PlayerWindow.State;
 
             if (_settingsWindow != null)
             {
@@ -1003,7 +1003,7 @@ namespace AndroidMusicPresenceLink
             if (_settingsWindow != null
                 && !Dispatcher.HasShutdownStarted
                 && !Dispatcher.HasShutdownFinished
-                && (forceShowSettings || !Config.OpenInTaskbar))
+                && (forceShowSettings || !Config.AppSettings.OpenInTaskbar))
             {
                 Debugger.show("[SETTINGS] Showing settings window after media player closed.");
                 _settingsWindow.Show();
@@ -1102,7 +1102,7 @@ namespace AndroidMusicPresenceLink
 
         internal void ShowOnboarding(bool forceRun)
         {
-            if (!forceRun && Config.OnboardingCompleted)
+            if (!forceRun && Config.AppSettings.OnboardingCompleted)
                 return;
 
             var onboardingWindow = new OnboardingWindow(Config);
@@ -1126,7 +1126,7 @@ namespace AndroidMusicPresenceLink
                 // Honor the view choice picked in onboarding: open the media player
                 // window if the user just selected it, or fall back to the settings
                 // window otherwise.
-                if (Config.ShowMediaPlayerWindow)
+                if (Config.MediaPlayer.ShowWindow)
                 {
                     ShowMediaPlayerWindowNow();
                 }
@@ -1139,13 +1139,13 @@ namespace AndroidMusicPresenceLink
 
         /// <summary>
         /// Resolves and applies the config's active theme profile, and keeps the legacy
-        /// <see cref="MusicConfig.UseDarkMode"/> flag in sync with the active theme's
+        /// <see cref="MusicConfig.Theme.UseDarkMode"/> flag in sync with the active theme's
         /// darkness so the tray icon and media-player icon logic stay correct.
         /// </summary>
         internal void ApplyActiveTheme(MusicConfig config)
         {
             var profile = ThemeCatalog.ResolveActive(config);
-            config.UseDarkMode = ThemeCatalog.IsDark(profile);
+            config.Theme.UseDarkMode = ThemeCatalog.IsDark(profile);
             ApplyThemeProfile(profile);
         }
 
@@ -1158,7 +1158,7 @@ namespace AndroidMusicPresenceLink
         internal void ApplyThemePreview(ThemeProfile profile)
         {
             if (Config != null)
-                Config.UseDarkMode = ThemeCatalog.IsDark(profile);
+                Config.Theme.UseDarkMode = ThemeCatalog.IsDark(profile);
             ApplyThemeProfile(profile);
         }
 
@@ -1321,7 +1321,7 @@ namespace AndroidMusicPresenceLink
 
             // Honor the user's saved view-style preference. If they last chose the
             // media player view, open it again, even if the window has since been closed.
-            if (Config.ShowMediaPlayerWindow)
+            if (Config.MediaPlayer.ShowWindow)
             {
                 ShowMediaPlayerWindowNow();
                 return;
@@ -1429,8 +1429,8 @@ namespace AndroidMusicPresenceLink
         /// </summary>
         private string BuildScrcpyArgs(string device)
         {
-            var codec = string.IsNullOrWhiteSpace(Config.ScrcpyAudioCodec) ? "raw" : Config.ScrcpyAudioCodec.Trim();
-            var buffer = Config.ScrcpyAudioBuffer > 0 ? Config.ScrcpyAudioBuffer : 50;
+            var codec = string.IsNullOrWhiteSpace(Config.AudioLink.Codec) ? "raw" : Config.AudioLink.Codec.Trim();
+            var buffer = Config.AudioLink.BufferMs > 0 ? Config.AudioLink.BufferMs : 50;
 
             var argParts = new List<string>
             {
@@ -1442,9 +1442,9 @@ namespace AndroidMusicPresenceLink
                 $"--audio-buffer={buffer}"
             };
 
-            if (!codec.Equals("raw", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(Config.ScrcpyAudioBitrate))
+            if (!codec.Equals("raw", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(Config.AudioLink.Bitrate))
             {
-                var bitrateText = Config.ScrcpyAudioBitrate.Trim();
+                var bitrateText = Config.AudioLink.Bitrate.Trim();
                 if (bitrateText.EndsWith("K", StringComparison.OrdinalIgnoreCase))
                 {
                     bitrateText = bitrateText[..^1];
@@ -1458,7 +1458,7 @@ namespace AndroidMusicPresenceLink
 
             if (codec.Equals("flac", StringComparison.OrdinalIgnoreCase))
             {
-                argParts.Add($"--audio-codec-options=flac-compression-level={Math.Clamp(Config.ScrcpyFlacCompressionLevel, 1, 8)}");
+                argParts.Add($"--audio-codec-options=flac-compression-level={Math.Clamp(Config.AudioLink.FlacCompressionLevel, 1, 8)}");
             }
 
             return string.Join(" ", argParts);
@@ -1581,11 +1581,11 @@ namespace AndroidMusicPresenceLink
                 // the recovery wait for the device to be present and start fresh.
                 if (wasDesired && !_isExiting && !_scrcpySwitchInProgress)
                 {
-                    if (!Config.AudioLinkConnectionAutoRestart)
+                    if (!Config.AudioLink.AutoRestartOnConnection)
                     {
                         Debugger.show($"Audio-link: scrcpy exited unexpectedly (was on {(wasUsb ? "USB" : "WiFi")} as {oldDevice ?? "<null>"}), connection auto-restart disabled.");
                     }
-                    else if (Config.UpdateIntervalMode > UpdateIntervalMode.Fast)
+                    else if (Config.Polling.Interval > UpdateIntervalMode.Fast)
                     {
                         Debugger.show($"Audio-link: scrcpy exited unexpectedly (was on {(wasUsb ? "USB" : "WiFi")} as {oldDevice ?? "<null>"}), auto-recovery disabled at this update interval.");
                     }
@@ -1837,20 +1837,20 @@ namespace AndroidMusicPresenceLink
             _hotkeySource.AddHook(HotkeyHook);
 
             // Register Shift + configured keys. Use try/catch to avoid crashing if registration fails.
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, Config.HotkeyModifier, Config.HotkeyVolumeUpKey); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, Config.HotkeyModifier, Config.HotkeyVolumeDownKey); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.HotkeyModifier, Config.HotkeyToggleScrcpyKey); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay, Config.HotkeyModifier, Config.HotkeyToggleLyricsOverlayKey); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo, Config.HotkeyModifier, Config.HotkeyCopyTrackInfoKey); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdAudioQuality, Config.HotkeyModifier, Config.HotkeyAudioQualityKey); } catch { }
-            Debugger.show($"[HOTKEY] Hotkeys initialized with modifier 0x{Config.HotkeyModifier:X}.");
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, Config.Hotkeys.Modifier, Config.Hotkeys.VolumeUp); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, Config.Hotkeys.Modifier, Config.Hotkeys.VolumeDown); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.Hotkeys.Modifier, Config.Hotkeys.ToggleScrcpy); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay, Config.Hotkeys.Modifier, Config.Hotkeys.ToggleLyricsOverlay); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo, Config.Hotkeys.Modifier, Config.Hotkeys.CopyTrackInfo); } catch { }
+            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdAudioQuality, Config.Hotkeys.Modifier, Config.Hotkeys.AudioQuality); } catch { }
+            Debugger.show($"[HOTKEY] Hotkeys initialized with modifier 0x{Config.Hotkeys.Modifier:X}.");
         }
 
         private void UpdateTrayAudioSettings()
         {
-            var codec = string.IsNullOrWhiteSpace(Config.ScrcpyAudioCodec) ? "raw" : Config.ScrcpyAudioCodec.Trim();
-            var bitrate = Config.ScrcpyAudioBitrate ?? string.Empty;
-            var buffer = Config.ScrcpyAudioBuffer > 0 ? Config.ScrcpyAudioBuffer : 50;
+            var codec = string.IsNullOrWhiteSpace(Config.AudioLink.Codec) ? "raw" : Config.AudioLink.Codec.Trim();
+            var bitrate = Config.AudioLink.Bitrate ?? string.Empty;
+            var buffer = Config.AudioLink.BufferMs > 0 ? Config.AudioLink.BufferMs : 50;
             _trayIconManager?.SetAudioSettings(codec, bitrate, buffer);
             _trayIconManager?.SetScrcpyRunning(_isScrcpyRunning);
         }
@@ -2111,9 +2111,9 @@ namespace AndroidMusicPresenceLink
             if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(album))
                 return false;
 
-            var template = string.IsNullOrWhiteSpace(Config.CopyTrackInfoTemplate)
+            var template = string.IsNullOrWhiteSpace(Config.MediaPlayer.CopyTrackInfoTemplate)
                 ? "{artist} - {title}"
-                : Config.CopyTrackInfoTemplate;
+                : Config.MediaPlayer.CopyTrackInfoTemplate;
 
             var text = template
                 .Replace("{artist}", artist, StringComparison.OrdinalIgnoreCase)
@@ -2148,14 +2148,14 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
-                var mode = Config.NextSongMode;
+                var mode = Config.NextSong.Mode;
                 if (mode == NextSongMode.Off) return;
 
                 var window = _mediaPlayerWindow;
                 if (window == null || !window.IsVisible) return;
 
                 var device = _presenceService?.CurrentDevice ?? string.Empty;
-                var roots = Config.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
+                var roots = Config.Library.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
 
                 // First enable and no list: trigger a scan automatically.
                 if (!_nextSongManager.IsListPresent)
@@ -2166,7 +2166,7 @@ namespace AndroidMusicPresenceLink
                         return;
                     }
 
-                    await _nextSongManager.ScanAsync(device, roots, Config.NextSongSortMode).ConfigureAwait(false);
+                    await _nextSongManager.ScanAsync(device, roots, Config.NextSong.SortMode).ConfigureAwait(false);
                 }
 
                 var result = await _nextSongManager.FindNeighboursAsync(title, artist).ConfigureAwait(false);
@@ -2194,7 +2194,7 @@ namespace AndroidMusicPresenceLink
 
         internal Task RefreshNextSongNeighboursAsync()
         {
-            if (_mediaPlayerWindow == null || !_mediaPlayerWindow.IsVisible || Config.NextSongMode == NextSongMode.Off)
+            if (_mediaPlayerWindow == null || !_mediaPlayerWindow.IsVisible || Config.NextSong.Mode == NextSongMode.Off)
                 return Task.CompletedTask;
 
             return UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
@@ -2219,7 +2219,7 @@ namespace AndroidMusicPresenceLink
                 {
                     try
                     {
-                        var r = await cacheManager.GetImagePathForNowPlayingAsync(device, result.PrevPath, Config.SelectedDeviceName).ConfigureAwait(false);
+                        var r = await cacheManager.GetImagePathForNowPlayingAsync(device, result.PrevPath, Config.Device.SelectedDeviceName).ConfigureAwait(false);
                         prevCover = r.ImagePath;
                     }
                     catch { }
@@ -2229,7 +2229,7 @@ namespace AndroidMusicPresenceLink
                 {
                     try
                     {
-                        var r = await cacheManager.GetImagePathForNowPlayingAsync(device, result.NextPath, Config.SelectedDeviceName).ConfigureAwait(false);
+                        var r = await cacheManager.GetImagePathForNowPlayingAsync(device, result.NextPath, Config.Device.SelectedDeviceName).ConfigureAwait(false);
                         nextCover = r.ImagePath;
                     }
                     catch { }
@@ -2254,7 +2254,7 @@ namespace AndroidMusicPresenceLink
                 try
                 {
                     var device = _presenceService?.CurrentDevice ?? string.Empty;
-                    var roots = Config.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
+                    var roots = Config.Library.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
 
                     if (string.IsNullOrWhiteSpace(device) || roots.Count == 0)
                     {
@@ -2264,12 +2264,12 @@ namespace AndroidMusicPresenceLink
                     }
 
                     _nextSongManager.InvalidateCache();
-                    await _nextSongManager.ScanAsync(device, roots, Config.NextSongSortMode).ConfigureAwait(false);
+                    await _nextSongManager.ScanAsync(device, roots, Config.NextSong.SortMode).ConfigureAwait(false);
 
                     // Re-run neighbour lookup with the last known track.
                     await Dispatcher.InvokeAsync(async () =>
                     {
-                        if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible && Config.NextSongMode != NextSongMode.Off)
+                        if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible && Config.NextSong.Mode != NextSongMode.Off)
                             await UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
                     });
                 }
@@ -2290,11 +2290,11 @@ namespace AndroidMusicPresenceLink
             {
                 try
                 {
-                    await _nextSongManager.ResortAsync(Config.NextSongSortMode).ConfigureAwait(false);
+                    await _nextSongManager.ResortAsync(Config.NextSong.SortMode).ConfigureAwait(false);
 
                     await Dispatcher.InvokeAsync(async () =>
                     {
-                        if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible && Config.NextSongMode != NextSongMode.Off)
+                        if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible && Config.NextSong.Mode != NextSongMode.Off)
                             await UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
                     });
                 }

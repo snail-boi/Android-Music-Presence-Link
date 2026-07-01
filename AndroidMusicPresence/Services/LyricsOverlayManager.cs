@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -174,7 +174,7 @@ namespace AndroidMusicPresenceLink
                     {
                         _loadedUsedFile = true; // path resolved; no more upgrade checks for this track
 
-                        var deviceKey = LyricsCache.DeviceKey(_config?.SelectedDeviceName, _getCurrentDevice());
+                        var deviceKey = LyricsCache.DeviceKey(_config?.Device.SelectedDeviceName, _getCurrentDevice());
                         var entry = LyricsCache.TryLoad(LyricsCache.FileKey(deviceKey, info.Item1!));
                         if (entry != null && entry.Source == LyricsCache.Source.Embed && !string.IsNullOrWhiteSpace(entry.Text))
                         {
@@ -250,7 +250,7 @@ namespace AndroidMusicPresenceLink
             var album = _currentAlbum ?? string.Empty;
 
             var device = _getCurrentDevice();
-            var deviceKey = LyricsCache.DeviceKey(_config?.SelectedDeviceName, device);
+            var deviceKey = LyricsCache.DeviceKey(_config?.Device.SelectedDeviceName, device);
 
             // Only trust the resolved file path when it was stamped for THIS track. The path
             // is produced by the cover pipeline, which lags the metadata notification, so a
@@ -364,18 +364,18 @@ namespace AndroidMusicPresenceLink
         {
             var roots = new List<string>();
 
-            if (!string.IsNullOrWhiteSpace(config.LyricsSearchFolderOverride))
+            if (!string.IsNullOrWhiteSpace(config.Library.LyricsSearchFolderOverride))
             {
-                roots.Add(config.LyricsSearchFolderOverride.Trim());
+                roots.Add(config.Library.LyricsSearchFolderOverride.Trim());
             }
             else
             {
-                roots.AddRange((config.MusicRemoteRoots ?? new List<string>())
+                roots.AddRange((config.Library.MusicRemoteRoots ?? new List<string>())
                     .Where(p => !string.IsNullOrWhiteSpace(p))
                     .Select(p => p.Trim()));
 
-                if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
-                    roots.Add(config.MusicRemoteRoot.Trim());
+                if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.Library.MusicRemoteRoot))
+                    roots.Add(config.Library.MusicRemoteRoot.Trim());
 
                 if (roots.Count == 0)
                     roots.Add("/storage/emulated/0/Music");

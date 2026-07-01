@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -25,10 +25,10 @@ namespace AndroidMusicPresenceLink
             _prevPanel.SetDirection(isPrevious: true);
             _nextPanel.SetDirection(isPrevious: false);
 
-            _prevPanel.SetRoundedCorners(App.Config.PlayerCoverRoundedCorners);
-            _nextPanel.SetRoundedCorners(App.Config.PlayerCoverRoundedCorners);
-            _prevPanel.SetShowCover(App.Config.PlayerShowCover);
-            _nextPanel.SetShowCover(App.Config.PlayerShowCover);
+            _prevPanel.SetRoundedCorners(App.Config.MediaPlayer.CoverRoundedCorners);
+            _nextPanel.SetRoundedCorners(App.Config.MediaPlayer.CoverRoundedCorners);
+            _prevPanel.SetShowCover(App.Config.MediaPlayer.ShowCover);
+            _nextPanel.SetShowCover(App.Config.MediaPlayer.ShowCover);
 
             _prevPanel.RefreshRequested += () => _rescanRequested?.Invoke();
             _nextPanel.RefreshRequested += () => _rescanRequested?.Invoke();
@@ -54,11 +54,11 @@ namespace AndroidMusicPresenceLink
 
             if (_prevPanel == null || _nextPanel == null) return;
 
-            bool roundedCorners = App.Config.PlayerCoverRoundedCorners;
+            bool roundedCorners = App.Config.MediaPlayer.CoverRoundedCorners;
             _prevPanel.SetRoundedCorners(roundedCorners);
             _nextPanel.SetRoundedCorners(roundedCorners);
-            _prevPanel.SetShowCover(App.Config.PlayerShowCover);
-            _nextPanel.SetShowCover(App.Config.PlayerShowCover);
+            _prevPanel.SetShowCover(App.Config.MediaPlayer.ShowCover);
+            _nextPanel.SetShowCover(App.Config.MediaPlayer.ShowCover);
 
             // Kirsten mode: smaller inset panels that partially overlap the main cover.
             bool kirsten = mode == NextSongMode.Kirsten;
@@ -211,9 +211,9 @@ namespace AndroidMusicPresenceLink
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(RefreshNextSongPanelSettings); return; }
             if (_prevPanel == null || _nextPanel == null) return;
 
-            bool roundedCorners = App.Config.PlayerCoverRoundedCorners;
-            bool showCover = App.Config.PlayerShowCover;
-            var mode = App.Config.NextSongMode;
+            bool roundedCorners = App.Config.MediaPlayer.CoverRoundedCorners;
+            bool showCover = App.Config.MediaPlayer.ShowCover;
+            var mode = App.Config.NextSong.Mode;
 
             if (mode == NextSongMode.Off)
             {

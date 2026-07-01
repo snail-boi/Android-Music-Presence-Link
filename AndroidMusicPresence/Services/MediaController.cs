@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -70,9 +70,9 @@ namespace AndroidMusicPresenceLink
             this.updateCurrentSongCallback = updateCurrentSongCallback;
             this.onUserInteraction = onUserInteraction;
 
-            cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB, config.CoverArtFileNamePatterns);
+            cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.AppSettings.CachClearInMB, config.Library.CoverArtFileNamePatterns);
             remoteRoots = GetNormalizedRemoteRoots(config);
-            deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
+            deviceName = config.Device.SelectedDeviceName?.Trim() ?? string.Empty;
             _noCoverIconPath = config.Paths?.NoCoverIconPath ?? string.Empty;
         }
 
@@ -88,9 +88,9 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
-                cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.CachClearInMB, config.CoverArtFileNamePatterns);
+                cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.AppSettings.CachClearInMB, config.Library.CoverArtFileNamePatterns);
                 remoteRoots = GetNormalizedRemoteRoots(config);
-                deviceName = config.SelectedDeviceName?.Trim() ?? string.Empty;
+                deviceName = config.Device.SelectedDeviceName?.Trim() ?? string.Empty;
                 _noCoverIconPath = config.Paths?.NoCoverIconPath ?? string.Empty;
                 Debugger.show("MediaController configuration updated. RemoteRoots='" + string.Join(";", remoteRoots) + "'");
             }
@@ -107,15 +107,15 @@ namespace AndroidMusicPresenceLink
 
         private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
         {
-            var roots = (config.MusicRemoteRoots ?? new List<string>())
+            var roots = (config.Library.MusicRemoteRoots ?? new List<string>())
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
+            if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.Library.MusicRemoteRoot))
             {
-                roots.Add(config.MusicRemoteRoot.Trim());
+                roots.Add(config.Library.MusicRemoteRoot.Trim());
             }
 
             return roots;

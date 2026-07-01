@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace AndroidMusicPresenceLink
@@ -70,27 +70,27 @@ namespace AndroidMusicPresenceLink
 
         partial void LoadHotkeysFromConfig()
         {
-            _hotkeyVolumeUpText = SafeDisplayName(_config.HotkeyVolumeUpKey);
-            _hotkeyVolumeDownText = SafeDisplayName(_config.HotkeyVolumeDownKey);
-            _hotkeyToggleScrcpyText = SafeDisplayName(_config.HotkeyToggleScrcpyKey);
-            _hotkeyToggleLyricsOverlayText = SafeDisplayName(_config.HotkeyToggleLyricsOverlayKey);
-            _hotkeyCopyTrackInfoText = SafeDisplayName(_config.HotkeyCopyTrackInfoKey);
-            _hotkeyAudioQualityText = SafeDisplayName(_config.HotkeyAudioQualityKey);
+            _hotkeyVolumeUpText = SafeDisplayName(_config.Hotkeys.VolumeUp);
+            _hotkeyVolumeDownText = SafeDisplayName(_config.Hotkeys.VolumeDown);
+            _hotkeyToggleScrcpyText = SafeDisplayName(_config.Hotkeys.ToggleScrcpy);
+            _hotkeyToggleLyricsOverlayText = SafeDisplayName(_config.Hotkeys.ToggleLyricsOverlay);
+            _hotkeyCopyTrackInfoText = SafeDisplayName(_config.Hotkeys.CopyTrackInfo);
+            _hotkeyAudioQualityText = SafeDisplayName(_config.Hotkeys.AudioQuality);
 
-            int mod = _config.HotkeyModifier;
+            int mod = _config.Hotkeys.Modifier;
             _selectedModifierValue = (mod == 1 || mod == 2 || mod == 4) ? mod : 1;
         }
 
         partial void ApplyHotkeysToConfig(MusicConfig config)
         {
-            config.HotkeyVolumeUpKey = HotkeyHelper.ParseVirtualKey(HotkeyVolumeUpText.Trim(), _config.HotkeyVolumeUpKey);
-            config.HotkeyVolumeDownKey = HotkeyHelper.ParseVirtualKey(HotkeyVolumeDownText.Trim(), _config.HotkeyVolumeDownKey);
-            config.HotkeyToggleScrcpyKey = HotkeyHelper.ParseVirtualKey(HotkeyToggleScrcpyText.Trim(), _config.HotkeyToggleScrcpyKey);
-            config.HotkeyToggleLyricsOverlayKey = HotkeyHelper.ParseVirtualKey(HotkeyToggleLyricsOverlayText.Trim(), _config.HotkeyToggleLyricsOverlayKey);
-            config.HotkeyCopyTrackInfoKey = HotkeyHelper.ParseVirtualKey(HotkeyCopyTrackInfoText.Trim(), _config.HotkeyCopyTrackInfoKey);
-            config.HotkeyAudioQualityKey = HotkeyHelper.ParseVirtualKey(HotkeyAudioQualityText.Trim(), _config.HotkeyAudioQualityKey);
+            config.Hotkeys.VolumeUp = HotkeyHelper.ParseVirtualKey(HotkeyVolumeUpText.Trim(), _config.Hotkeys.VolumeUp);
+            config.Hotkeys.VolumeDown = HotkeyHelper.ParseVirtualKey(HotkeyVolumeDownText.Trim(), _config.Hotkeys.VolumeDown);
+            config.Hotkeys.ToggleScrcpy = HotkeyHelper.ParseVirtualKey(HotkeyToggleScrcpyText.Trim(), _config.Hotkeys.ToggleScrcpy);
+            config.Hotkeys.ToggleLyricsOverlay = HotkeyHelper.ParseVirtualKey(HotkeyToggleLyricsOverlayText.Trim(), _config.Hotkeys.ToggleLyricsOverlay);
+            config.Hotkeys.CopyTrackInfo = HotkeyHelper.ParseVirtualKey(HotkeyCopyTrackInfoText.Trim(), _config.Hotkeys.CopyTrackInfo);
+            config.Hotkeys.AudioQuality = HotkeyHelper.ParseVirtualKey(HotkeyAudioQualityText.Trim(), _config.Hotkeys.AudioQuality);
 
-            config.HotkeyModifier = SelectedModifierValue;
+            config.Hotkeys.Modifier = SelectedModifierValue;
         }
 
         private static string SafeDisplayName(int virtualKey)

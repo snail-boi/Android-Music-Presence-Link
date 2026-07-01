@@ -1,9 +1,9 @@
-namespace AndroidMusicPresenceLink
+﻿namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Bindable wrapper around a <see cref="ThemeProfile"/> for the theme list/editor in the
     /// settings window. Built-in items are read-only (their name and colors can't be edited);
-    /// custom items are fully editable and persist back to <see cref="MusicConfig.CustomThemes"/>.
+    /// custom items are fully editable and persist back to <see cref="MusicConfig.Theme.CustomProfiles"/>.
     /// Color changes raise PropertyChanged so swatch previews and the live theme preview update.
     /// </summary>
     internal sealed class ThemeListItem : ViewModelBase

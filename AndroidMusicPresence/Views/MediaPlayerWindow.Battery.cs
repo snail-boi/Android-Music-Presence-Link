@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows;
@@ -130,12 +130,12 @@ namespace AndroidMusicPresenceLink
             var cfg = App.Config;
             var opts = new BatteryRenderOptions
             {
-                Style = cfg.BatteryVisualStyle,
-                ShowPercent = cfg.BatteryShowPercent,
-                PercentInside = cfg.BatteryPercentInside,
-                ShowBolt = cfg.BatteryShowBolt,
-                BoltInside = cfg.BatteryBoltInside,
-                ColorMode = cfg.BatteryColorMode
+                Style = cfg.MediaPlayer.BatteryVisualStyle,
+                ShowPercent = cfg.MediaPlayer.BatteryShowPercent,
+                PercentInside = cfg.MediaPlayer.BatteryPercentInside,
+                ShowBolt = cfg.MediaPlayer.BatteryShowBolt,
+                BoltInside = cfg.MediaPlayer.BatteryBoltInside,
+                ColorMode = cfg.MediaPlayer.BatteryColorMode
             };
 
             int level = _batteryLevel;

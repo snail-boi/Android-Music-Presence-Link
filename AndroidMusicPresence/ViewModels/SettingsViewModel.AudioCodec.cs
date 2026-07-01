@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -77,17 +77,17 @@ namespace AndroidMusicPresenceLink
         partial void LoadAudioCodecFromConfig()
         {
             AudioCodecs.Clear();
-            if (_config.ScrcpyAvailableAudioCodecs != null && _config.ScrcpyAvailableAudioCodecs.Count > 0)
+            if (_config.AudioLink.AvailableCodecs != null && _config.AudioLink.AvailableCodecs.Count > 0)
             {
-                foreach (var codec in _config.ScrcpyAvailableAudioCodecs.Distinct(StringComparer.OrdinalIgnoreCase))
+                foreach (var codec in _config.AudioLink.AvailableCodecs.Distinct(StringComparer.OrdinalIgnoreCase))
                     AudioCodecs.Add(codec.ToLowerInvariant());
             }
             if (!AudioCodecs.Any(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase)))
                 AudioCodecs.Insert(0, "raw");
 
-            _audioBitrate = _config.ScrcpyAudioBitrate ?? string.Empty;
-            _audioBuffer = _config.ScrcpyAudioBuffer > 0 ? _config.ScrcpyAudioBuffer.ToString() : "50";
-            _flacCompressionLevel = _config.ScrcpyFlacCompressionLevel.ToString();
+            _audioBitrate = _config.AudioLink.Bitrate ?? string.Empty;
+            _audioBuffer = _config.AudioLink.BufferMs > 0 ? _config.AudioLink.BufferMs.ToString() : "50";
+            _flacCompressionLevel = _config.AudioLink.FlacCompressionLevel.ToString();
 
             SelectCodecFromConfig();
         }
@@ -95,40 +95,40 @@ namespace AndroidMusicPresenceLink
         partial void ApplyAudioCodecToConfig(MusicConfig config)
         {
             var selectedCodec = SelectedCodec ?? "raw";
-            config.ScrcpyAudioCodec = selectedCodec;
+            config.AudioLink.Codec = selectedCodec;
 
             if (selectedCodec.Equals("raw", StringComparison.OrdinalIgnoreCase))
             {
-                config.ScrcpyAudioBitrate = string.Empty;
+                config.AudioLink.Bitrate = string.Empty;
             }
             else
             {
                 var bitrateText = AudioBitrate.Trim();
                 if (string.IsNullOrEmpty(bitrateText))
                 {
-                    config.ScrcpyAudioBitrate = string.Empty;
+                    config.AudioLink.Bitrate = string.Empty;
                 }
                 else if (int.TryParse(bitrateText, out var bitrateValue))
                 {
                     if (bitrateValue < 1)
                         bitrateValue = 1;
-                    config.ScrcpyAudioBitrate = bitrateValue > 0 ? bitrateValue.ToString() : string.Empty;
+                    config.AudioLink.Bitrate = bitrateValue > 0 ? bitrateValue.ToString() : string.Empty;
                 }
                 else
                 {
-                    config.ScrcpyAudioBitrate = string.Empty;
+                    config.AudioLink.Bitrate = string.Empty;
                 }
             }
 
             if (int.TryParse(AudioBuffer.Trim(), out var bufferValue) && bufferValue > 0)
-                config.ScrcpyAudioBuffer = Math.Max(1, bufferValue);
+                config.AudioLink.BufferMs = Math.Max(1, bufferValue);
             else
-                config.ScrcpyAudioBuffer = 50;
+                config.AudioLink.BufferMs = 50;
 
             if (int.TryParse(FlacCompressionLevel.Trim(), out var flacLevel))
-                config.ScrcpyFlacCompressionLevel = Math.Clamp(flacLevel, 1, 8);
+                config.AudioLink.FlacCompressionLevel = Math.Clamp(flacLevel, 1, 8);
             else
-                config.ScrcpyFlacCompressionLevel = 5;
+                config.AudioLink.FlacCompressionLevel = 5;
         }
 
         // Save-only interactive coercion. Adjusts the bound bitrate/buffer when the user declines
@@ -173,7 +173,7 @@ namespace AndroidMusicPresenceLink
 
         private void SelectCodecFromConfig()
         {
-            var codec = string.IsNullOrWhiteSpace(_config.ScrcpyAudioCodec) ? "raw" : _config.ScrcpyAudioCodec.Trim();
+            var codec = string.IsNullOrWhiteSpace(_config.AudioLink.Codec) ? "raw" : _config.AudioLink.Codec.Trim();
             if (!AudioCodecs.Any(c => c.Equals(codec, StringComparison.OrdinalIgnoreCase)))
                 codec = "raw";
 
@@ -199,7 +199,7 @@ namespace AndroidMusicPresenceLink
 
             // Stamp the preset onto the in-memory config so the media player's quality button
             // shows the friendly label even before Save.
-            _config.AudioQualityPresetName = preset.Name;
+            _config.AudioLink.QualityPresetName = preset.Name;
         }
 
         private async Task LoadScrcpyCodecsAsync()
@@ -234,7 +234,7 @@ namespace AndroidMusicPresenceLink
                 foreach (var codec in codecs)
                     AudioCodecs.Add(codec);
 
-                _config.ScrcpyAvailableAudioCodecs = codecs.ToList();
+                _config.AudioLink.AvailableCodecs = codecs.ToList();
                 MusicConfigManager.Save(_config);
                 UpdateSavedSnapshot();
 

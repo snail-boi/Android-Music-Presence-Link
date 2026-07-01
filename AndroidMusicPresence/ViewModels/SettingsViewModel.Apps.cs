@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -7,7 +7,7 @@ namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Apps group: the eligible-apps list with per-row presence and cover toggles, plus Manage
-    /// Apps (opens the manager dialog) and Clear Disabled. The list mirrors config.EligibleApps;
+    /// Apps (opens the manager dialog) and Clear Disabled. The list mirrors config.Apps.EligibleApps;
     /// Manage and Clear edit the config and rebuild the list, while the per-row toggles edit the
     /// AppPackageItem rows directly and are written back to config on save.
     /// </summary>
@@ -34,11 +34,11 @@ namespace AndroidMusicPresenceLink
             LoadAppsFromConfig();
         }
 
-        // Equivalent to the old RefreshAppsSummary: rebuild the rows from config.EligibleApps.
+        // Equivalent to the old RefreshAppsSummary: rebuild the rows from config.Apps.EligibleApps.
         partial void LoadAppsFromConfig()
         {
             AppPackages.Clear();
-            foreach (var app in _config.EligibleApps ?? new List<EligibleAppConfig>())
+            foreach (var app in _config.Apps.EligibleApps ?? new List<EligibleAppConfig>())
             {
                 if (string.IsNullOrWhiteSpace(app.PackageName))
                     continue;
@@ -52,7 +52,7 @@ namespace AndroidMusicPresenceLink
         {
             if (AppPackages.Count > 0)
             {
-                config.EligibleApps = AppPackages
+                config.Apps.EligibleApps = AppPackages
                     .Select(item => new EligibleAppConfig
                     {
                         PackageName = item.PackageName,
@@ -71,7 +71,7 @@ namespace AndroidMusicPresenceLink
             }
             else
             {
-                config.EligibleApps = _config.EligibleApps?.Select(a => new EligibleAppConfig
+                config.Apps.EligibleApps = _config.Apps.EligibleApps?.Select(a => new EligibleAppConfig
                 {
                     PackageName = a.PackageName,
                     PresenceMode = a.PresenceMode,
@@ -79,7 +79,7 @@ namespace AndroidMusicPresenceLink
                 }).ToList() ?? new List<EligibleAppConfig>();
             }
 
-            config.AllowedApps = config.EligibleApps
+            config.Apps.AllowedApps = config.Apps.EligibleApps
                 .Where(a => a.PresenceMode != PresenceMode.Off)
                 .Select(a => a.PackageName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -90,15 +90,15 @@ namespace AndroidMusicPresenceLink
         {
             ShowAppsManager?.Invoke(_config, updated =>
             {
-                _config.EligibleApps = updated.EligibleApps;
-                _config.AllowedApps = updated.AllowedApps;
+                _config.Apps.EligibleApps = updated.Apps.EligibleApps;
+                _config.Apps.AllowedApps = updated.Apps.AllowedApps;
                 LoadAppsFromConfig();
             });
         }
 
         private void ClearDisabledApps()
         {
-            _config.EligibleApps = _config.EligibleApps
+            _config.Apps.EligibleApps = _config.Apps.EligibleApps
                 .Where(a => a.PresenceMode != PresenceMode.Off || a.EnableCoverSearch)
                 .ToList();
             LoadAppsFromConfig();

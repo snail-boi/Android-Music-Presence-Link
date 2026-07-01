@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -108,7 +108,7 @@ namespace AndroidMusicPresenceLink
 
             _timer = new DispatcherTimer
             {
-                Interval = GetInterval(config.UpdateIntervalMode)
+                Interval = GetInterval(config.Polling.Interval)
             };
             _timer.Tick += async (_, __) => await TickAsync();
         }
@@ -128,10 +128,10 @@ namespace AndroidMusicPresenceLink
             // the next tick to re-detect. Otherwise a manual switch (e.g. Wi-Fi to
             // USB) would be ignored while the current link keeps answering.
             bool connectionChanged =
-                _config.WifiMode != config.WifiMode
-                || _config.IsWifiEnabled != config.IsWifiEnabled
-                || !string.Equals(_config.SelectedDeviceUSB, config.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(_config.SelectedDeviceWiFi, config.SelectedDeviceWiFi, StringComparison.OrdinalIgnoreCase);
+                _config.Device.WifiMode != config.Device.WifiMode
+                || _config.Device.IsWifiEnabled != config.Device.IsWifiEnabled
+                || !string.Equals(_config.Device.SelectedDeviceUSB, config.Device.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(_config.Device.SelectedDeviceWiFi, config.Device.SelectedDeviceWiFi, StringComparison.OrdinalIgnoreCase);
 
             _config = config;
             _mediaController.UpdateConfig(config);
@@ -144,7 +144,7 @@ namespace AndroidMusicPresenceLink
                 _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
             }
 
-            var interval = GetInterval(config.UpdateIntervalMode);
+            var interval = GetInterval(config.Polling.Interval);
             _timer.Interval = interval;
             if (interval.TotalSeconds <= 0)
             {
@@ -294,10 +294,10 @@ namespace AndroidMusicPresenceLink
                 // True in every mode (USB-only, WD, TCP/IP). Prefer the saved serial;
                 // otherwise take the first online non-wireless serial.
                 string usb = string.Empty;
-                if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB)
-                    && deviceList.Any(l => GetOnlineSerial(l).Equals(_config.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)))
+                if (!string.IsNullOrWhiteSpace(_config.Device.SelectedDeviceUSB)
+                    && deviceList.Any(l => GetOnlineSerial(l).Equals(_config.Device.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)))
                 {
-                    usb = _config.SelectedDeviceUSB;
+                    usb = _config.Device.SelectedDeviceUSB;
                 }
                 else
                 {
@@ -334,16 +334,16 @@ namespace AndroidMusicPresenceLink
                     // steady-state "USB always plugged" path. WD never reaches this;
                     // it reconnects over mDNS without USB.
                     if (wasAwaitingUsbReconnect
-                        && _config.WifiMode == WirelessMode.TcpIp
-                        && _config.IsWifiEnabled == true
-                        && !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
-                        && _config.SelectedDeviceWiFi != "None")
+                        && _config.Device.WifiMode == WirelessMode.TcpIp
+                        && _config.Device.IsWifiEnabled == true
+                        && !string.IsNullOrWhiteSpace(_config.Device.SelectedDeviceWiFi)
+                        && _config.Device.SelectedDeviceWiFi != "None")
                     {
                         var newWifi = await SetupWirelessFromUsbAsync(usb).ConfigureAwait(false);
                         if (!string.IsNullOrWhiteSpace(newWifi)
-                            && !string.Equals(newWifi, _config.SelectedDeviceWiFi, StringComparison.OrdinalIgnoreCase))
+                            && !string.Equals(newWifi, _config.Device.SelectedDeviceWiFi, StringComparison.OrdinalIgnoreCase))
                         {
-                            _config.SelectedDeviceWiFi = newWifi;
+                            _config.Device.SelectedDeviceWiFi = newWifi;
                             MusicConfigManager.Save(_config);
                             await _dispatcher.InvokeAsync(() => (Application.Current as App)?.UpdateConfig(_config));
                         }
@@ -361,7 +361,7 @@ namespace AndroidMusicPresenceLink
                 var now = DateTimeOffset.UtcNow;
                 bool mayReconnect = now - _lastWirelessReconnectUtc >= WirelessReconnectInterval;
 
-                switch (_config.WifiMode)
+                switch (_config.Device.WifiMode)
                 {
                     case WirelessMode.UsbOnly:
                         // No wireless of any kind. Without a cable there is no device,
@@ -393,11 +393,11 @@ namespace AndroidMusicPresenceLink
                             // run per tick; they add a blocking connect and extra adb-
                             // devices calls every poll while the cable is out.
                             if (mayReconnect
-                                && _config.IsWifiEnabled == true
-                                && !string.IsNullOrWhiteSpace(_config.WifiMdnsServiceName))
+                                && _config.Device.IsWifiEnabled == true
+                                && !string.IsNullOrWhiteSpace(_config.Device.MdnsServiceName))
                             {
                                 _lastWirelessReconnectUtc = now;
-                                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.WifiMdnsServiceName).ConfigureAwait(false);
+                                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.Device.MdnsServiceName).ConfigureAwait(false);
                                 if (!string.IsNullOrWhiteSpace(ipPort))
                                 {
                                     _currentDevice = ipPort;
@@ -407,9 +407,9 @@ namespace AndroidMusicPresenceLink
                                     _wifiReconnectFailurePromptShown = false;
                                     _lastWirelessReconnectUtc = DateTimeOffset.MinValue;
 
-                                    if (!string.Equals(_config.SelectedDeviceWiFi, ipPort, StringComparison.OrdinalIgnoreCase))
+                                    if (!string.Equals(_config.Device.SelectedDeviceWiFi, ipPort, StringComparison.OrdinalIgnoreCase))
                                     {
-                                        _config.SelectedDeviceWiFi = ipPort;
+                                        _config.Device.SelectedDeviceWiFi = ipPort;
                                         MusicConfigManager.Save(_config);
                                         await _dispatcher.InvokeAsync(() => (Application.Current as App)?.UpdateConfig(_config));
                                     }
@@ -427,8 +427,8 @@ namespace AndroidMusicPresenceLink
 
                     case WirelessMode.TcpIp:
                         {
-                            bool wifiConfigured = !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
-                                && _config.SelectedDeviceWiFi != "None";
+                            bool wifiConfigured = !string.IsNullOrWhiteSpace(_config.Device.SelectedDeviceWiFi)
+                                && _config.Device.SelectedDeviceWiFi != "None";
 
                             // Already up over TCP/IP? The live serial is the ip:port. Cheap
                             // path off the probe above, runs every poll.
@@ -447,12 +447,12 @@ namespace AndroidMusicPresenceLink
                             // Not up: throttled single connect to the saved fixed port
                             // (option B). Not run per tick; a connect to an unreachable
                             // endpoint blocks for the TCP timeout.
-                            if (mayReconnect && wifiConfigured && _config.IsWifiEnabled == true)
+                            if (mayReconnect && wifiConfigured && _config.Device.IsWifiEnabled == true)
                             {
                                 _lastWirelessReconnectUtc = now;
-                                if (await WirelessDebuggingHelper.TryConnectLastKnownAsync(_config.SelectedDeviceWiFi).ConfigureAwait(false))
+                                if (await WirelessDebuggingHelper.TryConnectLastKnownAsync(_config.Device.SelectedDeviceWiFi).ConfigureAwait(false))
                                 {
-                                    _currentDevice = _config.SelectedDeviceWiFi;
+                                    _currentDevice = _config.Device.SelectedDeviceWiFi;
                                     _currentDeviceIsUsb = false;
                                     _wifiNeedsUsbReconnect = false;
                                     _wifiReconnectPromptShown = false;
@@ -467,7 +467,7 @@ namespace AndroidMusicPresenceLink
                             // itself is handled by the USB branch above.
                             Disconnect();
                             _currentDeviceIsUsb = false;
-                            _wifiNeedsUsbReconnect = wifiConfigured && _config.IsWifiEnabled == true;
+                            _wifiNeedsUsbReconnect = wifiConfigured && _config.Device.IsWifiEnabled == true;
                             if (_wifiNeedsUsbReconnect && !_wifiReconnectPromptShown)
                             {
                                 _wifiReconnectPromptShown = true;
@@ -535,10 +535,10 @@ namespace AndroidMusicPresenceLink
             var deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
             string usbSerial = string.Empty;
-            if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB)
-                && deviceList.Any(l => GetOnlineSerial(l).Equals(_config.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrWhiteSpace(_config.Device.SelectedDeviceUSB)
+                && deviceList.Any(l => GetOnlineSerial(l).Equals(_config.Device.SelectedDeviceUSB, StringComparison.OrdinalIgnoreCase)))
             {
-                usbSerial = _config.SelectedDeviceUSB;
+                usbSerial = _config.Device.SelectedDeviceUSB;
             }
             else
             {
@@ -577,7 +577,7 @@ namespace AndroidMusicPresenceLink
 
             try
             {
-                if (_config.WifiMode == WirelessMode.WirelessDebugging)
+                if (_config.Device.WifiMode == WirelessMode.WirelessDebugging)
                 {
                     await RecoverWirelessDebuggingAsync().ConfigureAwait(false);
                 }
@@ -617,7 +617,7 @@ namespace AndroidMusicPresenceLink
             if (string.IsNullOrWhiteSpace(newWifi))
                 return;
 
-            _config.SelectedDeviceWiFi = newWifi;
+            _config.Device.SelectedDeviceWiFi = newWifi;
             MusicConfigManager.Save(_config);
             await _dispatcher.InvokeAsync(() =>
             {
@@ -638,12 +638,12 @@ namespace AndroidMusicPresenceLink
         private async Task RecoverWirelessDebuggingAsync()
         {
             // Step 1: mDNS lookup for the persisted service name.
-            if (!string.IsNullOrWhiteSpace(_config.WifiMdnsServiceName))
+            if (!string.IsNullOrWhiteSpace(_config.Device.MdnsServiceName))
             {
-                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.WifiMdnsServiceName).ConfigureAwait(false);
+                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.Device.MdnsServiceName).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(ipPort))
                 {
-                    _config.SelectedDeviceWiFi = ipPort;
+                    _config.Device.SelectedDeviceWiFi = ipPort;
                     _currentDevice = ipPort;
                     _currentDeviceIsUsb = false;
                     _wifiNeedsUsbReconnect = false;
@@ -661,12 +661,12 @@ namespace AndroidMusicPresenceLink
             // Step 2: try the last-known ip:port directly. Cheap, sometimes
             // works on networks where mDNS multicast is blocked but the
             // phone happens to still be on the same port.
-            if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi)
-                && _config.SelectedDeviceWiFi != "None")
+            if (!string.IsNullOrWhiteSpace(_config.Device.SelectedDeviceWiFi)
+                && _config.Device.SelectedDeviceWiFi != "None")
             {
-                if (await WirelessDebuggingHelper.TryConnectLastKnownAsync(_config.SelectedDeviceWiFi).ConfigureAwait(false))
+                if (await WirelessDebuggingHelper.TryConnectLastKnownAsync(_config.Device.SelectedDeviceWiFi).ConfigureAwait(false))
                 {
-                    _currentDevice = _config.SelectedDeviceWiFi;
+                    _currentDevice = _config.Device.SelectedDeviceWiFi;
                     _currentDeviceIsUsb = false;
                     _wifiNeedsUsbReconnect = false;
                     _wifiReconnectPromptShown = false;
@@ -696,12 +696,12 @@ namespace AndroidMusicPresenceLink
 
             // Retry mDNS now that we have USB context. Some networks only
             // surface the service after the phone has been actively used.
-            if (!string.IsNullOrWhiteSpace(_config.WifiMdnsServiceName))
+            if (!string.IsNullOrWhiteSpace(_config.Device.MdnsServiceName))
             {
-                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.WifiMdnsServiceName).ConfigureAwait(false);
+                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(_config.Device.MdnsServiceName).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(ipPort))
                 {
-                    _config.SelectedDeviceWiFi = ipPort;
+                    _config.Device.SelectedDeviceWiFi = ipPort;
                     _currentDevice = ipPort;
                     _currentDeviceIsUsb = false;
                     _wifiNeedsUsbReconnect = false;
@@ -720,13 +720,13 @@ namespace AndroidMusicPresenceLink
             // last-known port at that IP. If THAT also fails, the user
             // needs to re-pair, which we can't do silently.
             var freshIp = await DeviceQuery.GetDeviceWifiIpAsync(usbDevice).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(freshIp) && !string.IsNullOrWhiteSpace(_config.SelectedDeviceWiFi))
+            if (!string.IsNullOrWhiteSpace(freshIp) && !string.IsNullOrWhiteSpace(_config.Device.SelectedDeviceWiFi))
             {
-                var lastPort = ExtractWifiPort(_config.SelectedDeviceWiFi);
+                var lastPort = ExtractWifiPort(_config.Device.SelectedDeviceWiFi);
                 var candidate = $"{freshIp}:{lastPort}";
                 if (await WirelessDebuggingHelper.TryConnectLastKnownAsync(candidate).ConfigureAwait(false))
                 {
-                    _config.SelectedDeviceWiFi = candidate;
+                    _config.Device.SelectedDeviceWiFi = candidate;
                     _currentDevice = candidate;
                     _currentDeviceIsUsb = false;
                     _wifiNeedsUsbReconnect = false;
@@ -753,8 +753,8 @@ namespace AndroidMusicPresenceLink
 
             bool IsDeviceConnected(string id) => deviceList.Any(l => l.StartsWith(id) && l.EndsWith("device"));
 
-            if (!string.IsNullOrWhiteSpace(_config.SelectedDeviceUSB) && IsDeviceConnected(_config.SelectedDeviceUSB))
-                return _config.SelectedDeviceUSB;
+            if (!string.IsNullOrWhiteSpace(_config.Device.SelectedDeviceUSB) && IsDeviceConnected(_config.Device.SelectedDeviceUSB))
+                return _config.Device.SelectedDeviceUSB;
 
             foreach (var entry in deviceList)
             {
@@ -774,7 +774,7 @@ namespace AndroidMusicPresenceLink
 
         private async Task<string> SetupWirelessFromUsbAsync(string usbDevice)
         {
-            int port = ExtractWifiPort(_config.SelectedDeviceWiFi);
+            int port = ExtractWifiPort(_config.Device.SelectedDeviceWiFi);
             var ip = await DeviceQuery.GetDeviceWifiIpAsync(usbDevice).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(ip))
                 return string.Empty;
@@ -925,7 +925,7 @@ namespace AndroidMusicPresenceLink
                 //   state=<number>
                 //   position=<ms>
                 // Empty output means no active eligible session.
-                var pkgList = string.Join("|", (_config.EligibleApps ?? new List<EligibleAppConfig>())
+                var pkgList = string.Join("|", (_config.Apps.EligibleApps ?? new List<EligibleAppConfig>())
                     .Where(a => !string.IsNullOrWhiteSpace(a.PackageName) && a.PresenceMode != PresenceMode.Off)
                     .Select(a => a.PackageName.Trim())
                     .Distinct(StringComparer.OrdinalIgnoreCase));
@@ -988,7 +988,7 @@ namespace AndroidMusicPresenceLink
                 }
 
                 // Look up cover search and SMTC flags for the matched package.
-                var eligibleApps = (_config.EligibleApps ?? new List<EligibleAppConfig>())
+                var eligibleApps = (_config.Apps.EligibleApps ?? new List<EligibleAppConfig>())
                     .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
                     .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(
@@ -1102,10 +1102,10 @@ namespace AndroidMusicPresenceLink
                             _pausedSignature = signature;
                         }
 
-                        if (_config.SmtcPauseClearDelayMinutes > 0 && _pausedSince.HasValue)
+                        if (_config.MediaPlayer.SmtcPauseClearDelayMinutes > 0 && _pausedSince.HasValue)
                         {
                             var elapsed = DateTimeOffset.UtcNow - _pausedSince.Value;
-                            if (elapsed.TotalMinutes >= _config.SmtcPauseClearDelayMinutes)
+                            if (elapsed.TotalMinutes >= _config.MediaPlayer.SmtcPauseClearDelayMinutes)
                             {
                                 if (!_smtcPausedCleared)
                                 {
@@ -1117,7 +1117,7 @@ namespace AndroidMusicPresenceLink
                                 return false;
                             }
                         }
-                        else if (_config.SmtcPauseClearDelayMinutes == 0)
+                        else if (_config.MediaPlayer.SmtcPauseClearDelayMinutes == 0)
                         {
                             // legacy logging, this probably won't be changed and if it is then just uncomment
                             //Debugger.show("not clearing value 0 is no timeout");
@@ -1215,7 +1215,7 @@ namespace AndroidMusicPresenceLink
                 // adb caches it as "ip:port" in subsequent `adb devices`
                 // output, identical to a TCP/IP serial. So we can only fall
                 // back to serial-shape inference if WifiMode is somehow unset.
-                bool isWirelessDebugging = _config.WifiMode == WirelessMode.WirelessDebugging;
+                bool isWirelessDebugging = _config.Device.WifiMode == WirelessMode.WirelessDebugging;
 
                 if (isWirelessDebugging)
                     return hasActiveSong ? TrayIconState.ActiveWifiDebug : TrayIconState.InactiveWifiDebug;
@@ -1260,7 +1260,7 @@ namespace AndroidMusicPresenceLink
         {
             _lastActivityUtc = DateTimeOffset.UtcNow;
 
-            if (!_config.AdaptivePollingEnabled || !_adaptiveActive)
+            if (!_config.Polling.AdaptiveEnabled || !_adaptiveActive)
                 return;
 
             _adaptiveActive = false; // set synchronously so a burst doesn't queue many
@@ -1269,7 +1269,7 @@ namespace AndroidMusicPresenceLink
 
         private void ResumeBasePolling()
         {
-            var baseInterval = GetInterval(_config.UpdateIntervalMode);
+            var baseInterval = GetInterval(_config.Polling.Interval);
             if (baseInterval.TotalSeconds <= 0)
                 return;
 
@@ -1283,10 +1283,10 @@ namespace AndroidMusicPresenceLink
         // never below the user's configured interval. Runs on the dispatcher thread.
         private void ApplyAdaptivePolling(bool isPlaying)
         {
-            if (!_config.AdaptivePollingEnabled)
+            if (!_config.Polling.AdaptiveEnabled)
                 return;
 
-            var baseInterval = GetInterval(_config.UpdateIntervalMode);
+            var baseInterval = GetInterval(_config.Polling.Interval);
             if (baseInterval.TotalSeconds <= 0)
                 return; // polling disabled entirely; nothing to scale
 
@@ -1300,7 +1300,7 @@ namespace AndroidMusicPresenceLink
 
             // N = user threshold in minutes. Playing gets 2N for the first drop;
             // subsequent steps use ceil(N/2), ceil(N/4), ceil(N/8).
-            double n = Math.Max(1, _config.AdaptivePollingThresholdMinutes);
+            double n = Math.Max(1, _config.Polling.AdaptiveThresholdMinutes);
             double step1 = isPlaying ? n * 2 : n;
             double step2 = step1 + Math.Ceiling(n / 2.0);
             double step3 = step2 + Math.Ceiling(n / 4.0);
@@ -1333,7 +1333,7 @@ namespace AndroidMusicPresenceLink
                 if (target > baseInterval)
                 {
                     Debugger.show($"[ADAPTIVE] Poll interval slowed: {_timer.Interval.TotalSeconds:0}s -> {target.TotalSeconds:0}s (inactive for {(DateTimeOffset.UtcNow - _lastActivityUtc).TotalMinutes:0.0} min).");
-                    if (_config.AdaptivePollingAlertEnabled)
+                    if (_config.Polling.AdaptiveAlertEnabled)
                         (Application.Current as App)?.ShowToast($"Poll rate slowed to {target.TotalSeconds:0}s due to inactivity.", ToastLevel.Info);
                     // Extend the shell session idle timeout when we reach the 30s stage
                     // so the persistent session doesn't expire between polls.

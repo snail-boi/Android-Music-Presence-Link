@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -113,18 +113,18 @@ namespace AndroidMusicPresenceLink
                 return string.Empty;
             }
 
-            if (!string.IsNullOrWhiteSpace(config.SelectedDeviceUSB) && IsDeviceConnected(config.SelectedDeviceUSB))
+            if (!string.IsNullOrWhiteSpace(config.Device.SelectedDeviceUSB) && IsDeviceConnected(config.Device.SelectedDeviceUSB))
             {
-                return config.SelectedDeviceUSB;
+                return config.Device.SelectedDeviceUSB;
             }
 
             // USB-only mode: never attempt a wireless connection.
-            if (config.WifiMode == WirelessMode.UsbOnly)
+            if (config.Device.WifiMode == WirelessMode.UsbOnly)
                 return string.Empty;
 
-            if (config.WifiMode == WirelessMode.WirelessDebugging && !string.IsNullOrWhiteSpace(config.WifiMdnsServiceName))
+            if (config.Device.WifiMode == WirelessMode.WirelessDebugging && !string.IsNullOrWhiteSpace(config.Device.MdnsServiceName))
             {
-                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(config.WifiMdnsServiceName).ConfigureAwait(false);
+                var ipPort = await WirelessDebuggingHelper.ReconnectViaMdnsAsync(config.Device.MdnsServiceName).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(ipPort))
                 {
                     devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
@@ -141,17 +141,17 @@ namespace AndroidMusicPresenceLink
                 return string.Empty;
             }
 
-            if (!string.IsNullOrWhiteSpace(config.SelectedDeviceWiFi) && config.SelectedDeviceWiFi != "None")
+            if (!string.IsNullOrWhiteSpace(config.Device.SelectedDeviceWiFi) && config.Device.SelectedDeviceWiFi != "None")
             {
-                if (!IsDeviceConnected(config.SelectedDeviceWiFi))
+                if (!IsDeviceConnected(config.Device.SelectedDeviceWiFi))
                 {
-                    await AdbHelper.RunAdbCaptureAsync($"connect {config.SelectedDeviceWiFi}").ConfigureAwait(false);
+                    await AdbHelper.RunAdbCaptureAsync($"connect {config.Device.SelectedDeviceWiFi}").ConfigureAwait(false);
                     devices = await AdbHelper.RunAdbCaptureAsync("devices").ConfigureAwait(false);
                     deviceList = devices.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 }
 
-                if (IsDeviceConnected(config.SelectedDeviceWiFi))
-                    return config.SelectedDeviceWiFi;
+                if (IsDeviceConnected(config.Device.SelectedDeviceWiFi))
+                    return config.Device.SelectedDeviceWiFi;
             }
 
             return string.Empty;

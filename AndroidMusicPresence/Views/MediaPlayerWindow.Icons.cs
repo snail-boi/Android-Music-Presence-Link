@@ -15,7 +15,7 @@ namespace AndroidMusicPresenceLink
         /// <summary>
         /// Returns whether the dark theme is currently active. Reads from the live
         /// ThemeBackgroundBrush resource because the dark-mode toggle only calls
-        /// ApplyTheme, leaving App.Config.UseDarkMode stale until the next save.
+        /// ApplyTheme, leaving App.Config.Theme.UseDarkMode stale until the next save.
         /// </summary>
         private static bool IsDarkThemeActive()
         {
@@ -26,7 +26,7 @@ namespace AndroidMusicPresenceLink
                 int luma = (c.R * 299 + c.G * 587 + c.B * 114) / 1000;
                 return luma < 128;
             }
-            return App.Config?.UseDarkMode ?? true;
+            return App.Config?.Theme.UseDarkMode ?? true;
         }
         private Brush ResolveIconBrush()
         {

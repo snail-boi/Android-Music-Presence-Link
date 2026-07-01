@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -91,14 +91,14 @@ namespace AndroidMusicPresenceLink
         {
             if (config == null) return null;
 
-            var codec = string.IsNullOrWhiteSpace(config.ScrcpyAudioCodec) ? "raw" : config.ScrcpyAudioCodec.Trim().ToLowerInvariant();
-            var bitrate = (config.ScrcpyAudioBitrate ?? string.Empty).Trim();
+            var codec = string.IsNullOrWhiteSpace(config.AudioLink.Codec) ? "raw" : config.AudioLink.Codec.Trim().ToLowerInvariant();
+            var bitrate = (config.AudioLink.Bitrate ?? string.Empty).Trim();
             // Strip a trailing "K" if any tooling added it.
             if (bitrate.EndsWith("K", StringComparison.OrdinalIgnoreCase))
                 bitrate = bitrate[..^1];
 
-            var buffer = config.ScrcpyAudioBuffer > 0 ? config.ScrcpyAudioBuffer : 80;
-            var flac = config.ScrcpyFlacCompressionLevel;
+            var buffer = config.AudioLink.BufferMs > 0 ? config.AudioLink.BufferMs : 80;
+            var flac = config.AudioLink.FlacCompressionLevel;
 
             foreach (var preset in All)
             {
@@ -132,17 +132,17 @@ namespace AndroidMusicPresenceLink
         {
             if (config == null || preset == null) return;
 
-            config.ScrcpyAudioCodec = preset.Codec;
+            config.AudioLink.Codec = preset.Codec;
             // Empty means "no explicit bitrate"; the launch code already handles that.
-            config.ScrcpyAudioBitrate = preset.Bitrate;
-            config.ScrcpyAudioBuffer = preset.BufferMs > 0 ? preset.BufferMs : 80;
+            config.AudioLink.Bitrate = preset.Bitrate;
+            config.AudioLink.BufferMs = preset.BufferMs > 0 ? preset.BufferMs : 80;
 
             if (preset.Codec.Equals("flac", StringComparison.OrdinalIgnoreCase))
             {
-                config.ScrcpyFlacCompressionLevel = Math.Clamp(preset.FlacCompressionLevel, 1, 8);
+                config.AudioLink.FlacCompressionLevel = Math.Clamp(preset.FlacCompressionLevel, 1, 8);
             }
 
-            config.AudioQualityPresetName = preset.Name;
+            config.AudioLink.QualityPresetName = preset.Name;
         }
 
 
@@ -150,11 +150,11 @@ namespace AndroidMusicPresenceLink
             string codec, string bitrate, int bufferMs, int flacLevel)
         {
             if (config == null) return;
-            config.ScrcpyAudioCodec = codec;
-            config.ScrcpyAudioBitrate = bitrate;
-            config.ScrcpyAudioBuffer = bufferMs;
-            config.ScrcpyFlacCompressionLevel = flacLevel;
-            config.AudioQualityPresetName = CustomLabel;
+            config.AudioLink.Codec = codec;
+            config.AudioLink.Bitrate = bitrate;
+            config.AudioLink.BufferMs = bufferMs;
+            config.AudioLink.FlacCompressionLevel = flacLevel;
+            config.AudioLink.QualityPresetName = CustomLabel;
         }
 
         public static string GetShortLabelForConfig(MusicConfig config)

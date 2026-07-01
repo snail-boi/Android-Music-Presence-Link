@@ -106,7 +106,7 @@ namespace AndroidMusicPresenceLink
                 // No song playing: follow the active theme. Dark mode stays near-black,
                 // light mode goes near-white so it matches the rest of the UI.
                 // Read from live resources rather than App.Config because the dark-mode
-                // toggle calls ApplyTheme without updating Config.UseDarkMode.
+                // toggle calls ApplyTheme without updating Config.Theme.UseDarkMode.
                 var solid = new SolidColorBrush(isDarkNow
                     ? Color.FromRgb(22, 22, 22)
                     : Color.FromRgb(247, 247, 247));
@@ -115,7 +115,7 @@ namespace AndroidMusicPresenceLink
             }
             else
             {
-                int samplePoints = App.Config?.PlayerGradientSamplePoints ?? 8;
+                int samplePoints = App.Config?.MediaPlayer.GradientSamplePoints ?? 8;
                 var colors = ExtractGradientColors(imagePath, samplePoints);
                 newBrush = BuildGradientBrush(colors, samplePoints);
             }

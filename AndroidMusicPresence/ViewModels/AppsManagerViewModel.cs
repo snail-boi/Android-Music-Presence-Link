@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -74,7 +74,7 @@ namespace AndroidMusicPresenceLink
                 }
 
                 // Build a combined list: installed packages + any already saved in config
-                var savedApps = (_config.EligibleApps ?? new List<EligibleAppConfig>())
+                var savedApps = (_config.Apps.EligibleApps ?? new List<EligibleAppConfig>())
                     .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
                     .ToDictionary(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase);
 
@@ -106,28 +106,31 @@ namespace AndroidMusicPresenceLink
         {
             var updatedConfig = new MusicConfig
             {
-                EligibleApps = Items
-                    .Where(i => i.PresenceMode != PresenceMode.Off || i.EnableCoverSearch)
-                    .Select(i => new EligibleAppConfig
-                    {
-                        PackageName = i.PackageName,
-                        PresenceMode = i.PresenceMode,
-                        EnableCoverSearch = i.EnableCoverSearch
-                    })
-                    .ToList(),
-                AllowedApps = Items
-                    .Where(i => i.PresenceMode != PresenceMode.Off)
-                    .Select(i => i.PackageName)
-                    .ToList()
+                Apps = new AppsConfig
+                {
+                    EligibleApps = Items
+                        .Where(i => i.PresenceMode != PresenceMode.Off || i.EnableCoverSearch)
+                        .Select(i => new EligibleAppConfig
+                        {
+                            PackageName = i.PackageName,
+                            PresenceMode = i.PresenceMode,
+                            EnableCoverSearch = i.EnableCoverSearch
+                        })
+                        .ToList(),
+                    AllowedApps = Items
+                        .Where(i => i.PresenceMode != PresenceMode.Off)
+                        .Select(i => i.PackageName)
+                        .ToList()
+                }
             };
 
             // Merge back any existing config entries that weren't loaded (e.g. no device connected)
-            foreach (var existing in _config.EligibleApps ?? new List<EligibleAppConfig>())
+            foreach (var existing in _config.Apps.EligibleApps ?? new List<EligibleAppConfig>())
             {
-                if (!updatedConfig.EligibleApps.Any(a =>
+                if (!updatedConfig.Apps.EligibleApps.Any(a =>
                     string.Equals(a.PackageName, existing.PackageName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    updatedConfig.EligibleApps.Add(existing);
+                    updatedConfig.Apps.EligibleApps.Add(existing);
                 }
             }
 

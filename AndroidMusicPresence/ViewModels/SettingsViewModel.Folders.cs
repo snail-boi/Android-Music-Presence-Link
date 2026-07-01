@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -41,19 +41,19 @@ namespace AndroidMusicPresenceLink
             foreach (var root in GetNormalizedRemoteRoots(_config))
                 RemoteRoots.Add(root);
 
-            _lyricsFolder = _config.LyricsSearchFolderOverride ?? string.Empty;
+            _lyricsFolder = _config.Library.LyricsSearchFolderOverride ?? string.Empty;
         }
 
         partial void ApplyFoldersToConfig(MusicConfig config)
         {
-            config.MusicRemoteRoots = RemoteRoots
+            config.Library.MusicRemoteRoots = RemoteRoots
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            config.MusicRemoteRoot = config.MusicRemoteRoots.FirstOrDefault() ?? string.Empty;
+            config.Library.MusicRemoteRoot = config.Library.MusicRemoteRoots.FirstOrDefault() ?? string.Empty;
 
-            config.LyricsSearchFolderOverride = LyricsFolder.Trim();
+            config.Library.LyricsSearchFolderOverride = LyricsFolder.Trim();
         }
 
         private async Task PickRemoteRootAsync()
@@ -108,14 +108,14 @@ namespace AndroidMusicPresenceLink
 
         private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
         {
-            var roots = (config.MusicRemoteRoots ?? new List<string>())
+            var roots = (config.Library.MusicRemoteRoots ?? new List<string>())
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.MusicRemoteRoot))
-                roots.Add(config.MusicRemoteRoot.Trim());
+            if (roots.Count == 0 && !string.IsNullOrWhiteSpace(config.Library.MusicRemoteRoot))
+                roots.Add(config.Library.MusicRemoteRoot.Trim());
 
             return roots;
         }

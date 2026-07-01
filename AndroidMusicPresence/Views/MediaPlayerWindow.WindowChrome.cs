@@ -128,7 +128,7 @@ namespace AndroidMusicPresenceLink
                 Opacity = _alwaysOnTop ? 0.85 : 0.45
             };
 
-            ApplyPillMode(BtnAlwaysOnTop, App.Config?.PillModeAlwaysOnTop ?? 0);
+            ApplyPillMode(BtnAlwaysOnTop, App.Config?.MediaPlayer.PillModeAlwaysOnTop ?? 0);
         }
 
         // ── Connection Info ─────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ namespace AndroidMusicPresenceLink
             else if (status.StartsWith("Wireless"))
                 icon = BuildWdIcon(brush, 36);
             else if (status.StartsWith("Wi-Fi port"))
-                icon = BuildPortLostIcon(brush, App.Config?.WifiMode == WirelessMode.WirelessDebugging, 36);
+                icon = BuildPortLostIcon(brush, App.Config?.Device.WifiMode == WirelessMode.WirelessDebugging, 36);
             else
                 icon = BuildNoConnectionIcon(brush, 36);
 
@@ -200,7 +200,7 @@ namespace AndroidMusicPresenceLink
         private void RenderSettingsPaneArrowIcons()
         {
             var iconBrush = TryFindResource("ThemeControlForegroundBrush") as Brush ?? Brushes.White;
-            bool swap = App.Config?.SwapSettingsLocation ?? false;
+            bool swap = App.Config?.MediaPlayer.SwapSettingsLocation ?? false;
 
             // Left pane: open arrow points right normally, left when swapped (player settings live here).
             BtnShowSettingsPane.Content = swap ? BuildCollapseSettingsArrowIcon(iconBrush) : BuildRevealSettingsArrowIcon(iconBrush);
