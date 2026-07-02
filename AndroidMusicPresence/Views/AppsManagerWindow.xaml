@@ -199,6 +199,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="70" />
                     <ColumnDefinition Width="50" />
+                    <ColumnDefinition Width="70" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="App" FontWeight="SemiBold" FontSize="12"
                            Foreground="{DynamicResource ThemeForegroundBrush}" />
@@ -206,6 +207,9 @@
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource ThemeForegroundBrush}" />
                 <TextBlock Grid.Column="2" Text="Cover" FontWeight="SemiBold" FontSize="12"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeForegroundBrush}" />
+                <TextBlock Grid.Column="3" Text="Subsonic" FontWeight="SemiBold" FontSize="12"
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource ThemeForegroundBrush}" />
             </Grid>
@@ -230,6 +234,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="70" />
                                 <ColumnDefinition Width="50" />
+                                <ColumnDefinition Width="70" />
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
@@ -255,6 +260,16 @@
                                     Width="40"
                                     HorizontalAlignment="Center"
                                     Command="{Binding DataContext.ToggleCoverCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}" />
+
+                            <Button Grid.Column="3"
+                                    Content="{Binding SubsonicLabel}"
+                                    Background="{Binding SubsonicBrush}"
+                                    Style="{StaticResource CycleButton}"
+                                    Width="52"
+                                    HorizontalAlignment="Center"
+                                    ToolTip="Query the configured Subsonic server for cover art and duration. Combine with Cover to fall back only when no local file matches."
+                                    Command="{Binding DataContext.ToggleSubsonicCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     CommandParameter="{Binding}" />
                         </Grid>
                     </DataTemplate>

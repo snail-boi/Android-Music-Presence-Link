@@ -21,6 +21,7 @@ namespace AndroidMusicPresenceLink
 
         public RelayCommand<AppPackageItem> CyclePresenceModeCommand { get; private set; } = null!;
         public RelayCommand<AppPackageItem> ToggleCoverCommand { get; private set; } = null!;
+        public RelayCommand<AppPackageItem> ToggleSubsonicCommand { get; private set; } = null!;
         public RelayCommand ManageAppsCommand { get; private set; } = null!;
         public RelayCommand ClearDisabledAppsCommand { get; private set; } = null!;
 
@@ -28,6 +29,7 @@ namespace AndroidMusicPresenceLink
         {
             CyclePresenceModeCommand = new RelayCommand<AppPackageItem>(item => item?.CyclePresenceMode());
             ToggleCoverCommand = new RelayCommand<AppPackageItem>(item => item?.ToggleCover());
+            ToggleSubsonicCommand = new RelayCommand<AppPackageItem>(item => item?.ToggleSubsonic());
             ManageAppsCommand = new RelayCommand(ManageApps);
             ClearDisabledAppsCommand = new RelayCommand(ClearDisabledApps);
 
@@ -44,7 +46,7 @@ namespace AndroidMusicPresenceLink
                     continue;
                 if (app.PresenceMode == PresenceMode.Off)
                     continue;
-                AppPackages.Add(new AppPackageItem(app.PackageName, app.PresenceMode, app.EnableCoverSearch));
+                AppPackages.Add(new AppPackageItem(app.PackageName, app.PresenceMode, app.EnableCoverSearch, app.UseSubsonic));
             }
         }
 
@@ -57,7 +59,8 @@ namespace AndroidMusicPresenceLink
                     {
                         PackageName = item.PackageName,
                         PresenceMode = item.PresenceMode,
-                        EnableCoverSearch = item.EnableCoverSearch
+                        EnableCoverSearch = item.EnableCoverSearch,
+                        UseSubsonic = item.UseSubsonic
                     })
                     .Where(item => !string.IsNullOrWhiteSpace(item.PackageName))
                     .GroupBy(item => item.PackageName, StringComparer.OrdinalIgnoreCase)
@@ -65,7 +68,8 @@ namespace AndroidMusicPresenceLink
                     {
                         PackageName = g.Key,
                         PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
-                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch),
+                        UseSubsonic = g.Any(x => x.UseSubsonic)
                     })
                     .ToList();
             }
@@ -75,7 +79,8 @@ namespace AndroidMusicPresenceLink
                 {
                     PackageName = a.PackageName,
                     PresenceMode = a.PresenceMode,
-                    EnableCoverSearch = a.EnableCoverSearch
+                    EnableCoverSearch = a.EnableCoverSearch,
+                    UseSubsonic = a.UseSubsonic
                 }).ToList() ?? new List<EligibleAppConfig>();
             }
 
@@ -99,7 +104,7 @@ namespace AndroidMusicPresenceLink
         private void ClearDisabledApps()
         {
             _config.Apps.EligibleApps = _config.Apps.EligibleApps
-                .Where(a => a.PresenceMode != PresenceMode.Off || a.EnableCoverSearch)
+                .Where(a => a.PresenceMode != PresenceMode.Off || a.EnableCoverSearch || a.UseSubsonic)
                 .ToList();
             LoadAppsFromConfig();
         }

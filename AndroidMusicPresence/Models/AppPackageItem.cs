@@ -39,6 +39,21 @@ namespace AndroidMusicPresenceLink
             }
         }
 
+        private bool _useSubsonic;
+        public bool UseSubsonic
+        {
+            get => _useSubsonic;
+            set
+            {
+                if (_useSubsonic == value) return;
+                _useSubsonic = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UseSubsonic)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubsonicLabel)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubsonicColor)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubsonicBrush)));
+            }
+        }
+
         public string PresenceModeLabel => _presenceMode switch
         {
             PresenceMode.Full => "Full",
@@ -61,11 +76,17 @@ namespace AndroidMusicPresenceLink
         public System.Windows.Media.Brush CoverBrush => new System.Windows.Media.SolidColorBrush(
             (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(CoverColor));
 
-        public AppPackageItem(string packageName, PresenceMode presenceMode, bool enableCoverSearch)
+        public string SubsonicLabel => _useSubsonic ? "On" : "Off";
+        public string SubsonicColor => _useSubsonic ? "#34C954" : "#FF3B30";
+        public System.Windows.Media.Brush SubsonicBrush => new System.Windows.Media.SolidColorBrush(
+            (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(SubsonicColor));
+
+        public AppPackageItem(string packageName, PresenceMode presenceMode, bool enableCoverSearch, bool useSubsonic = false)
         {
             PackageName = packageName;
             _presenceMode = presenceMode;
             _enableCoverSearch = enableCoverSearch;
+            _useSubsonic = useSubsonic;
         }
 
         public void CyclePresenceMode()
@@ -81,6 +102,11 @@ namespace AndroidMusicPresenceLink
         public void ToggleCover()
         {
             EnableCoverSearch = !EnableCoverSearch;
+        }
+
+        public void ToggleSubsonic()
+        {
+            UseSubsonic = !UseSubsonic;
         }
     }
 }

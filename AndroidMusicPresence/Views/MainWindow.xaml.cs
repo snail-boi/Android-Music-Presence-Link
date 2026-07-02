@@ -39,6 +39,7 @@ namespace AndroidMusicPresenceLink
             _vm.ShowAppsManager = ShowAppsManagerDialog;
             _vm.StartHotkeyRecording = StartRecordingHotkey;
             RootContent.DataContext = _vm;
+            SeedSubsonicPasswordBox();
 
             _vm.PropertyChanged += Vm_PropertyChanged;
 
@@ -68,7 +69,23 @@ namespace AndroidMusicPresenceLink
         internal void SyncRuntimeConfig(MusicConfig config)
         {
             _vm.SyncRuntimeConfig(config);
+            SeedSubsonicPasswordBox();
             UpdateMediaPlayerModeButton((Application.Current as App)?.IsMediaPlayerModeActive() == true);
+        }
+
+        // PasswordBox.Password isn't a bindable DependencyProperty, so it's seeded from the VM's
+        // decrypted value here. OnSubsonicPasswordEdited treats an unchanged value as a no-op, so
+        // seeding never falsely marks the password dirty.
+        private void SeedSubsonicPasswordBox()
+        {
+            if (SubsonicPasswordBox != null)
+                SubsonicPasswordBox.Password = _vm.SubsonicPassword ?? string.Empty;
+        }
+
+        private void SubsonicPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is PasswordBox pb)
+                _vm.OnSubsonicPasswordEdited(pb.Password);
         }
 
         internal void UpdateMediaPlayerModeButton(bool isMediaPlayerModeActive)
@@ -82,7 +99,11 @@ namespace AndroidMusicPresenceLink
 
         internal void Save(bool showConfirmation) => _vm.Save(showConfirmation);
 
-        internal void RevertUnsavedChanges() => _vm.RevertUnsavedChanges();
+        internal void RevertUnsavedChanges()
+        {
+            _vm.RevertUnsavedChanges();
+            SeedSubsonicPasswordBox();
+        }
 
         // ── Window lifecycle ─────────────────────────────────────────────────
 

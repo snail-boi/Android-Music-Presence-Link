@@ -126,6 +126,16 @@ namespace AndroidMusicPresenceLink
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
 
+        // Distinct "subsonic|..." namespace so a Subsonic cover key can never collide with a
+        // local-file ComputeKey(deviceId, remotePath) hash. Keyed on the stable library song id.
+        private static string ComputeSubsonicKey(string serverUrl, string songId)
+        {
+            using var sha = SHA256.Create();
+            var input = Encoding.UTF8.GetBytes("subsonic|" + serverUrl + "|" + songId);
+            var hash = sha.ComputeHash(input);
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        }
+
         private static string ResolveCacheDeviceKey(string? configuredDeviceName, string deviceId)
         {
             if (!string.IsNullOrWhiteSpace(configuredDeviceName))
@@ -410,6 +420,59 @@ namespace AndroidMusicPresenceLink
             {
                 Debugger.show("GetImagePathForNowPlayingAsync failed: " + ex.Message);
                 return (null, null, null);
+            }
+        }
+
+        // Network fallback: downloads (and caches) cover art for a Subsonic library song.
+        // Reuses the same index.json / size-limit machinery as the local-file path, keyed on
+        // the song id so repeated plays hit cache. Returns the cached image path, or null when
+        // the song has no cover art or the download fails. Never throws.
+        public async Task<string?> CacheSubsonicCoverArtAsync(string serverUrl, string username, string password, string songId, string? coverArtId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(songId) || string.IsNullOrWhiteSpace(coverArtId))
+                    return null;
+
+                string key = ComputeSubsonicKey(serverUrl, songId);
+
+                if (index.TryGetValue(key, out var existing) && !string.IsNullOrEmpty(existing.FileName))
+                {
+                    var cached = Path.Combine(cachePath, existing.FileName);
+                    if (File.Exists(cached))
+                    {
+                        existing.LastAccessUtc = DateTime.UtcNow;
+                        SaveIndex();
+                        return cached;
+                    }
+                }
+
+                string cachedFilename = key + ".jpg";
+                string cachedFull = Path.Combine(cachePath, cachedFilename);
+
+                var downloaded = await SubsonicClient.DownloadCoverArtAsync(serverUrl, username, password, coverArtId!, cachedFull)
+                    .ConfigureAwait(false);
+                if (downloaded == null || !File.Exists(cachedFull))
+                    return null;
+
+                var fi = new FileInfo(cachedFull);
+                index[key] = new CacheEntry
+                {
+                    FileName = cachedFilename,
+                    Size = fi.Length,
+                    LastAccessUtc = DateTime.UtcNow,
+                    FolderKey = null,
+                    DurationSeconds = 0
+                };
+                SaveIndex();
+                EnforceCacheSizeLimit();
+
+                return cachedFull;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("CacheSubsonicCoverArtAsync failed: " + ex.Message);
+                return null;
             }
         }
 

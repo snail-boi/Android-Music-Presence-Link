@@ -170,6 +170,9 @@ namespace AndroidMusicPresenceLink
         // Legacy field kept for migration only. New code uses PresenceMode.
         public bool IsEnabled { get; set; } = false;
         public bool EnableCoverSearch { get; set; } = false;
+        // Independent of EnableCoverSearch. When both are on, the local file search runs first
+        // and Subsonic is a fallback; when only this is on, Subsonic is queried directly.
+        public bool UseSubsonic { get; set; } = false;
         public PresenceMode PresenceMode { get; set; } = PresenceMode.Off;
     }
 
@@ -214,6 +217,16 @@ namespace AndroidMusicPresenceLink
     {
         public List<string> AllowedApps { get; set; } = new List<string>();
         public List<EligibleAppConfig> EligibleApps { get; set; } = new List<EligibleAppConfig>();
+    }
+
+    public class SubsonicConfig
+    {
+        // Base URL of the Subsonic-API-compatible server, e.g. "http://192.168.1.50:4533".
+        public string ServerUrl { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        // DPAPI-encrypted (CurrentUser) password, base64-encoded. Never plaintext on disk.
+        // Encrypt/decrypt via SecretProtector. Empty means "no password set".
+        public string EncryptedPassword { get; set; } = string.Empty;
     }
 
     public class PollingConfig
@@ -371,6 +384,7 @@ namespace AndroidMusicPresenceLink
         public DeviceConfig Device { get; set; } = new DeviceConfig();
         public LibraryConfig Library { get; set; } = new LibraryConfig();
         public AppsConfig Apps { get; set; } = new AppsConfig();
+        public SubsonicConfig Subsonic { get; set; } = new SubsonicConfig();
         public PollingConfig Polling { get; set; } = new PollingConfig();
         public AudioLinkConfig AudioLink { get; set; } = new AudioLinkConfig();
         public MediaPlayerConfig MediaPlayer { get; set; } = new MediaPlayerConfig();
@@ -420,8 +434,15 @@ namespace AndroidMusicPresenceLink
                         PackageName = a.PackageName,
                         IsEnabled = a.IsEnabled,
                         EnableCoverSearch = a.EnableCoverSearch,
+                        UseSubsonic = a.UseSubsonic,
                         PresenceMode = a.PresenceMode
                     }).ToList() ?? new List<EligibleAppConfig>()
+                },
+                Subsonic = new SubsonicConfig
+                {
+                    ServerUrl = Subsonic.ServerUrl,
+                    Username = Subsonic.Username,
+                    EncryptedPassword = Subsonic.EncryptedPassword
                 },
                 Polling = new PollingConfig
                 {
@@ -591,6 +612,7 @@ namespace AndroidMusicPresenceLink
             config.Device ??= new DeviceConfig();
             config.Library ??= new LibraryConfig();
             config.Apps ??= new AppsConfig();
+            config.Subsonic ??= new SubsonicConfig();
             config.Polling ??= new PollingConfig();
             config.AudioLink ??= new AudioLinkConfig();
             config.MediaPlayer ??= new MediaPlayerConfig();
@@ -612,6 +634,10 @@ namespace AndroidMusicPresenceLink
             config.Apps.EligibleApps ??= new List<EligibleAppConfig>();
             config.Library.MusicRemoteRoots ??= new List<string>();
             config.Device.MdnsServiceName ??= string.Empty;
+
+            config.Subsonic.ServerUrl = (config.Subsonic.ServerUrl ?? string.Empty).Trim();
+            config.Subsonic.Username = (config.Subsonic.Username ?? string.Empty).Trim();
+            config.Subsonic.EncryptedPassword ??= string.Empty;
 
             if (!Enum.IsDefined(typeof(UpdateIntervalMode), config.Polling.Interval))
                 config.Polling.Interval = UpdateIntervalMode.Extreme;
@@ -659,7 +685,8 @@ namespace AndroidMusicPresenceLink
                     {
                         PackageName = g.Key,
                         PresenceMode = mode,
-                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch),
+                        UseSubsonic = g.Any(x => x.UseSubsonic)
                     };
                 })
                 .ToList();

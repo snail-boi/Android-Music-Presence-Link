@@ -38,6 +38,7 @@ namespace AndroidMusicPresenceLink
         // Per-row buttons. The clicked row is passed in as the command parameter.
         public RelayCommand<AppPackageItem> CyclePresenceModeCommand { get; }
         public RelayCommand<AppPackageItem> ToggleCoverCommand { get; }
+        public RelayCommand<AppPackageItem> ToggleSubsonicCommand { get; }
         public RelayCommand SaveCommand { get; }
 
         public AppsManagerViewModel(MusicConfig config, Action<MusicConfig> onSaved, Func<string> getCurrentDevice)
@@ -48,6 +49,7 @@ namespace AndroidMusicPresenceLink
 
             CyclePresenceModeCommand = new RelayCommand<AppPackageItem>(item => item?.CyclePresenceMode());
             ToggleCoverCommand = new RelayCommand<AppPackageItem>(item => item?.ToggleCover());
+            ToggleSubsonicCommand = new RelayCommand<AppPackageItem>(item => item?.ToggleSubsonic());
             SaveCommand = new RelayCommand(Save);
         }
 
@@ -88,7 +90,7 @@ namespace AndroidMusicPresenceLink
                 foreach (var pkg in allPackages)
                 {
                     if (savedApps.TryGetValue(pkg, out var saved))
-                        Items.Add(new AppPackageItem(pkg, saved.PresenceMode, saved.EnableCoverSearch));
+                        Items.Add(new AppPackageItem(pkg, saved.PresenceMode, saved.EnableCoverSearch, saved.UseSubsonic));
                     else
                         Items.Add(new AppPackageItem(pkg, PresenceMode.Off, false));
                 }
@@ -109,12 +111,13 @@ namespace AndroidMusicPresenceLink
                 Apps = new AppsConfig
                 {
                     EligibleApps = Items
-                        .Where(i => i.PresenceMode != PresenceMode.Off || i.EnableCoverSearch)
+                        .Where(i => i.PresenceMode != PresenceMode.Off || i.EnableCoverSearch || i.UseSubsonic)
                         .Select(i => new EligibleAppConfig
                         {
                             PackageName = i.PackageName,
                             PresenceMode = i.PresenceMode,
-                            EnableCoverSearch = i.EnableCoverSearch
+                            EnableCoverSearch = i.EnableCoverSearch,
+                            UseSubsonic = i.UseSubsonic
                         })
                         .ToList(),
                     AllowedApps = Items

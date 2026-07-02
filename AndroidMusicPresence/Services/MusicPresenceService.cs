@@ -1002,15 +1002,18 @@ namespace AndroidMusicPresenceLink
                                 1 => PresenceMode.Half,
                                 _ => PresenceMode.Off
                             },
-                            EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                            EnableCoverSearch = g.Any(x => x.EnableCoverSearch),
+                            UseSubsonic = g.Any(x => x.UseSubsonic)
                         },
                         StringComparer.OrdinalIgnoreCase);
 
                 bool enableCoverSearchForApp = false;
+                bool useSubsonicForApp = false;
                 bool enableSmtcForApp = false;
                 if (eligibleApps.TryGetValue(pkg, out var matchedApp))
                 {
                     enableCoverSearchForApp = matchedApp.EnableCoverSearch;
+                    useSubsonicForApp = matchedApp.UseSubsonic;
                     enableSmtcForApp = matchedApp.PresenceMode == PresenceMode.Full;
                 }
 
@@ -1133,7 +1136,7 @@ namespace AndroidMusicPresenceLink
                         _smtcPausedCleared = false;
                     }
 
-                    await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp, enableSmtcForApp, adbPositionMs, _timer.Interval).ConfigureAwait(false);
+                    await _mediaController.UpdateMediaControlsAsync(title, artist, album, isPlaying, enableCoverSearchForApp, useSubsonicForApp, enableSmtcForApp, adbPositionMs, _timer.Interval).ConfigureAwait(false);
                     NotifyMediaPlayerState(_mediaController.CurrentTitle, _mediaController.CurrentArtist, _mediaController.CurrentAlbum, _mediaController.CurrentCoverPath, isPlaying, _mediaController.CurrentPositionMs, _mediaController.CurrentDurationMs);
                     return isPlaying;
                 }

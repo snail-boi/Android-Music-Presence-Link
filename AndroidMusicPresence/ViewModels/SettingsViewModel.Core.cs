@@ -49,6 +49,7 @@ namespace AndroidMusicPresenceLink
             InitDevice();
             InitFolders();
             InitApps();
+            InitSubsonic();
             InitAudioCodec();
             InitHotkeys();
         }
@@ -58,6 +59,7 @@ namespace AndroidMusicPresenceLink
         partial void InitDevice();
         partial void InitFolders();
         partial void InitApps();
+        partial void InitSubsonic();
         partial void InitAudioCodec();
         partial void InitHotkeys();
 
@@ -67,12 +69,14 @@ namespace AndroidMusicPresenceLink
         partial void LoadDeviceFromConfig();
         partial void LoadFoldersFromConfig();
         partial void LoadAppsFromConfig();
+        partial void LoadSubsonicFromConfig();
         partial void LoadAudioCodecFromConfig();
         partial void LoadHotkeysFromConfig();
 
         partial void ApplyDeviceToConfig(MusicConfig config);
         partial void ApplyFoldersToConfig(MusicConfig config);
         partial void ApplyAppsToConfig(MusicConfig config);
+        partial void ApplySubsonicToConfig(MusicConfig config);
         partial void ApplyAudioCodecToConfig(MusicConfig config);
         partial void ApplyHotkeysToConfig(MusicConfig config);
 
@@ -423,6 +427,7 @@ namespace AndroidMusicPresenceLink
             ApplyDeviceToConfig(config);
             ApplyFoldersToConfig(config);
             ApplyAppsToConfig(config);
+            ApplySubsonicToConfig(config);
             ApplyAudioCodecToConfig(config);
             ApplyHotkeysToConfig(config);
 
@@ -445,6 +450,7 @@ namespace AndroidMusicPresenceLink
 
             _config = built;
             _savedConfig = built.Clone();
+            MarkSubsonicPasswordSaved();
 
             Debugger.show("[SETTINGS] Settings saved.");
 
@@ -481,6 +487,7 @@ namespace AndroidMusicPresenceLink
             LoadDeviceFromConfig();
             LoadFoldersFromConfig();
             LoadAppsFromConfig();
+            LoadSubsonicFromConfig();
             LoadAudioCodecFromConfig();
             LoadHotkeysFromConfig();
 
@@ -569,6 +576,12 @@ namespace AndroidMusicPresenceLink
             if (left.AudioLink.AutoRestartOnQualityChange != right.AudioLink.AutoRestartOnQualityChange) return false;
             if (left.AudioLink.Bleedless != right.AudioLink.Bleedless) return false;
 
+            var leftSub = left.Subsonic ?? new SubsonicConfig();
+            var rightSub = right.Subsonic ?? new SubsonicConfig();
+            if (!string.Equals(leftSub.ServerUrl ?? string.Empty, rightSub.ServerUrl ?? string.Empty, StringComparison.Ordinal)) return false;
+            if (!string.Equals(leftSub.Username ?? string.Empty, rightSub.Username ?? string.Empty, StringComparison.Ordinal)) return false;
+            if (!string.Equals(leftSub.EncryptedPassword ?? string.Empty, rightSub.EncryptedPassword ?? string.Empty, StringComparison.Ordinal)) return false;
+
             var eligibleLeft = (left.Apps.EligibleApps ?? new List<EligibleAppConfig>())
                 .Where(a => !string.IsNullOrWhiteSpace(a.PackageName))
                 .GroupBy(a => a.PackageName.Trim(), StringComparer.OrdinalIgnoreCase)
@@ -578,7 +591,8 @@ namespace AndroidMusicPresenceLink
                     {
                         PackageName = g.Key,
                         PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
-                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch),
+                        UseSubsonic = g.Any(x => x.UseSubsonic)
                     },
                     StringComparer.OrdinalIgnoreCase);
 
@@ -591,7 +605,8 @@ namespace AndroidMusicPresenceLink
                     {
                         PackageName = g.Key,
                         PresenceMode = g.Max(x => (int)x.PresenceMode) switch { 2 => PresenceMode.Full, 1 => PresenceMode.Half, _ => PresenceMode.Off },
-                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch)
+                        EnableCoverSearch = g.Any(x => x.EnableCoverSearch),
+                        UseSubsonic = g.Any(x => x.UseSubsonic)
                     },
                     StringComparer.OrdinalIgnoreCase);
 
@@ -605,6 +620,8 @@ namespace AndroidMusicPresenceLink
                 if (pair.Value.PresenceMode != rightItem.PresenceMode)
                     return false;
                 if (pair.Value.EnableCoverSearch != rightItem.EnableCoverSearch)
+                    return false;
+                if (pair.Value.UseSubsonic != rightItem.UseSubsonic)
                     return false;
             }
 

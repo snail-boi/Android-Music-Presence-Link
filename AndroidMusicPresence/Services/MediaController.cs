@@ -42,6 +42,12 @@ namespace AndroidMusicPresenceLink
         private List<string> remoteRoots = new();
         private string deviceName = string.Empty;
 
+        // Subsonic fallback config. Password stays DPAPI-encrypted here and is only decrypted
+        // (via SecretProtector) at the moment of a request, never held in plaintext long-term.
+        private string _subsonicServerUrl = string.Empty;
+        private string _subsonicUsername = string.Empty;
+        private string _subsonicEncryptedPassword = string.Empty;
+
         public string? CurrentTitle { get; private set; }
         public string? CurrentArtist { get; private set; }
         public string? CurrentAlbum { get; private set; }
@@ -74,6 +80,7 @@ namespace AndroidMusicPresenceLink
             remoteRoots = GetNormalizedRemoteRoots(config);
             deviceName = config.Device.SelectedDeviceName?.Trim() ?? string.Empty;
             _noCoverIconPath = config.Paths?.NoCoverIconPath ?? string.Empty;
+            ApplySubsonicConfig(config);
         }
 
         public Task PauseTrackAsync() => PauseTrack();
@@ -92,6 +99,7 @@ namespace AndroidMusicPresenceLink
                 remoteRoots = GetNormalizedRemoteRoots(config);
                 deviceName = config.Device.SelectedDeviceName?.Trim() ?? string.Empty;
                 _noCoverIconPath = config.Paths?.NoCoverIconPath ?? string.Empty;
+                ApplySubsonicConfig(config);
                 Debugger.show("MediaController configuration updated. RemoteRoots='" + string.Join(";", remoteRoots) + "'");
             }
             catch (Exception ex)
@@ -103,6 +111,13 @@ namespace AndroidMusicPresenceLink
         public void ResetCoverSearch()
         {
             lastSMTCTitle = null;
+        }
+
+        private void ApplySubsonicConfig(MusicConfig config)
+        {
+            _subsonicServerUrl = config.Subsonic?.ServerUrl?.Trim() ?? string.Empty;
+            _subsonicUsername = config.Subsonic?.Username?.Trim() ?? string.Empty;
+            _subsonicEncryptedPassword = config.Subsonic?.EncryptedPassword ?? string.Empty;
         }
 
         private static List<string> GetNormalizedRemoteRoots(MusicConfig config)
@@ -313,7 +328,7 @@ namespace AndroidMusicPresenceLink
 
         public bool IsPaused { get; private set; }
 
-        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch, bool enableSmtc, long adbPositionMs, TimeSpan updateCycleTime)
+        public async Task UpdateMediaControlsAsync(string title, string artist, string album, bool isPlaying, bool enableCoverSearch, bool useSubsonic, bool enableSmtc, long adbPositionMs, TimeSpan updateCycleTime)
         {
             try
             {
@@ -366,18 +381,22 @@ namespace AndroidMusicPresenceLink
                 {
                     if (metadataChanged)
                     {
-                        if (enableCoverSearch && enableSmtc)
+                        // A cover/duration lookup runs when either the local file search or the
+                        // Subsonic fallback is enabled for this app. When both are on the local
+                        // search runs first and Subsonic backs it up (handled inside SetSMTCImageAsync).
+                        bool lookupEnabled = enableCoverSearch || useSubsonic;
+                        if (lookupEnabled && enableSmtc)
                         {
-                            var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
+                            var result = await SetSMTCImageAsync(title, artist, enableCoverSearch, useSubsonic).ConfigureAwait(false);
                             duration = result.Duration ?? duration;
                             meta = result.Metadata;
                             CurrentCoverPath = result.ImagePath;
                         }
-                        else if (enableCoverSearch && !enableSmtc)
+                        else if (lookupEnabled && !enableSmtc)
                         {
                             // Half mode: search for cover so it's cached and ready when switching to Full,
                             // but don't push it to SMTC yet.
-                            var result = await SetSMTCImageAsync(title, artist).ConfigureAwait(false);
+                            var result = await SetSMTCImageAsync(title, artist, enableCoverSearch, useSubsonic).ConfigureAwait(false);
                             duration = result.Duration ?? duration;
                             meta = result.Metadata;
                             CurrentCoverPath = result.ImagePath;
@@ -772,7 +791,7 @@ namespace AndroidMusicPresenceLink
             }
         }
 
-        private async Task<(TimeSpan? Duration, CoverCacheManager.MediaMetadata? Metadata, string? ImagePath)> SetSMTCImageAsync(string fileNameWithoutExtension, string artist)
+        private async Task<(TimeSpan? Duration, CoverCacheManager.MediaMetadata? Metadata, string? ImagePath)> SetSMTCImageAsync(string fileNameWithoutExtension, string artist, bool enableCoverSearch, bool useSubsonic)
         {
             if (mediaPlayer == null || smtcDisplayUpdater == null)
             {
@@ -782,6 +801,19 @@ namespace AndroidMusicPresenceLink
                     Debugger.show("Failed to initialize media player");
                     return (null, null, EffectiveNoCoverPath);
                 }
+            }
+
+            Debugger.show($"[COVERART] Lookup for '{fileNameWithoutExtension}' by '{artist}' — coverSearch={enableCoverSearch}, subsonic={useSubsonic}");
+
+            // Subsonic-only: skip the entire ADB find/pull pipeline and query the server directly.
+            // (Reached only when useSubsonic is true, since the caller gates on enableCoverSearch||useSubsonic.)
+            if (!enableCoverSearch)
+            {
+                var subOnly = await TrySubsonicFallbackAsync(fileNameWithoutExtension ?? string.Empty, artist).ConfigureAwait(false);
+                if (subOnly.HasValue)
+                    return subOnly.Value;
+                await SetDefaultImage().ConfigureAwait(false);
+                return (null, null, EffectiveNoCoverPath);
             }
 
             var localRemoteRoots = remoteRoots.ToList();
@@ -802,6 +834,12 @@ namespace AndroidMusicPresenceLink
                 if (localRemoteRoots.Count == 0)
                 {
                     Debugger.show("[COVERART] No remote roots configured for cover lookup");
+                    if (useSubsonic)
+                    {
+                        var sub = await TrySubsonicFallbackAsync(fileNameWithoutExtension ?? string.Empty, artist).ConfigureAwait(false);
+                        if (sub.HasValue)
+                            return sub.Value;
+                    }
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, EffectiveNoCoverPath);
                 }
@@ -921,6 +959,12 @@ namespace AndroidMusicPresenceLink
                     Debugger.show("[COVERART] No files found in configured remote roots");
                     CurrentRemoteFilePath = null;
                     CurrentRemoteFileToken = null;
+                    if (useSubsonic)
+                    {
+                        var sub = await TrySubsonicFallbackAsync(titleStr, artist).ConfigureAwait(false);
+                        if (sub.HasValue)
+                            return sub.Value;
+                    }
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, EffectiveNoCoverPath);
                 }
@@ -988,6 +1032,12 @@ namespace AndroidMusicPresenceLink
                     Debugger.show($"[COVERART] No filename contains the title '{titleStr}' (normalized: '{normTitle}')");
                     CurrentRemoteFilePath = null;
                     CurrentRemoteFileToken = null;
+                    if (useSubsonic)
+                    {
+                        var sub = await TrySubsonicFallbackAsync(titleStr, artist).ConfigureAwait(false);
+                        if (sub.HasValue)
+                            return sub.Value;
+                    }
                     await SetDefaultImage().ConfigureAwait(false);
                     return (null, null, EffectiveNoCoverPath);
                 }
@@ -1135,6 +1185,61 @@ namespace AndroidMusicPresenceLink
                 Debugger.show($"[COVERART] Critical error in SetSMTCImageAsync: {ex.Message}");
                 await SetDefaultImage().ConfigureAwait(false);
                 return (null, null, EffectiveNoCoverPath);
+            }
+        }
+
+        // Network fallback for streamed tracks with no local file. Returns null when Subsonic is
+        // unconfigured or has no match (caller then applies its own default-image handling); on a
+        // match it sets the SMTC thumbnail (or default when the song has no art) and returns the
+        // duration + resolved image path. Never throws.
+        private async Task<(TimeSpan? Duration, CoverCacheManager.MediaMetadata? Metadata, string? ImagePath)?> TrySubsonicFallbackAsync(string title, string? artist)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_subsonicServerUrl) || string.IsNullOrWhiteSpace(_subsonicUsername))
+                    return null;
+
+                var password = SecretProtector.Unprotect(_subsonicEncryptedPassword);
+                if (string.IsNullOrEmpty(password))
+                {
+                    Debugger.show("[SUBSONIC] Fallback skipped: no password configured.");
+                    return null;
+                }
+
+                var match = await SubsonicClient.Search3Async(_subsonicServerUrl, _subsonicUsername, password, title, artist ?? string.Empty).ConfigureAwait(false);
+                if (match == null)
+                    return null;
+
+                // No local file backs this track — clear any stale remote-file token so the lyrics
+                // resolver doesn't associate the previous track's path with this one.
+                CurrentRemoteFilePath = null;
+                CurrentRemoteFileToken = null;
+
+                TimeSpan? duration = match.DurationSeconds.HasValue && match.DurationSeconds.Value > 0
+                    ? TimeSpan.FromSeconds(match.DurationSeconds.Value)
+                    : (TimeSpan?)null;
+
+                string? imagePath = null;
+                if (!string.IsNullOrWhiteSpace(match.CoverArtId))
+                {
+                    imagePath = await cacheManager.CacheSubsonicCoverArtAsync(
+                        _subsonicServerUrl, _subsonicUsername, password, match.Id, match.CoverArtId).ConfigureAwait(false);
+                }
+
+                if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
+                {
+                    await SetCachedImage(imagePath).ConfigureAwait(false);
+                    return (duration, null, imagePath);
+                }
+
+                // Matched (so we have a duration) but no usable cover art — show the default image.
+                await SetDefaultImage().ConfigureAwait(false);
+                return (duration, null, EffectiveNoCoverPath);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[SUBSONIC] Fallback failed: {ex.Message}");
+                return null;
             }
         }
 
