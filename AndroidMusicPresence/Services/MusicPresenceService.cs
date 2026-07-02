@@ -96,7 +96,7 @@ namespace AndroidMusicPresenceLink
         internal CoverCacheManager? GetCoverCacheManager() => _mediaController.CoverCache;
         internal event Action<TrayIconState>? TrayStateChanged;
         internal event Action<string?, string?, string?>? NowPlayingChanged;
-        internal event Action<string?, string?, string?, bool, long>? LyricsPlaybackChanged;
+        internal event Action<string?, string?, string?, bool, bool, long>? LyricsPlaybackChanged;
         internal event Action<string?, string?, string?, string?, bool, long, long>? MediaPlayerStateChanged;
 
         public MusicPresenceService(Dispatcher dispatcher, MusicConfig config)
@@ -204,7 +204,7 @@ namespace AndroidMusicPresenceLink
                 if (string.IsNullOrEmpty(_currentDevice))
                 {
                     NotifyNowPlaying(null, null, null);
-                    NotifyLyricsPlayback(null, null, null, false, 0);
+                    NotifyLyricsPlayback(null, null, null, false, false, 0);
                     NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
                 }
 
@@ -286,7 +286,7 @@ namespace AndroidMusicPresenceLink
                         _currentDevice = string.Empty;
                         _mediaController.Clear();
                         NotifyNowPlaying(null, null, null);
-                        NotifyLyricsPlayback(null, null, null, false, 0);
+                        NotifyLyricsPlayback(null, null, null, false, false, 0);
                     }
                 }
 
@@ -982,7 +982,7 @@ namespace AndroidMusicPresenceLink
                 {
                     _mediaController.ClearDisplay();
                     NotifyNowPlaying(null, null, null);
-                    NotifyLyricsPlayback(null, null, null, false, 0);
+                    NotifyLyricsPlayback(null, null, null, false, false, 0);
                     NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
                     return false;
                 }
@@ -1082,7 +1082,7 @@ namespace AndroidMusicPresenceLink
                 {
                     _mediaController.ClearDisplay();
                     NotifyNowPlaying(null, null, null);
-                    NotifyLyricsPlayback(null, null, null, false, 0);
+                    NotifyLyricsPlayback(null, null, null, false, false, 0);
                     NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
                     return false;
                 }
@@ -1094,7 +1094,7 @@ namespace AndroidMusicPresenceLink
                 if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
                 {
                     NotifyNowPlaying(artist, title, album);
-                    NotifyLyricsPlayback(artist, title, album, isPlaying, Math.Max(0, adbPositionMs));
+                    NotifyLyricsPlayback(artist, title, album, isPlaying, useSubsonicForApp, Math.Max(0, adbPositionMs));
 
                     if (!isPlaying)
                     {
@@ -1143,7 +1143,7 @@ namespace AndroidMusicPresenceLink
 
                 _mediaController.ClearDisplay();
                 NotifyNowPlaying(null, null, null);
-                NotifyLyricsPlayback(null, null, null, false, 0);
+                NotifyLyricsPlayback(null, null, null, false, false, 0);
                 NotifyMediaPlayerState(null, null, null, null, false, 0, 0);
                 return false;
             }
@@ -1172,11 +1172,11 @@ namespace AndroidMusicPresenceLink
 
         public Task SeekRelativeCurrentAsync(int seconds) => _mediaController.SeekRelativeAsync(seconds);
 
-        private void NotifyLyricsPlayback(string? artist, string? title, string? album, bool isPlaying, long positionMs)
+        private void NotifyLyricsPlayback(string? artist, string? title, string? album, bool isPlaying, bool useSubsonic, long positionMs)
         {
             try
             {
-                LyricsPlaybackChanged?.Invoke(artist, title, album, isPlaying, positionMs);
+                LyricsPlaybackChanged?.Invoke(artist, title, album, isPlaying, useSubsonic, positionMs);
             }
             catch
             {

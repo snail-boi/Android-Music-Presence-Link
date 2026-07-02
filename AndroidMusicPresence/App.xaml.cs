@@ -676,9 +676,9 @@ namespace AndroidMusicPresenceLink
             }
         }
 
-        private void OnLyricsPlaybackChanged(string? artist, string? title, string? album, bool isPlaying, long positionMs)
+        private void OnLyricsPlaybackChanged(string? artist, string? title, string? album, bool isPlaying, bool useSubsonic, long positionMs)
         {
-            _lyricsOverlayManager?.OnPlaybackChanged(artist, title, album, isPlaying, positionMs);
+            _lyricsOverlayManager?.OnPlaybackChanged(artist, title, album, isPlaying, useSubsonic, positionMs);
         }
 
         private void OnMediaPlayerStateChanged(string? title, string? artist, string? album, string? coverPath, bool isPlaying, long positionMs, long durationMs)

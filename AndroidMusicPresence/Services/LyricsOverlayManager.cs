@@ -31,6 +31,9 @@ namespace AndroidMusicPresenceLink
         private string? _currentArtist;
         private string? _currentTitle;
         private string? _currentAlbum;
+        // Whether the app that owns the current media session has the Subsonic toggle on. Gates
+        // the network lyrics fallback exactly like the cover/duration fallback.
+        private bool _useSubsonic;
 
         private string? _loadedTrackKey;
         private List<LyricsLine> _lines = new();
@@ -96,7 +99,7 @@ namespace AndroidMusicPresenceLink
             });
         }
 
-        public void OnPlaybackChanged(string? artist, string? title, string? album, bool isPlaying, long positionMs)
+        public void OnPlaybackChanged(string? artist, string? title, string? album, bool isPlaying, bool useSubsonic, long positionMs)
         {
             _dispatcher.BeginInvoke(async () =>
             {
@@ -104,6 +107,7 @@ namespace AndroidMusicPresenceLink
                 _currentTitle = title;
                 _currentAlbum = album;
                 _isPlaying = isPlaying;
+                _useSubsonic = useSubsonic;
 
                 var now = DateTime.UtcNow;
                 var reported = Math.Max(0, positionMs);
@@ -282,19 +286,56 @@ namespace AndroidMusicPresenceLink
                 return (new List<LyricsLine>(), false, fileMatches); // no device: transient, do not cache NONE
 
             string? bestRemotePath = await FindBestLrcAsync(device, artist, title, album).ConfigureAwait(true);
-            if (string.IsNullOrWhiteSpace(bestRemotePath))
+            if (!string.IsNullOrWhiteSpace(bestRemotePath))
             {
-                LyricsCache.Save(cacheKey, LyricsCache.Source.None, string.Empty);
-                return (new List<LyricsLine>(), false, fileMatches);
+                string? text = await PullLrcTextAsync(device, bestRemotePath!).ConfigureAwait(true);
+                if (string.IsNullOrWhiteSpace(text))
+                    return (new List<LyricsLine>(), false, fileMatches); // pull failed: transient, do not cache NONE
+
+                LyricsCache.Save(cacheKey, LyricsCache.Source.Lrc, text!);
+                var parsed = ParseLrcText(text!);
+                return (parsed.lines, parsed.isTimed, fileMatches);
             }
 
-            string? text = await PullLrcTextAsync(device, bestRemotePath!).ConfigureAwait(true);
-            if (string.IsNullOrWhiteSpace(text))
-                return (new List<LyricsLine>(), false, fileMatches); // pull failed: transient, do not cache NONE
+            // 3) No local .lrc. If this app has the Subsonic toggle on, ask the server for lyrics
+            //    (synced when available) before recording "no lyrics". Gated so it never runs for
+            //    apps without Subsonic enabled.
+            Debugger.show($"[LYRICS] No local lyrics for '{artist} - {title}'; subsonic fallback {( _useSubsonic ? "enabled" : "disabled")}.");
+            if (_useSubsonic)
+            {
+                string? subText = await TryFetchSubsonicLyricsAsync(artist, title).ConfigureAwait(true);
+                if (!string.IsNullOrWhiteSpace(subText))
+                {
+                    LyricsCache.Save(cacheKey, LyricsCache.Source.Lrc, subText!);
+                    var parsedSub = ParseLrcText(subText!);
+                    return (parsedSub.lines, parsedSub.isTimed, fileMatches);
+                }
+            }
 
-            LyricsCache.Save(cacheKey, LyricsCache.Source.Lrc, text!);
-            var parsed = ParseLrcText(text!);
-            return (parsed.lines, parsed.isTimed, fileMatches);
+            LyricsCache.Save(cacheKey, LyricsCache.Source.None, string.Empty);
+            return (new List<LyricsLine>(), false, fileMatches);
+        }
+
+        // Network lyrics fallback for streamed tracks, gated by the per-app Subsonic toggle.
+        private async Task<string?> TryFetchSubsonicLyricsAsync(string artist, string title)
+        {
+            try
+            {
+                var sub = _config?.Subsonic;
+                if (sub == null || string.IsNullOrWhiteSpace(sub.ServerUrl) || string.IsNullOrWhiteSpace(sub.Username))
+                    return null;
+
+                var password = SecretProtector.Unprotect(sub.EncryptedPassword);
+                if (string.IsNullOrEmpty(password))
+                    return null;
+
+                return await SubsonicClient.GetLyricsAsync(sub.ServerUrl, sub.Username, password, title, artist).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[SUBSONIC] lyrics fetch failed: {ex.Message}");
+                return null;
+            }
         }
 
         private async Task<string?> FindBestLrcAsync(string device, string artist, string title, string album)

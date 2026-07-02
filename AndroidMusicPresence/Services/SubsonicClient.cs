@@ -181,6 +181,177 @@ namespace AndroidMusicPresenceLink
             }
         }
 
+        // Resolves lyrics for a streamed track. Prefers the OpenSubsonic getLyricsBySongId
+        // endpoint (supports synced/timed lyrics), falling back to the legacy getLyrics endpoint
+        // (plain text) on older servers. Returns LRC-formatted text (timestamps present only when
+        // the server had synced lyrics), or null when nothing is found. Never throws.
+        internal static async Task<string?> GetLyricsAsync(
+            string serverUrl, string username, string password, string title, string artist,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(serverUrl) || string.IsNullOrWhiteSpace(username)
+                || string.IsNullOrEmpty(password) || string.IsNullOrWhiteSpace(title))
+                return null;
+
+            try
+            {
+                var match = await Search3Async(serverUrl, username, password, title, artist, ct).ConfigureAwait(false);
+                if (match == null)
+                {
+                    Debugger.show($"[SUBSONIC] Lyrics: no song match for title '{title}'.");
+                    return null;
+                }
+
+                var structured = await GetStructuredLyricsAsync(serverUrl, username, password, match.Id, ct).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(structured))
+                    return structured;
+
+                // Legacy fallback keys off artist/title, using the values the server itself
+                // returned for the matched song (more likely to match its own index).
+                var legacy = await GetLegacyLyricsAsync(serverUrl, username, password, match.Artist, match.Title, ct).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(legacy))
+                    Debugger.show($"[SUBSONIC] Lyrics: none found for song id {match.Id} ('{match.Artist} - {match.Title}') via either endpoint.");
+                return legacy;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[SUBSONIC] GetLyricsAsync failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static async Task<string?> GetStructuredLyricsAsync(
+            string serverUrl, string username, string password, string songId, CancellationToken ct)
+        {
+            try
+            {
+                string url = BuildUrl(serverUrl, username, password, "getLyricsBySongId",
+                    $"&id={Uri.EscapeDataString(songId)}");
+
+                using var client = new HttpClient { Timeout = RequestTimeout };
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(ClientName + "/1.0");
+
+                string json = await client.GetStringAsync(url, ct).ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(json);
+
+                if (!TryGetOkResponse(doc, out var response, out string? error))
+                {
+                    Debugger.show($"[SUBSONIC] getLyricsBySongId rejected: {error}");
+                    return null;
+                }
+
+                if (!response.TryGetProperty("lyricsList", out var lyricsList)
+                    || !lyricsList.TryGetProperty("structuredLyrics", out var structuredArr)
+                    || structuredArr.ValueKind != JsonValueKind.Array
+                    || structuredArr.GetArrayLength() == 0)
+                {
+                    Debugger.show($"[SUBSONIC] getLyricsBySongId: server returned no structured lyrics for song {songId}.");
+                    return null;
+                }
+
+                // Prefer a synced entry (timed overlay); otherwise take the first available.
+                JsonElement chosen = default;
+                bool found = false;
+                bool chosenSynced = false;
+                foreach (var entry in structuredArr.EnumerateArray())
+                {
+                    bool synced = entry.TryGetProperty("synced", out var s) && s.ValueKind == JsonValueKind.True;
+                    if (!found || (synced && !chosenSynced))
+                    {
+                        chosen = entry;
+                        chosenSynced = synced;
+                        found = true;
+                        if (synced) break;
+                    }
+                }
+                if (!found || !chosen.TryGetProperty("line", out var lines) || lines.ValueKind != JsonValueKind.Array)
+                    return null;
+
+                long offset = 0;
+                if (chosen.TryGetProperty("offset", out var off) && off.ValueKind == JsonValueKind.Number && off.TryGetInt64(out var o))
+                    offset = o;
+
+                var sb = new StringBuilder();
+                foreach (var line in lines.EnumerateArray())
+                {
+                    string value = line.TryGetProperty("value", out var v) && v.ValueKind == JsonValueKind.String
+                        ? (v.GetString() ?? string.Empty)
+                        : string.Empty;
+
+                    if (chosenSynced && line.TryGetProperty("start", out var st)
+                        && st.ValueKind == JsonValueKind.Number && st.TryGetInt64(out var start))
+                        sb.Append(FormatLrcTimestamp(start + offset)).AppendLine(value);
+                    else
+                        sb.AppendLine(value);
+                }
+
+                var text = sb.ToString().Trim();
+                if (string.IsNullOrWhiteSpace(text))
+                    return null;
+
+                Debugger.show($"[SUBSONIC] getLyricsBySongId returned {(chosenSynced ? "synced" : "plain")} lyrics.");
+                return text;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[SUBSONIC] getLyricsBySongId failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static async Task<string?> GetLegacyLyricsAsync(
+            string serverUrl, string username, string password, string artist, string title, CancellationToken ct)
+        {
+            try
+            {
+                string extra = $"&artist={Uri.EscapeDataString(artist ?? string.Empty)}&title={Uri.EscapeDataString(title ?? string.Empty)}";
+                string url = BuildUrl(serverUrl, username, password, "getLyrics", extra);
+
+                using var client = new HttpClient { Timeout = RequestTimeout };
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(ClientName + "/1.0");
+
+                string json = await client.GetStringAsync(url, ct).ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(json);
+
+                if (!TryGetOkResponse(doc, out var response, out _))
+                    return null;
+
+                if (!response.TryGetProperty("lyrics", out var lyrics))
+                    return null;
+
+                // JSON puts the text under "value"; some servers return the element as a string.
+                string? text = null;
+                if (lyrics.ValueKind == JsonValueKind.Object
+                    && lyrics.TryGetProperty("value", out var val) && val.ValueKind == JsonValueKind.String)
+                    text = val.GetString();
+                else if (lyrics.ValueKind == JsonValueKind.String)
+                    text = lyrics.GetString();
+
+                text = text?.Trim();
+                if (string.IsNullOrWhiteSpace(text))
+                    return null;
+
+                Debugger.show("[SUBSONIC] getLyrics (legacy) returned plain lyrics.");
+                return text;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[SUBSONIC] getLyrics (legacy) failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string FormatLrcTimestamp(long milliseconds)
+        {
+            if (milliseconds < 0) milliseconds = 0;
+            long totalCentis = milliseconds / 10;
+            long centis = totalCentis % 100;
+            long totalSeconds = totalCentis / 100;
+            long seconds = totalSeconds % 60;
+            long minutes = totalSeconds / 60;
+            return $"[{minutes:D2}:{seconds:D2}.{centis:D2}]";
+        }
+
         // Builds "<server>/rest/<method>.view?u=..&t=..&s=..&v=..&c=..&f=json<extra>".
         // Token auth: t = md5(password + salt), fresh random salt per request — the raw
         // password is never placed in the URL.
