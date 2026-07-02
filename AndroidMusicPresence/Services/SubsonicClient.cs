@@ -22,7 +22,7 @@ namespace AndroidMusicPresenceLink
         private const string ClientName = "AndroidMusicPresenceLink";
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(8);
 
-        internal sealed record SongMatch(string Id, string? CoverArtId, double? DurationSeconds, string Title, string Artist);
+        internal sealed record SongMatch(string Id, string? CoverArtId, double? DurationSeconds, string Title, string Artist, string? Suffix);
 
         // Resolves the currently-playing title/artist to the best matching library song.
         // Returns null on any failure (network, auth, malformed response, no match).
@@ -91,7 +91,8 @@ namespace AndroidMusicPresenceLink
                                 duration = ds;
                         }
                         string? coverArtId = song.TryGetProperty("coverArt", out var ca) ? ca.GetString() : null;
-                        best = new SongMatch(id, coverArtId, duration, songTitle, songArtist);
+                        string? suffix = song.TryGetProperty("suffix", out var sfx) && sfx.ValueKind == JsonValueKind.String ? sfx.GetString() : null;
+                        best = new SongMatch(id, coverArtId, duration, songTitle, songArtist, suffix);
                     }
                 }
 
@@ -149,6 +150,52 @@ namespace AndroidMusicPresenceLink
             catch (Exception ex)
             {
                 Debugger.show($"[SUBSONIC] getCoverArt failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        // Downloads the original audio file for a song id (Subsonic download.view) to destPath.
+        // Returns destPath on success, null on failure. Rejects a subsonic-response error document
+        // returned in place of file bytes. Never throws. Uses a longer timeout than metadata calls
+        // since it transfers a whole track.
+        internal static async Task<string?> DownloadSongAsync(
+            string serverUrl, string username, string password, string songId, string destPath,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(songId) || string.IsNullOrWhiteSpace(destPath))
+                return null;
+
+            try
+            {
+                string url = BuildUrl(serverUrl, username, password, "download",
+                    $"&id={Uri.EscapeDataString(songId)}");
+
+                using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(ClientName + "/1.0");
+
+                using var resp = await client.GetAsync(url, ct).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    Debugger.show($"[SUBSONIC] download HTTP {(int)resp.StatusCode}.");
+                    return null;
+                }
+
+                var bytes = await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+                if (bytes.Length == 0)
+                    return null;
+
+                if (LooksLikeErrorDocument(bytes))
+                {
+                    Debugger.show("[SUBSONIC] download returned an error document, not a file.");
+                    return null;
+                }
+
+                await File.WriteAllBytesAsync(destPath, bytes, ct).ConfigureAwait(false);
+                return destPath;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[SUBSONIC] download failed: {ex.Message}");
                 return null;
             }
         }

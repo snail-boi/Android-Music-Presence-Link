@@ -338,10 +338,10 @@
                                                Opacity="0" />
                                         <Border x:Name="CoverContextMenuHost" Background="Transparent">
                                             <Border.ContextMenu>
-                                                <ContextMenu>
+                                                <ContextMenu Opened="CoverContextMenu_Opened">
                                                     <MenuItem Header="Save cover image..." Click="SaveCoverMenuItem_Click" />
                                                     <MenuItem Header="Copy track info" Click="CopyCoverInfoMenuItem_Click" />
-                                                    <MenuItem Header="Edit metadata..." Click="EditMetadataMenuItem_Click" />
+                                                    <MenuItem x:Name="EditMetadataMenuItem" Header="Edit metadata..." Click="EditMetadataMenuItem_Click" ToolTipService.ShowOnDisabled="True" />
                                                     <MenuItem Header="Save song to PC..." Click="SaveTrackMenuItem_Click" />
                                                 </ContextMenu>
                                             </Border.ContextMenu>

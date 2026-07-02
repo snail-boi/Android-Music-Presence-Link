@@ -85,6 +85,9 @@ namespace AndroidMusicPresenceLink
         private readonly Func<MusicConfig>? _getConfig;
         private readonly Func<Task>? _editMetadataAction;
         private readonly Func<Task>? _saveTrackAction;
+        // Returns true when the current track was resolved from Subsonic (a cloud track with no
+        // local file). Used to disable tag editing in the cover context menu.
+        private readonly Func<bool>? _isCloudTrack;
         private readonly Action<AudioQualityPresets.Preset>? _applyAudioQualityPreset;
         private readonly Action? _openCustomQualityWindow;
 
@@ -135,7 +138,8 @@ namespace AndroidMusicPresenceLink
             Func<Task<(int current, int max)>>? getPhoneVolume = null,
             Func<int, int, int, Task>? setPhoneVolume = null,
             Func<Task>? editMetadataAction = null,
-            Func<Task>? saveTrackAction = null)
+            Func<Task>? saveTrackAction = null,
+            Func<bool>? isCloudTrack = null)
         {
             InitializeComponent();
             PlayerPaneBorder.DataContext = _vm;
@@ -157,6 +161,7 @@ namespace AndroidMusicPresenceLink
             _setPhoneVolume = setPhoneVolume;
             _editMetadataAction = editMetadataAction;
             _saveTrackAction = saveTrackAction;
+            _isCloudTrack = isCloudTrack;
 
             if (_lyricsManager != null)
             {

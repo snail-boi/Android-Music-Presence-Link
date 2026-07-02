@@ -369,6 +369,19 @@ namespace AndroidMusicPresenceLink
             catch { }
         }
 
+        // Cloud (Subsonic) tracks have no local file to rewrite tags on, so disable tag editing
+        // and explain why. Everything else stays available (cover/info are already local, and the
+        // Save-song path downloads from the server for cloud tracks).
+        private void CoverContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            if (EditMetadataMenuItem == null)
+                return;
+
+            bool isCloud = _isCloudTrack?.Invoke() == true;
+            EditMetadataMenuItem.IsEnabled = !isCloud;
+            EditMetadataMenuItem.ToolTip = isCloud ? "No support for editing cloud metadata" : null;
+        }
+
         // Opens the tag editor for the current track. Orchestration lives in App via the
         // injected _editMetadataAction (declared in MediaPlayerWindow_xaml.cs).
         private async void EditMetadataMenuItem_Click(object sender, RoutedEventArgs e)

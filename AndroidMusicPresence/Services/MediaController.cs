@@ -58,6 +58,11 @@ namespace AndroidMusicPresenceLink
         // resolved on this cover pipeline, which runs separately from (and later than) the
         // metadata notification that drives lyric loading.
         public string? CurrentRemoteFileToken { get; private set; }
+        // Set when the current track's cover/duration was resolved from Subsonic (no local file).
+        // Null for local-file or unresolved tracks. Lets the UI treat the track as a cloud track
+        // (grey out tag editing, download the file from the server instead of the phone).
+        public string? CurrentSubsonicSongId { get; private set; }
+        public string? CurrentSubsonicSuffix { get; private set; }
         internal CoverCacheManager CoverCache => cacheManager;
 
         // Android only reports the last scrub position, so realPositionMs is the
@@ -805,6 +810,11 @@ namespace AndroidMusicPresenceLink
 
             Debugger.show($"[COVERART] Lookup for '{fileNameWithoutExtension}' by '{artist}' — coverSearch={enableCoverSearch}, subsonic={useSubsonic}");
 
+            // Fresh resolution for this track: clear any prior Subsonic identity. It's re-set only
+            // if the Subsonic fallback actually resolves the track below.
+            CurrentSubsonicSongId = null;
+            CurrentSubsonicSuffix = null;
+
             // Subsonic-only: skip the entire ADB find/pull pipeline and query the server directly.
             // (Reached only when useSubsonic is true, since the caller gates on enableCoverSearch||useSubsonic.)
             if (!enableCoverSearch)
@@ -1214,6 +1224,8 @@ namespace AndroidMusicPresenceLink
                 // resolver doesn't associate the previous track's path with this one.
                 CurrentRemoteFilePath = null;
                 CurrentRemoteFileToken = null;
+                CurrentSubsonicSongId = match.Id;
+                CurrentSubsonicSuffix = match.Suffix;
 
                 TimeSpan? duration = match.DurationSeconds.HasValue && match.DurationSeconds.Value > 0
                     ? TimeSpan.FromSeconds(match.DurationSeconds.Value)

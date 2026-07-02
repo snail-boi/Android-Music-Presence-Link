@@ -825,6 +825,16 @@ namespace AndroidMusicPresenceLink
             if (_saveTrackOpen)
                 return;
 
+            var remotePath = _presenceService?.CurrentRemoteFilePath;
+            var subsonicSongId = _presenceService?.CurrentSubsonicSongId;
+
+            // Cloud (Subsonic) track: no local file on the phone — download from the server instead.
+            if (string.IsNullOrWhiteSpace(remotePath) && !string.IsNullOrWhiteSpace(subsonicSongId))
+            {
+                await SaveSubsonicTrackAsync(subsonicSongId!).ConfigureAwait(true);
+                return;
+            }
+
             var device = _presenceService?.CurrentDevice ?? string.Empty;
             if (string.IsNullOrWhiteSpace(device))
             {
@@ -832,7 +842,6 @@ namespace AndroidMusicPresenceLink
                 return;
             }
 
-            var remotePath = _presenceService?.CurrentRemoteFilePath;
             if (string.IsNullOrWhiteSpace(remotePath))
             {
                 ShowToast("No track file has been resolved yet.", ToastLevel.Warning);
@@ -877,6 +886,73 @@ namespace AndroidMusicPresenceLink
             }
         }
 
+        // Downloads the current Subsonic-streamed track's original file from the server.
+        private async Task SaveSubsonicTrackAsync(string songId)
+        {
+            var sub = Config?.Subsonic;
+            if (sub == null || string.IsNullOrWhiteSpace(sub.ServerUrl) || string.IsNullOrWhiteSpace(sub.Username))
+            {
+                ShowToast("Subsonic is not configured.", ToastLevel.Warning);
+                return;
+            }
+
+            var password = SecretProtector.Unprotect(sub.EncryptedPassword);
+            if (string.IsNullOrEmpty(password))
+            {
+                ShowToast("Subsonic password is not set.", ToastLevel.Warning);
+                return;
+            }
+
+            // Build a sensible default filename from the now-playing metadata + the server's suffix.
+            string suffix = _presenceService?.CurrentSubsonicSuffix ?? string.Empty;
+            string ext = string.IsNullOrWhiteSpace(suffix) ? ".mp3" : "." + suffix.TrimStart('.');
+            string artist = _lastMediaPlayerArtist ?? string.Empty;
+            string title = _lastMediaPlayerTitle ?? string.Empty;
+            string baseName = $"{artist} - {title}".Trim(' ', '-');
+            if (string.IsNullOrWhiteSpace(baseName)) baseName = "track";
+            string suggested = SanitizeFileName(baseName) + ext;
+
+            _saveTrackOpen = true;
+            try
+            {
+                var dialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "Save song",
+                    FileName = suggested,
+                    Filter = $"Audio Files|*{ext}|All Files|*.*",
+                    DefaultExt = ext
+                };
+
+                if (dialog.ShowDialog(_mediaPlayerWindow) != true)
+                    return;
+
+                string dest = dialog.FileName;
+
+                ShowToast("Downloading file from server...", ToastLevel.Info);
+                var result = await SubsonicClient.DownloadSongAsync(sub.ServerUrl, sub.Username, password, songId, dest).ConfigureAwait(true);
+
+                if (result != null && System.IO.File.Exists(dest) && new System.IO.FileInfo(dest).Length > 0)
+                    ShowToast("Saved: " + System.IO.Path.GetFileName(dest), ToastLevel.Info);
+                else
+                    ShowToast("Download failed or file is empty.", ToastLevel.Warning);
+            }
+            catch (Exception ex)
+            {
+                ShowToast("Failed to save song: " + ex.Message, ToastLevel.Warning);
+            }
+            finally
+            {
+                _saveTrackOpen = false;
+            }
+        }
+
+        private static string SanitizeFileName(string name)
+        {
+            foreach (var c in System.IO.Path.GetInvalidFileNameChars())
+                name = name.Replace(c, '_');
+            return name;
+        }
+
         internal void ShowMediaPlayerWindowNow()
         {
             Debugger.show("[MEDIAPLAYER] Opening media player window.");
@@ -901,7 +977,8 @@ namespace AndroidMusicPresenceLink
                     GetPhoneVolumeAsync,
                     (prev, target, max) => SetPhoneVolumeAsync(prev, target, max),
                     EditCurrentTrackMetadataAsync,
-                    SaveCurrentTrackAsync);
+                    SaveCurrentTrackAsync,
+                    () => _presenceService?.CurrentSubsonicSongId != null);
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
                 _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask, () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
 

@@ -92,6 +92,8 @@ namespace AndroidMusicPresenceLink
         internal string CurrentDevice => _currentDevice;
         internal string? CurrentRemoteFilePath => _mediaController.CurrentRemoteFilePath;
         internal string? CurrentRemoteFileToken => _mediaController.CurrentRemoteFileToken;
+        internal string? CurrentSubsonicSongId => _mediaController.CurrentSubsonicSongId;
+        internal string? CurrentSubsonicSuffix => _mediaController.CurrentSubsonicSuffix;
         internal string? CurrentCoverPath => _mediaController.CurrentCoverPath;
         internal CoverCacheManager? GetCoverCacheManager() => _mediaController.CoverCache;
         internal event Action<TrayIconState>? TrayStateChanged;
