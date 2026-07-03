@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace AndroidMusicPresenceLink
 {
@@ -146,6 +149,87 @@ namespace AndroidMusicPresenceLink
             catch (Exception ex)
             {
                 Interaction?.ShowWarning($"Failed to open lyrics cache folder: {ex.Message}", "Error");
+            }
+        }
+
+        // ── Forced (custom) covers management (Library & Caching section) ─────
+
+        public sealed class ForcedCoverItem
+        {
+            public string Token { get; init; } = string.Empty;
+            public string Title { get; init; } = string.Empty;
+            public string Artist { get; init; } = string.Empty;
+            public ImageSource? Thumbnail { get; init; }
+        }
+
+        public ObservableCollection<ForcedCoverItem> ForcedCovers { get; } = new();
+
+        public bool HasForcedCovers => ForcedCovers.Count > 0;
+
+        private RelayCommand<ForcedCoverItem>? _removeForcedCoverCommand;
+        public RelayCommand<ForcedCoverItem> RemoveForcedCoverCommand => _removeForcedCoverCommand ??= new RelayCommand<ForcedCoverItem>(RemoveForcedCover);
+
+        private RelayCommand? _removeAllForcedCoversCommand;
+        public RelayCommand RemoveAllForcedCoversCommand => _removeAllForcedCoversCommand ??= new RelayCommand(RemoveAllForcedCovers);
+
+        // Called by the window whenever the Library & Caching expander opens, so covers
+        // forced from the media player while settings were already open still show up.
+        internal void RefreshForcedCovers()
+        {
+            ForcedCovers.Clear();
+            foreach (var cover in ForcedCoverStore.All())
+            {
+                ForcedCovers.Add(new ForcedCoverItem
+                {
+                    Token = cover.Token,
+                    Title = cover.Title,
+                    Artist = cover.Artist,
+                    Thumbnail = LoadCoverThumbnail(cover.ImagePath)
+                });
+            }
+
+            RaisePropertyChanged(nameof(HasForcedCovers));
+        }
+
+        private void RemoveForcedCover(ForcedCoverItem? item)
+        {
+            if (item == null) return;
+
+            ForcedCoverStore.RemoveByToken(item.Token);
+            ForcedCovers.Remove(item);
+            RaisePropertyChanged(nameof(HasForcedCovers));
+            (Application.Current as App)?.NotifyForcedCoversChanged();
+        }
+
+        private void RemoveAllForcedCovers()
+        {
+            if (ForcedCovers.Count == 0) return;
+
+            ForcedCoverStore.RemoveAll();
+            ForcedCovers.Clear();
+            RaisePropertyChanged(nameof(HasForcedCovers));
+            (Application.Current as App)?.NotifyForcedCoversChanged();
+        }
+
+        private static ImageSource? LoadCoverThumbnail(string path)
+        {
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(path, UriKind.Absolute);
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                // A re-forced cover reuses the same file name; skip WPF's URI cache so the
+                // list shows the new image instead of the stale one.
+                bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bmp.DecodePixelWidth = 96;
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            }
+            catch
+            {
+                return null;
             }
         }
 

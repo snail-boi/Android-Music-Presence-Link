@@ -88,6 +88,11 @@ namespace AndroidMusicPresenceLink
         // Returns true when the current track was resolved from Subsonic (a cloud track with no
         // local file). Used to disable tag editing in the cover context menu.
         private readonly Func<bool>? _isCloudTrack;
+        // Forced (user-chosen) cover overrides; orchestration lives in App so the token is
+        // built from the raw track metadata rather than the window's display text.
+        private readonly Func<Task>? _setCustomCoverAction;
+        private readonly Func<Task>? _removeCustomCoverAction;
+        private readonly Func<bool>? _hasForcedCover;
         private readonly Action<AudioQualityPresets.Preset>? _applyAudioQualityPreset;
         private readonly Action? _openCustomQualityWindow;
 
@@ -139,7 +144,10 @@ namespace AndroidMusicPresenceLink
             Func<int, int, int, Task>? setPhoneVolume = null,
             Func<Task>? editMetadataAction = null,
             Func<Task>? saveTrackAction = null,
-            Func<bool>? isCloudTrack = null)
+            Func<bool>? isCloudTrack = null,
+            Func<Task>? setCustomCoverAction = null,
+            Func<Task>? removeCustomCoverAction = null,
+            Func<bool>? hasForcedCover = null)
         {
             InitializeComponent();
             PlayerPaneBorder.DataContext = _vm;
@@ -162,6 +170,9 @@ namespace AndroidMusicPresenceLink
             _editMetadataAction = editMetadataAction;
             _saveTrackAction = saveTrackAction;
             _isCloudTrack = isCloudTrack;
+            _setCustomCoverAction = setCustomCoverAction;
+            _removeCustomCoverAction = removeCustomCoverAction;
+            _hasForcedCover = hasForcedCover;
 
             if (_lyricsManager != null)
             {

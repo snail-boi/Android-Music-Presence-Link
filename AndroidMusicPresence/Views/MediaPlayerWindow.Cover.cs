@@ -380,6 +380,46 @@ namespace AndroidMusicPresenceLink
             bool isCloud = _isCloudTrack?.Invoke() == true;
             EditMetadataMenuItem.IsEnabled = !isCloud;
             EditMetadataMenuItem.ToolTip = isCloud ? "No support for editing cloud metadata" : null;
+
+            if (SetCustomCoverMenuItem != null)
+            {
+                SetCustomCoverMenuItem.IsEnabled = _hasSong;
+                SetCustomCoverMenuItem.ToolTip = _hasSong ? null : "No track is playing";
+            }
+
+            if (RemoveCustomCoverMenuItem != null)
+            {
+                bool hasForced = _hasForcedCover?.Invoke() == true;
+                RemoveCustomCoverMenuItem.IsEnabled = hasForced;
+                RemoveCustomCoverMenuItem.ToolTip = hasForced ? null : "This track has no custom cover";
+            }
+        }
+
+        private async void SetCustomCoverMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_setCustomCoverAction == null)
+            {
+                (Application.Current as App)?.ShowToast("Setting a custom cover is not available right now.", ToastLevel.Warning);
+                return;
+            }
+
+            try { await _setCustomCoverAction(); }
+            catch (Exception ex)
+            {
+                (Application.Current as App)?.ShowToast("Set custom cover failed: " + ex.Message, ToastLevel.Warning);
+            }
+        }
+
+        private async void RemoveCustomCoverMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_removeCustomCoverAction == null)
+                return;
+
+            try { await _removeCustomCoverAction(); }
+            catch (Exception ex)
+            {
+                (Application.Current as App)?.ShowToast("Remove custom cover failed: " + ex.Message, ToastLevel.Warning);
+            }
         }
 
         // Opens the tag editor for the current track. Orchestration lives in App via the

@@ -45,6 +45,7 @@ namespace AndroidMusicPresenceLink
 
             // Debug logging follows the toggle and is applied once at load, as before.
             Debugger.IsEnabled = _vm.DebugMode;
+            Debugger.AdvancedEnabled = _vm.AdvancedDebugMode;
 
             Closing += MainWindow_Closing;
             Loaded += MainWindow_Loaded;
@@ -62,6 +63,8 @@ namespace AndroidMusicPresenceLink
                 (Application.Current as App)?.ApplyThemePreview(_vm.BuildActiveThemeProfile());
             else if (e.PropertyName == nameof(SettingsViewModel.DebugMode))
                 Debugger.IsEnabled = _vm.DebugMode;
+            else if (e.PropertyName == nameof(SettingsViewModel.AdvancedDebugMode))
+                Debugger.AdvancedEnabled = _vm.AdvancedDebugMode;
         }
 
         // ── Internal surface preserved for App.xaml.cs ───────────────────────
@@ -367,6 +370,11 @@ namespace AndroidMusicPresenceLink
         {
             if (sender is not Expander expander)
                 return;
+
+            // Reload the custom-covers list on open so covers forced from the media
+            // player while settings were already open still show up.
+            if (ReferenceEquals(expander, LibraryCachingExpander))
+                _vm.RefreshForcedCovers();
 
             if (expander.Content is not FrameworkElement content)
                 return;

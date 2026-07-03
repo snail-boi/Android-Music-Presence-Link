@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.Globalization;
 
 namespace AndroidMusicPresenceLink
 {
@@ -11,14 +10,51 @@ namespace AndroidMusicPresenceLink
 
         private const int MaxLogFiles = 5;
         private static readonly string latestLogPath = Path.Combine(logDirectory, "musicpresence_latest.log");
+        private static readonly string advancedLogPath = Path.Combine(logDirectory, "advanced_debug.log");
         private static bool rotated;
+        private static DateTime? lastEntryUtc;
+        private static StreamWriter? advancedWriter;
+        private static bool advancedEnabled;
 
         public static bool IsEnabled { get; set; }
+
+        // Advanced mode replaces normal logging entirely: every show() call plus the
+        // per-command adb traffic from AdbHelper goes to a single advanced_debug.log,
+        // which starts fresh each time the mode turns on.
+        public static bool AdvancedEnabled
+        {
+            get => advancedEnabled;
+            set
+            {
+                lock (syncRoot)
+                {
+                    if (advancedEnabled == value)
+                        return;
+
+                    advancedEnabled = value;
+                    if (value)
+                        OpenAdvancedLog();
+                    else
+                        CloseAdvancedLog();
+                }
+            }
+        }
+
+        // Gap between entries that triggers a separator line. Kept in sync with the
+        // poll interval by MusicPresenceService so slow/adaptive polling doesn't put
+        // a separator between every routine tick.
+        public static TimeSpan SeparatorGap { get; set; } = TimeSpan.FromSeconds(5);
 
         internal static string LogDirectory => logDirectory;
 
         public static void show(string message)
         {
+            if (advancedEnabled)
+            {
+                WriteAdvanced(message);
+                return;
+            }
+
             if (!IsEnabled) return;
 
             lock (syncRoot)
@@ -30,8 +66,7 @@ namespace AndroidMusicPresenceLink
                 }
 
                 var now = DateTime.Now;
-                var lastEntryUtc = GetLastLogEntryUtc();
-                if (lastEntryUtc.HasValue && (now.ToUniversalTime() - lastEntryUtc.Value).TotalSeconds > 5)
+                if (lastEntryUtc.HasValue && (now.ToUniversalTime() - lastEntryUtc.Value) > SeparatorGap)
                 {
                     WriteToLogFile("--------------------------------------------------");
                 }
@@ -39,36 +74,66 @@ namespace AndroidMusicPresenceLink
                 string logEntry = $"{now:yyyy-MM-dd HH:mm:ss} - {message}";
                 Debug.WriteLine(logEntry);
                 WriteToLogFile(logEntry);
+                lastEntryUtc = now.ToUniversalTime();
             }
         }
 
-        private static DateTime? GetLastLogEntryUtc()
+        // Extra-verbose channel for per-adb-command tracing. No-op unless advanced
+        // mode is on, so call sites don't need their own guards.
+        public static void advanced(string message)
         {
-            if (!File.Exists(latestLogPath))
-                return null;
+            if (!advancedEnabled) return;
+            WriteAdvanced(message);
+        }
 
-            try
+        private static void WriteAdvanced(string message)
+        {
+            lock (syncRoot)
             {
-                var lines = File.ReadAllLines(latestLogPath);
-                for (int i = lines.Length - 1; i >= 0; i--)
+                if (advancedWriter == null) return;
+
+                try
                 {
-                    var line = lines[i];
-                    if (string.IsNullOrWhiteSpace(line))
-                        continue;
-
-                    if (line.Length < 19)
-                        continue;
-
-                    var stamp = line.Substring(0, 19);
-                    if (DateTime.TryParseExact(stamp, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-                        return DateTime.SpecifyKind(parsed, DateTimeKind.Local).ToUniversalTime();
+                    string entry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - {message}";
+                    Debug.WriteLine(entry);
+                    advancedWriter.WriteLine(entry);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Advanced Logging Error] {ex.Message}");
                 }
             }
-            catch
-            {
-            }
+        }
 
-            return null;
+        private static void OpenAdvancedLog()
+        {
+            try
+            {
+                if (!Directory.Exists(logDirectory))
+                    Directory.CreateDirectory(logDirectory);
+
+                // AutoFlush keeps the file intact after a crash (the whole point of the
+                // mode) while still being far cheaper than reopening the file per line.
+                advancedWriter = new StreamWriter(advancedLogPath, append: false) { AutoFlush = true };
+                advancedWriter.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - ===== ADVANCED DEBUG LOG STARTED =====");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Advanced Log Open Error] {ex.Message}");
+                advancedWriter = null;
+            }
+        }
+
+        private static void CloseAdvancedLog()
+        {
+            try
+            {
+                advancedWriter?.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - ===== ADVANCED DEBUG LOG ENDED =====");
+                advancedWriter?.Dispose();
+            }
+            catch { }
+
+            advancedWriter = null;
         }
 
         private static void WriteToLogFile(string message)

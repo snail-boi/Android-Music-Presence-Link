@@ -373,6 +373,9 @@ namespace AndroidMusicPresenceLink
         public string IgnoredUpdateVersion { get; set; } = string.Empty;
         public bool OnboardingCompleted { get; set; } = false;
         public bool DebugMode { get; set; } = false;
+        // Replaces normal logging with a single advanced_debug.log that traces every
+        // adb command and its output. Persisted so it can capture app startup too.
+        public bool AdvancedDebugMode { get; set; } = false;
         public int CachClearInMB { get; set; } = 200;
     }
 
@@ -555,6 +558,7 @@ namespace AndroidMusicPresenceLink
                     IgnoredUpdateVersion = AppSettings.IgnoredUpdateVersion,
                     OnboardingCompleted = AppSettings.OnboardingCompleted,
                     DebugMode = AppSettings.DebugMode,
+                    AdvancedDebugMode = AppSettings.AdvancedDebugMode,
                     CachClearInMB = AppSettings.CachClearInMB
                 }
             };

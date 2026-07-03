@@ -445,6 +445,21 @@ namespace AndroidMusicPresenceLink
                 CurrentArtist = artist;
                 CurrentAlbum = album;
 
+                // Forced covers are a display-level override: the lookup above still ran
+                // (it resolves duration, remote file path, and lyrics), but the image it
+                // produced is swapped out before anything user-visible consumes it. Keyed
+                // on the final title/artist so it matches what the player window shows.
+                if (metadataChanged || smtcMetadataChanged)
+                {
+                    var forcedCover = ForcedCoverStore.TryGetPath(title, artist);
+                    if (forcedCover != null && !string.Equals(CurrentCoverPath, forcedCover, StringComparison.OrdinalIgnoreCase))
+                    {
+                        CurrentCoverPath = forcedCover;
+                        if (enableSmtc)
+                            await SetCachedImage(forcedCover).ConfigureAwait(false);
+                    }
+                }
+
                 if (duration.HasValue && duration.Value > TimeSpan.Zero)
                     lastTrackDuration = duration;
 

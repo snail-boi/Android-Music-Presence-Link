@@ -90,6 +90,9 @@ namespace AndroidMusicPresenceLink
         private bool _debugMode;
         public bool DebugMode { get => _debugMode; set => Set(ref _debugMode, value); }
 
+        private bool _advancedDebugMode;
+        public bool AdvancedDebugMode { get => _advancedDebugMode; set => Set(ref _advancedDebugMode, value); }
+
         private bool _useDarkMode;
         public bool UseDarkMode { get => _useDarkMode; set => Set(ref _useDarkMode, value); }
 
@@ -320,6 +323,7 @@ namespace AndroidMusicPresenceLink
         private void LoadCoreFromConfig()
         {
             _debugMode = _config.AppSettings.DebugMode;
+            _advancedDebugMode = _config.AppSettings.AdvancedDebugMode;
             _useDarkMode = _config.Theme.UseDarkMode;
             _openInTaskbar = _config.AppSettings.OpenInTaskbar;
             _startWithWindows = _config.AppSettings.StartWithWindows;
@@ -357,6 +361,7 @@ namespace AndroidMusicPresenceLink
         private void ApplyCoreToConfig(MusicConfig config)
         {
             config.AppSettings.DebugMode = DebugMode;
+            config.AppSettings.AdvancedDebugMode = AdvancedDebugMode;
             config.Theme.UseDarkMode = UseDarkMode;
             config.AppSettings.OpenInTaskbar = OpenInTaskbar;
             config.AppSettings.StartWithWindows = StartWithWindows;
@@ -536,6 +541,7 @@ namespace AndroidMusicPresenceLink
             if (left.Polling.AdaptiveThresholdMinutes != right.Polling.AdaptiveThresholdMinutes) return false;
             if (left.Polling.AdaptiveAlertEnabled != right.Polling.AdaptiveAlertEnabled) return false;
             if (left.AppSettings.DebugMode != right.AppSettings.DebugMode) return false;
+            if (left.AppSettings.AdvancedDebugMode != right.AppSettings.AdvancedDebugMode) return false;
             if (!string.Equals(left.Theme.ActiveProfile ?? string.Empty, right.Theme.ActiveProfile ?? string.Empty, StringComparison.Ordinal)) return false;
             var leftThemes = left.Theme.CustomProfiles ?? new List<ThemeProfile>();
             var rightThemes = right.Theme.CustomProfiles ?? new List<ThemeProfile>();

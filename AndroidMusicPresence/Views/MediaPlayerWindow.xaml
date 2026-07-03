@@ -343,6 +343,9 @@
                                                     <MenuItem Header="Copy track info" Click="CopyCoverInfoMenuItem_Click" />
                                                     <MenuItem x:Name="EditMetadataMenuItem" Header="Edit metadata..." Click="EditMetadataMenuItem_Click" ToolTipService.ShowOnDisabled="True" />
                                                     <MenuItem Header="Save song to PC..." Click="SaveTrackMenuItem_Click" />
+                                                    <Separator />
+                                                    <MenuItem x:Name="SetCustomCoverMenuItem" Header="Set custom cover..." Click="SetCustomCoverMenuItem_Click" ToolTipService.ShowOnDisabled="True" />
+                                                    <MenuItem x:Name="RemoveCustomCoverMenuItem" Header="Remove custom cover" Click="RemoveCustomCoverMenuItem_Click" ToolTipService.ShowOnDisabled="True" />
                                                 </ContextMenu>
                                             </Border.ContextMenu>
                                         </Border>

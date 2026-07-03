@@ -108,10 +108,8 @@ namespace AndroidMusicPresenceLink
             _mediaController = new MediaController(dispatcher, () => _currentDevice, async () => { await UpdateCurrentSongAsync().ConfigureAwait(false); }, config, NotifyUserInteraction);
             _mediaController.Initialize();
 
-            _timer = new DispatcherTimer
-            {
-                Interval = GetInterval(config.Polling.Interval)
-            };
+            _timer = new DispatcherTimer();
+            SetPollInterval(GetInterval(config.Polling.Interval));
             _timer.Tick += async (_, __) => await TickAsync();
         }
 
@@ -147,7 +145,7 @@ namespace AndroidMusicPresenceLink
             }
 
             var interval = GetInterval(config.Polling.Interval);
-            _timer.Interval = interval;
+            SetPollInterval(interval);
             if (interval.TotalSeconds <= 0)
             {
                 _timer.Stop();
@@ -1279,7 +1277,7 @@ namespace AndroidMusicPresenceLink
                 return;
 
             if (_timer.Interval != baseInterval)
-                _timer.Interval = baseInterval;
+                SetPollInterval(baseInterval);
 
             _ = TickAsync();
         }
@@ -1350,10 +1348,19 @@ namespace AndroidMusicPresenceLink
                     Debugger.show($"[ADAPTIVE] Poll interval restored to base: {target.TotalSeconds:0}s.");
                     AdbHelper.SessionIdleTimeout = TimeSpan.FromSeconds(20);
                 }
-                _timer.Interval = target;
+                SetPollInterval(target);
             }
 
             _adaptiveActive = target > baseInterval;
+        }
+
+        // Single choke point for poll-interval changes: keeps the debug log's
+        // separator threshold in step with however fast we're actually polling
+        // (base or adaptive), so routine ticks never get separator lines.
+        private void SetPollInterval(TimeSpan interval)
+        {
+            _timer.Interval = interval;
+            Debugger.SeparatorGap = TimeSpan.FromSeconds(Math.Max(5, interval.TotalSeconds + 2));
         }
 
         public void Dispose()

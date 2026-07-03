@@ -134,6 +134,9 @@ namespace AndroidMusicPresenceLink
 
         private static async Task<string> RunAdbProcessAsync(string args, bool captureOutput)
         {
+            bool trace = Debugger.AdvancedEnabled;
+            Debugger.advanced($"[ADB EXEC] adb {args}");
+
             var psi = new ProcessStartInfo(AdbPath, args)
             {
                 RedirectStandardOutput = true,
@@ -151,7 +154,9 @@ namespace AndroidMusicPresenceLink
                 if (process == null)
                     return string.Empty;
 
-                if (captureOutput)
+                // Advanced tracing needs the output even for fire-and-forget calls,
+                // so it forces the capturing path.
+                if (captureOutput || trace)
                 {
                     var outputTask = process.StandardOutput.ReadToEndAsync();
                     var errorTask = process.StandardError.ReadToEndAsync();
@@ -159,12 +164,14 @@ namespace AndroidMusicPresenceLink
 
                     var output = await outputTask.ConfigureAwait(false);
                     var error = await errorTask.ConfigureAwait(false);
+
+                    Debugger.advanced($"[ADB EXEC] exit={process.ExitCode}, output: {(string.IsNullOrWhiteSpace(output) ? "<empty>" : output.Trim())}");
                     if (!string.IsNullOrWhiteSpace(error))
                     {
                         Debugger.show("ADB error: " + error.Trim());
                     }
 
-                    return output;
+                    return captureOutput ? output : string.Empty;
                 }
 
                 _ = process.StandardOutput.ReadToEndAsync();
@@ -252,35 +259,45 @@ namespace AndroidMusicPresenceLink
                     //hiding this one as it's too spammy and the session lifecycle is already logged at start/end
                     //Debugger.show($"ADB shell session pid={_process.Id}, device={(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}, cmd#{commandNumber}");
 
+                    bool trace = Debugger.AdvancedEnabled;
+                    Debugger.advanced($"[ADB SHELL] ({(string.IsNullOrWhiteSpace(_serial) ? "default" : _serial)}, cmd#{commandNumber}) $ {shellCommand}");
+
                     var marker = "__ADB_HELPER_DONE__" + Guid.NewGuid().ToString("N");
                     var lineToSend = shellCommand + "; echo " + marker + ":$?";
 
                     await _stdin.WriteLineAsync(lineToSend).ConfigureAwait(false);
                     await _stdin.FlushAsync().ConfigureAwait(false);
 
-                    StringBuilder? output = captureOutput ? new StringBuilder() : null;
+                    // Tracing collects output even when the caller doesn't want it; the
+                    // lines are read off the pipe either way to find the marker.
+                    StringBuilder? output = captureOutput || trace ? new StringBuilder() : null;
+                    string exitCode = "?";
 
                     while (true)
                     {
                         var line = await _stdout.ReadLineAsync().ConfigureAwait(false);
                         if (line == null)
                         {
+                            Debugger.advanced($"[ADB SHELL] (cmd#{commandNumber}) stream closed before marker; restarting session");
                             Restart();
-                            return output?.ToString() ?? string.Empty;
+                            return captureOutput ? output?.ToString() ?? string.Empty : string.Empty;
                         }
 
                         if (line.StartsWith(marker + ":", StringComparison.Ordinal))
                         {
+                            exitCode = line.Substring(marker.Length + 1);
                             break;
                         }
 
-                        if (captureOutput)
-                        {
-                            output!.AppendLine(line);
-                        }
+                        output?.AppendLine(line);
                     }
 
-                    return output?.ToString() ?? string.Empty;
+                    if (trace && output != null)
+                    {
+                        Debugger.advanced($"[ADB SHELL] (cmd#{commandNumber}) exit={exitCode}, output: {(output.Length == 0 ? "<empty>" : output.ToString().TrimEnd())}");
+                    }
+
+                    return captureOutput ? output?.ToString() ?? string.Empty : string.Empty;
                 }
                 catch (Exception ex)
                 {

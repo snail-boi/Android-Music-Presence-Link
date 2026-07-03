@@ -42,6 +42,7 @@ using System.Windows.Media;
 // v1.4.5 : the customizability update
 // v1.5.0 : the big boy update aka the MVVM refactor update aka the rewrite update aka nexts and previous's update
 // v1.6.0 : the embedded lyrics and metadata editing update with some adaptive poll rates on the side
+// v1.7.0 : random bulshit go 3 the threequening update
 
 
 namespace AndroidMusicPresenceLink
@@ -142,6 +143,7 @@ namespace AndroidMusicPresenceLink
             Config = MusicConfigManager.Load();
             ApplyStartupRegistration(Config.AppSettings.StartWithWindows);
             Debugger.IsEnabled = Config.AppSettings.DebugMode;
+            Debugger.AdvancedEnabled = Config.AppSettings.AdvancedDebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
             if (Config.Theme.RandomAtStartup)
             {
@@ -637,6 +639,7 @@ namespace AndroidMusicPresenceLink
             Config = config;
             ApplyStartupRegistration(config.AppSettings.StartWithWindows);
             Debugger.IsEnabled = Config.AppSettings.DebugMode;
+            Debugger.AdvancedEnabled = Config.AppSettings.AdvancedDebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
             ApplyActiveTheme(config);
             _presenceService?.UpdateConfig(config);
@@ -720,6 +723,75 @@ namespace AndroidMusicPresenceLink
         internal bool IsMediaPlayerModeActive()
         {
             return _mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible;
+        }
+
+        // ── Forced (custom) covers ────────────────────────────────────────────
+
+        internal Task SetCustomCoverForCurrentTrackAsync()
+        {
+            var title = _lastMediaPlayerTitle;
+            var artist = _lastMediaPlayerArtist;
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                ShowToast("No track is playing.", ToastLevel.Warning);
+                return Task.CompletedTask;
+            }
+
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Choose a custom cover image",
+                Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp",
+                CheckFileExists = true
+            };
+
+            bool? ok = _mediaPlayerWindow != null ? dialog.ShowDialog(_mediaPlayerWindow) : dialog.ShowDialog();
+            if (ok != true)
+                return Task.CompletedTask;
+
+            var storedPath = ForcedCoverStore.Set(title, artist, dialog.FileName);
+            if (storedPath == null)
+            {
+                ShowToast("Could not use that image (unsupported type or read error).", ToastLevel.Warning);
+                return Task.CompletedTask;
+            }
+
+            RefreshCoverAfterForcedCoverChange(storedPath);
+            ShowToast("Custom cover set.");
+            return Task.CompletedTask;
+        }
+
+        internal Task RemoveCustomCoverForCurrentTrackAsync()
+        {
+            var title = _lastMediaPlayerTitle;
+            var artist = _lastMediaPlayerArtist;
+            if (string.IsNullOrWhiteSpace(title) || !ForcedCoverStore.Has(title, artist))
+                return Task.CompletedTask;
+
+            ForcedCoverStore.Remove(title, artist);
+            // Pass null: the real cover re-resolves on the next poll tick.
+            RefreshCoverAfterForcedCoverChange(null);
+            ShowToast("Custom cover removed.");
+            return Task.CompletedTask;
+        }
+
+        // Forces the next poll tick to re-resolve the cover (which applies or drops the
+        // override for SMTC and everything else) and updates the player window right away
+        // so the user isn't left waiting a poll cycle.
+        internal void RefreshCoverAfterForcedCoverChange(string? immediatePath)
+        {
+            _presenceService?.ResetCoverSearch();
+            if (_mediaPlayerWindow != null && !string.IsNullOrWhiteSpace(_lastMediaPlayerTitle))
+            {
+                _lastMediaPlayerCoverPath = immediatePath;
+                _mediaPlayerWindow.UpdateTrack(_lastMediaPlayerTitle, _lastMediaPlayerArtist, _lastMediaPlayerAlbum, immediatePath, _lastMediaPlayerIsPlaying);
+            }
+        }
+
+        // Called by the settings view after bulk removals so a removed override for the
+        // currently playing track stops showing without an app restart.
+        internal void NotifyForcedCoversChanged()
+        {
+            _presenceService?.ResetCoverSearch();
         }
 
         internal async Task EditCurrentTrackMetadataAsync()
@@ -978,7 +1050,10 @@ namespace AndroidMusicPresenceLink
                     (prev, target, max) => SetPhoneVolumeAsync(prev, target, max),
                     EditCurrentTrackMetadataAsync,
                     SaveCurrentTrackAsync,
-                    () => _presenceService?.CurrentSubsonicSongId != null);
+                    () => _presenceService?.CurrentSubsonicSongId != null,
+                    SetCustomCoverForCurrentTrackAsync,
+                    RemoveCustomCoverForCurrentTrackAsync,
+                    () => ForcedCoverStore.Has(_lastMediaPlayerTitle, _lastMediaPlayerArtist));
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
                 _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask, () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
 
@@ -1863,6 +1938,8 @@ namespace AndroidMusicPresenceLink
             _lyricsOverlayManager?.Dispose();
             DisposeHotkeys();
             AdbHelper.StopServer();
+            // Flushes the END marker; the mode itself stays enabled in config.
+            Debugger.AdvancedEnabled = false;
             base.OnExit(e);
         }
 

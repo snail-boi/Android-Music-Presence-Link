@@ -664,7 +664,7 @@
                     </Expander>
 
                     <!-- ====== FOLDERS & CACHE ====== -->
-                    <Expander Header="Library &amp; Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <Expander x:Name="LibraryCachingExpander" Header="Library &amp; Caching" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
                             <TextBlock Text="Library"
                                    Style="{StaticResource HeaderTitleStyle}" />
@@ -785,6 +785,60 @@
                                     Margin="8,0,0,0"
                                     Command="{Binding OpenLyricsCacheCommand}" />
                             </StackPanel>
+
+                            <!-- Custom (forced) covers -->
+
+                            <TextBlock Text="Custom covers"
+                                   Style="{StaticResource SectionLabelStyle}"
+                                   Margin="0,16,0,4" />
+                            <TextBlock Text="Covers you've set via right-click on the cover art in the media player. Remove one to go back to the real cover art."
+                                   Style="{StaticResource HintTextStyle}" />
+
+                            <ItemsControl ItemsSource="{Binding ForcedCovers}" Margin="0,4,0,8">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Width="120" Margin="0,0,10,10">
+                                            <Image Source="{Binding Thumbnail}"
+                                               Width="96" Height="96"
+                                               Stretch="UniformToFill"
+                                               HorizontalAlignment="Center"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                            <TextBlock Text="{Binding Title}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   HorizontalAlignment="Center"
+                                                   TextAlignment="Center"
+                                                   ToolTip="{Binding Title}"
+                                                   Margin="0,4,0,0" />
+                                            <TextBlock Text="{Binding Artist}"
+                                                   Style="{StaticResource HintTextStyle}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   HorizontalAlignment="Center"
+                                                   TextAlignment="Center"
+                                                   ToolTip="{Binding Artist}"
+                                                   Margin="0,0,0,0" />
+                                            <Button Content="Remove"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Width="90"
+                                                Margin="0,4,0,0"
+                                                HorizontalAlignment="Center"
+                                                Command="{Binding DataContext.RemoveForcedCoverCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Button Content="Remove all custom covers"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Width="180"
+                                HorizontalAlignment="Left"
+                                Command="{Binding RemoveAllForcedCoversCommand}"
+                                IsEnabled="{Binding HasForcedCovers}" />
                         </StackPanel>
                     </Expander>
 
@@ -1485,6 +1539,14 @@
                                    Style="{StaticResource HintTextStyle}" />
 
                             <CheckBox Content="Enable debug logging" IsChecked="{Binding DebugMode, Mode=TwoWay}" Margin="0,0,0,8" Style="{StaticResource ToggleSwitchStyle}"/>
+                            <CheckBox Content="Advanced debug logging"
+                                      IsChecked="{Binding AdvancedDebugMode, Mode=TwoWay}"
+                                      Margin="16,0,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      ToolTip="Traces every ADB command and its output to a single advanced_debug.log. Replaces normal logging while enabled."/>
+                            <TextBlock Text="Logs all ADB traffic to advanced_debug.log; normal logging pauses while this is on."
+                                       Style="{StaticResource HintTextStyle}"
+                                       Margin="16,0,0,8"/>
                             <Button Content="Open log folder"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Width="160"
