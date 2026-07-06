@@ -539,7 +539,7 @@
                                     Command="{Binding CycleBatteryBoltPlacementCommand}" />
                             </Grid>
 
-                            <Grid>
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -549,6 +549,27 @@
                                     Style="{StaticResource CycleButtonStyle}"
                                     Content="{Binding BatteryColorModeLabel}"
                                     Command="{Binding CycleBatteryColorModeCommand}" />
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Poll rate" Style="{StaticResource RowLabel}"
+                                       TextWrapping="Wrap" Margin="0,0,8,0" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBox Width="70"
+                                         TextAlignment="Center"
+                                         Style="{StaticResource InputTextBoxStyle}"
+                                         Text="{Binding BatteryPollText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Margin="4,0,0,0"
+                                        MinWidth="45"
+                                        Padding="6,0"
+                                        Style="{StaticResource CycleButtonStyle}"
+                                        Content="{Binding BatteryPollUnitLabel}"
+                                        Command="{Binding ToggleBatteryPollUnitCommand}" />
+                                </StackPanel>
                             </Grid>
 
                         </StackPanel>
@@ -734,6 +755,83 @@
                             </Grid>
 
                         </StackPanel>
+
+                    </StackPanel>
+                </Expander>
+
+                <!-- ── PREDICTIVE UI ─────────────────────────────────────────────── -->
+                <Expander Header="Predictive UI" IsExpanded="False" Margin="0,0,0,8" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
+                    <StackPanel>
+
+                        <TextBlock Text="Makes the player react instantly to button presses by predicting the result from the library list. Wrong guesses are corrected as soon as the phone answers."
+                               FontSize="11"
+                               Opacity="0.55"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10" />
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Predictive UI" Style="{StaticResource RowLabel}" />
+                                <TextBlock Text="Safe shows a loading state instantly; Full predicts the next title from the library list."
+                                       FontSize="11"
+                                       Opacity="0.55"
+                                       TextWrapping="Wrap"
+                                       MaxWidth="200"
+                                       Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding PredictiveUiLabel}"
+                                Opacity="{Binding PredictiveUiOpacity}"
+                                Command="{Binding CyclePredictiveUiCommand}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Predictive covers" Style="{StaticResource RowLabel}" />
+                                <TextBlock Text="Keeps neighbour covers in memory for an instant swap. 2x holds two in each direction."
+                                       FontSize="11"
+                                       Opacity="0.55"
+                                       TextWrapping="Wrap"
+                                       MaxWidth="200"
+                                       Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding PredictiveCoverLabel}"
+                                Opacity="{Binding PredictiveCoverOpacity}"
+                                Command="{Binding CyclePredictiveCoverCommand}" />
+                        </Grid>
+
+                        <!-- Same setting as in Next / previous song; shown here too because
+                             Full predictions and predictive covers read the same list. -->
+                        <Grid Visibility="{Binding PredictiveListOptionsVisible, Converter={StaticResource BoolToVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Sort order" Style="{StaticResource RowLabel}" />
+                                <TextBlock Text="Shared with Next / previous song."
+                                       FontSize="11"
+                                       Opacity="0.55"
+                                       TextWrapping="Wrap"
+                                       MaxWidth="200"
+                                       Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                Style="{StaticResource CycleButtonStyle}"
+                                Content="{Binding NextSongSortLabel}"
+                                Command="{Binding CycleNextSongSortCommand}" />
+                        </Grid>
 
                     </StackPanel>
                 </Expander>

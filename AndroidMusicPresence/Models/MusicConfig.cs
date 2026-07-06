@@ -95,6 +95,17 @@ namespace AndroidMusicPresenceLink
         Kirsten = 3
     }
 
+    public enum PredictiveUiMode
+    {
+        Off = 0,
+        // Instant buttons; next/prev flips the title to a generic "Loading" state
+        // without touching the library list.
+        Safe = 1,
+        // Instant buttons; next/prev shows the predicted neighbour title from the
+        // library list.
+        Full = 2
+    }
+
     public enum NextSongSortMode
     {
         FilenameAZ = 0,
@@ -287,6 +298,8 @@ namespace AndroidMusicPresenceLink
         public bool BatteryShowBolt { get; set; } = true;
         public bool BatteryBoltInside { get; set; } = true;
         public BatteryColorMode BatteryColorMode { get; set; } = BatteryColorMode.Enabled;
+        // How often the phone is pinged (dumpsys battery over ADB) for the battery icon.
+        public int BatteryPollIntervalSeconds { get; set; } = 150;
 
         public bool SwapArtistAlbum { get; set; } = false;
         public bool CoverRoundedCorners { get; set; } = true;
@@ -305,6 +318,16 @@ namespace AndroidMusicPresenceLink
 
         public string CopyTrackInfoTemplate { get; set; } = "{artist} - {title}";
         public int SmtcPauseClearDelayMinutes { get; set; } = 0;
+
+        // Instant-response transport buttons: pause flips the icon immediately, and
+        // next/prev swap the title right away (Safe = "Loading", Full = predicted
+        // neighbour from the library list) with the no-cover image until the real
+        // MediaSession state arrives and corrects it. Safe by default: it needs no
+        // library list and its only wrong-guess cost is a briefly generic title.
+        public PredictiveUiMode PredictiveUi { get; set; } = PredictiveUiMode.Safe;
+        // Predicted neighbour covers held in memory for an instant swap on next/prev.
+        // 0 = off, 1 = next+prev preloaded, 2 = two out in each direction.
+        public int PredictiveCoverMode { get; set; } = 0;
     }
 
     public class ToastConfig
@@ -491,6 +514,7 @@ namespace AndroidMusicPresenceLink
                     BatteryShowBolt = MediaPlayer.BatteryShowBolt,
                     BatteryBoltInside = MediaPlayer.BatteryBoltInside,
                     BatteryColorMode = MediaPlayer.BatteryColorMode,
+                    BatteryPollIntervalSeconds = MediaPlayer.BatteryPollIntervalSeconds,
                     SwapArtistAlbum = MediaPlayer.SwapArtistAlbum,
                     CoverRoundedCorners = MediaPlayer.CoverRoundedCorners,
                     CoverShadow = MediaPlayer.CoverShadow,
@@ -502,7 +526,9 @@ namespace AndroidMusicPresenceLink
                     PillModeQuality = MediaPlayer.PillModeQuality,
                     PillModeAlwaysOnTop = MediaPlayer.PillModeAlwaysOnTop,
                     CopyTrackInfoTemplate = MediaPlayer.CopyTrackInfoTemplate,
-                    SmtcPauseClearDelayMinutes = MediaPlayer.SmtcPauseClearDelayMinutes
+                    SmtcPauseClearDelayMinutes = MediaPlayer.SmtcPauseClearDelayMinutes,
+                    PredictiveUi = MediaPlayer.PredictiveUi,
+                    PredictiveCoverMode = MediaPlayer.PredictiveCoverMode
                 },
                 Toast = new ToastConfig
                 {
@@ -745,6 +771,15 @@ namespace AndroidMusicPresenceLink
 
             if (config.MediaPlayer.SmtcPauseClearDelayMinutes < 0)
                 config.MediaPlayer.SmtcPauseClearDelayMinutes = 0;
+
+            if (config.MediaPlayer.PredictiveCoverMode < 0 || config.MediaPlayer.PredictiveCoverMode > 2)
+                config.MediaPlayer.PredictiveCoverMode = 0;
+            if (!Enum.IsDefined(typeof(PredictiveUiMode), config.MediaPlayer.PredictiveUi))
+                config.MediaPlayer.PredictiveUi = PredictiveUiMode.Safe;
+
+            // Floor of 5s so a typo can't turn the battery poll into an ADB hammer.
+            if (config.MediaPlayer.BatteryPollIntervalSeconds < 5)
+                config.MediaPlayer.BatteryPollIntervalSeconds = 150;
 
             if (config.Hotkeys.VolumeUp < 0 || config.Hotkeys.VolumeUp > 0xFF)
                 config.Hotkeys.VolumeUp = 0xAF;

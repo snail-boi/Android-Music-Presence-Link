@@ -32,11 +32,14 @@ namespace AndroidMusicPresenceLink
             CycleNextSongModeCommand = new RelayCommand(CycleNextSongMode);
             CycleNextSongSortCommand = new RelayCommand(CycleNextSongSort);
             RescanLibraryCommand = new RelayCommand(RescanLibrary);
+            CyclePredictiveUiCommand = new RelayCommand(CyclePredictiveUi);
+            CyclePredictiveCoverCommand = new RelayCommand(CyclePredictiveCover);
 
             CycleBatteryStyleCommand = new RelayCommand(CycleBatteryStyle);
             CycleBatteryPercentPlacementCommand = new RelayCommand(CycleBatteryPercentPlacement);
             CycleBatteryBoltPlacementCommand = new RelayCommand(CycleBatteryBoltPlacement);
             CycleBatteryColorModeCommand = new RelayCommand(CycleBatteryColorMode);
+            ToggleBatteryPollUnitCommand = new RelayCommand(ToggleBatteryPollUnit);
         }
 
         // ── Checkboxes ────────────────────────────────────────────────────────
@@ -135,6 +138,65 @@ namespace AndroidMusicPresenceLink
             App.Config.MediaPlayer.BatteryColorMode = (BatteryColorMode)next;
             RaisePropertyChanged(nameof(BatteryColorModeLabel));
             SaveAndNotify();
+        }
+
+        // ── Battery poll rate (same textbox + unit-toggle pattern as seek) ──────
+
+        public RelayCommand ToggleBatteryPollUnitCommand { get; }
+
+        private string _batteryPollText = "150";
+        public string BatteryPollText
+        {
+            get => _batteryPollText;
+            set
+            {
+                if (!Set(ref _batteryPollText, value)) return;
+                if (_loading) return;
+                if (int.TryParse(value.Trim(), out int v) && v > 0)
+                {
+                    bool isMin = BatteryPollUnitLabel == "min";
+                    App.Config.MediaPlayer.BatteryPollIntervalSeconds = Math.Max(5, isMin ? v * 60 : v);
+                    SaveAndNotify();
+                }
+            }
+        }
+
+        private string _batteryPollUnitLabel = "sec";
+        public string BatteryPollUnitLabel { get => _batteryPollUnitLabel; private set => Set(ref _batteryPollUnitLabel, value); }
+
+        private void ToggleBatteryPollUnit()
+        {
+            if (_loading) return;
+
+            bool currentlyMin = BatteryPollUnitLabel == "min";
+            _loading = true;
+            if (currentlyMin)
+            {
+                if (int.TryParse(BatteryPollText.Trim(), out int min))
+                    BatteryPollText = (min * 60).ToString();
+                BatteryPollUnitLabel = "sec";
+            }
+            else
+            {
+                if (int.TryParse(BatteryPollText.Trim(), out int sec) && sec % 60 == 0)
+                {
+                    BatteryPollText = (sec / 60).ToString();
+                }
+                else if (int.TryParse(BatteryPollText.Trim(), out int secR))
+                {
+                    int rounded = Math.Max(1, (int)Math.Round(secR / 60.0));
+                    BatteryPollText = rounded.ToString();
+                }
+                BatteryPollUnitLabel = "min";
+            }
+            _loading = false;
+
+            if (int.TryParse(BatteryPollText.Trim(), out int v) && v > 0)
+            {
+                bool nowMin = BatteryPollUnitLabel == "min";
+                App.Config.MediaPlayer.BatteryPollIntervalSeconds = Math.Max(5, nowMin ? v * 60 : v);
+                SaveAndNotify();
+            }
         }
 
         private bool _playerShowHelpButton;
@@ -385,6 +447,50 @@ namespace AndroidMusicPresenceLink
             }
         }
 
+        // ── Predictive UI / covers ────────────────────────────────────────────
+
+        private static readonly string[] PredictiveUiLabels = { "Off", "Safe", "Full" };
+        private static readonly string[] PredictiveCoverLabels = { "Off", "1x", "2x" };
+
+        public RelayCommand CyclePredictiveUiCommand { get; }
+        public RelayCommand CyclePredictiveCoverCommand { get; }
+
+        public string PredictiveUiLabel => PredictiveUiLabels[Math.Clamp((int)App.Config.MediaPlayer.PredictiveUi, 0, 2)];
+        public double PredictiveUiOpacity => App.Config.MediaPlayer.PredictiveUi == PredictiveUiMode.Off ? 0.45 : 1.0;
+
+        public string PredictiveCoverLabel => PredictiveCoverLabels[Math.Clamp(App.Config.MediaPlayer.PredictiveCoverMode, 0, 2)];
+        public double PredictiveCoverOpacity => App.Config.MediaPlayer.PredictiveCoverMode == 0 ? 0.45 : 1.0;
+
+        // Sort order (shared with next/prev song) only matters when something is
+        // actually reading the library list: Full predictions or predictive covers.
+        public bool PredictiveListOptionsVisible
+            => App.Config.MediaPlayer.PredictiveUi == PredictiveUiMode.Full
+            || App.Config.MediaPlayer.PredictiveCoverMode > 0;
+
+        private void CyclePredictiveUi()
+        {
+            int next = ((int)App.Config.MediaPlayer.PredictiveUi + 1) % 3;
+            App.Config.MediaPlayer.PredictiveUi = (PredictiveUiMode)next;
+            RaisePropertyChanged(nameof(PredictiveUiLabel));
+            RaisePropertyChanged(nameof(PredictiveUiOpacity));
+            RaisePropertyChanged(nameof(PredictiveListOptionsVisible));
+            SaveAndNotify();
+            // Full predictions come from the library list; make sure one exists.
+            if (App.Config.MediaPlayer.PredictiveUi == PredictiveUiMode.Full)
+                (Application.Current as App)?.EnsurePredictiveLibraryAsync();
+        }
+
+        private void CyclePredictiveCover()
+        {
+            App.Config.MediaPlayer.PredictiveCoverMode = (App.Config.MediaPlayer.PredictiveCoverMode + 1) % 3;
+            RaisePropertyChanged(nameof(PredictiveCoverLabel));
+            RaisePropertyChanged(nameof(PredictiveCoverOpacity));
+            RaisePropertyChanged(nameof(PredictiveListOptionsVisible));
+            SaveAndNotify();
+            if (App.Config.MediaPlayer.PredictiveCoverMode > 0)
+                (Application.Current as App)?.EnsurePredictiveLibraryAsync();
+        }
+
         // ── Load / save ───────────────────────────────────────────────────────
 
         public void LoadFromConfig()
@@ -416,6 +522,11 @@ namespace AndroidMusicPresenceLink
                 bool useMin = threshSec % 60 == 0;
                 _seekUnitLabel = useMin ? "min" : "sec";
                 _seekThresholdText = useMin ? (threshSec / 60).ToString() : threshSec.ToString();
+
+                int pollSec = c.MediaPlayer.BatteryPollIntervalSeconds;
+                bool pollUseMin = pollSec % 60 == 0;
+                _batteryPollUnitLabel = pollUseMin ? "min" : "sec";
+                _batteryPollText = pollUseMin ? (pollSec / 60).ToString() : pollSec.ToString();
 
                 _timeFormatLabel = c.MediaPlayer.ShowTimeLeft ? "Remaining" : "Elapsed";
 

@@ -121,37 +121,9 @@ namespace AndroidMusicPresenceLink
                 return new NeighbourResult(null, null, null, null, false);
             }
 
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                Debugger.show("[NEXTSONG] Title is null/empty, returning not found.");
+            int bestIndex = FindBestMatchIndex(title, artist);
+            if (bestIndex < 0)
                 return new NeighbourResult(null, null, null, null, false);
-            }
-
-            int bestIndex = -1;
-            int bestScore = int.MinValue;
-
-            string normTitle = NormalizeForMatch(title);
-            string normArtist = NormalizeForMatch(artist ?? string.Empty);
-            Debugger.show($"[NEXTSONG] Normalized title: \"{normTitle}\", artist: \"{normArtist}\"");
-
-            for (int i = 0; i < _entries.Count; i++)
-            {
-                var entry = _entries[i];
-                var score = ScoreCandidate(entry.RemotePath, normTitle, normArtist);
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    bestIndex = i;
-                }
-            }
-
-            Debugger.show($"[NEXTSONG] Best match index: {bestIndex}, score: {bestScore}");
-
-            if (bestIndex < 0 || bestScore < 10)
-            {
-                Debugger.show($"[NEXTSONG] No match found (score {bestScore} below threshold). Returning not found.");
-                return new NeighbourResult(null, null, null, null, false);
-            }
 
             Debugger.show($"[NEXTSONG] Matched: \"{_entries[bestIndex].RemotePath}\"");
 
@@ -181,6 +153,70 @@ namespace AndroidMusicPresenceLink
             }
 
             return new NeighbourResult(prevPath, prevTitle, nextPath, nextTitle, true);
+        }
+
+        public record NeighbourAtOffset(int Offset, string RemotePath, string Title);
+
+        /// <summary>
+        /// Like FindNeighboursAsync but returns every entry within ±radius of the
+        /// matched track (offset 0, the match itself, is skipped). Used by the
+        /// predictive UI/covers feature, which needs up to two entries per direction.
+        /// Returns an empty list when the current track can't be matched.
+        /// </summary>
+        public async Task<List<NeighbourAtOffset>> FindNeighboursAtOffsetsAsync(string? title, string? artist, int radius)
+        {
+            await EnsureLoadedAsync().ConfigureAwait(false);
+
+            var result = new List<NeighbourAtOffset>();
+            int bestIndex = FindBestMatchIndex(title, artist);
+            if (bestIndex < 0)
+                return result;
+
+            for (int offset = -radius; offset <= radius; offset++)
+            {
+                if (offset == 0) continue;
+                int i = bestIndex + offset;
+                if (i < 0 || i >= _entries.Count) continue;
+                result.Add(new NeighbourAtOffset(offset, _entries[i].RemotePath, FilenameToDisplayTitle(_entries[i].RemotePath)));
+            }
+
+            Debugger.show($"[NEXTSONG] FindNeighboursAtOffsetsAsync radius {radius}: {result.Count} neighbours around index {bestIndex}.");
+            return result;
+        }
+
+        // Fuzzy-matches the track against the loaded list and returns its index,
+        // or -1 when nothing scores above the match threshold.
+        private int FindBestMatchIndex(string? title, string? artist)
+        {
+            if (_entries.Count == 0 || string.IsNullOrWhiteSpace(title))
+                return -1;
+
+            int bestIndex = -1;
+            int bestScore = int.MinValue;
+
+            string normTitle = NormalizeForMatch(title);
+            string normArtist = NormalizeForMatch(artist ?? string.Empty);
+            Debugger.show($"[NEXTSONG] Normalized title: \"{normTitle}\", artist: \"{normArtist}\"");
+
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                var score = ScoreCandidate(_entries[i].RemotePath, normTitle, normArtist);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestIndex = i;
+                }
+            }
+
+            Debugger.show($"[NEXTSONG] Best match index: {bestIndex}, score: {bestScore}");
+
+            if (bestIndex < 0 || bestScore < 10)
+            {
+                Debugger.show($"[NEXTSONG] No match found (score {bestScore} below threshold).");
+                return -1;
+            }
+
+            return bestIndex;
         }
 
         // ── Scoring (mirrors MediaController logic) ───────────────────────────

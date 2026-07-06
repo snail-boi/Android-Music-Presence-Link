@@ -709,6 +709,9 @@ namespace AndroidMusicPresenceLink
 
                 if (App.Config.NextSong.Mode != NextSongMode.Off && trackChanged)
                     _ = UpdateNextSongNeighboursAsync(title, artist);
+
+                if (trackChanged && (Config.MediaPlayer.PredictiveUi == PredictiveUiMode.Full || Config.MediaPlayer.PredictiveCoverMode > 0))
+                    _ = PrefetchPredictiveNeighboursAsync(title, artist);
             });
         }
 
@@ -1032,9 +1035,9 @@ namespace AndroidMusicPresenceLink
             if (_mediaPlayerWindow == null)
             {
                 _mediaPlayerWindow = new MediaPlayerWindow(
-                    () => _presenceService?.PauseCurrentAsync() ?? Task.CompletedTask,
-                    () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask,
-                    () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask,
+                    PredictivePauseAsync,
+                    PredictiveNextAsync,
+                    PredictivePreviousAsync,
                     () => _lyricsOverlayManager?.ToggleVisibility(),
                     IsScrcpyAudioSessionAvailable,
                     TryGetScrcpyVolume,
@@ -1055,7 +1058,7 @@ namespace AndroidMusicPresenceLink
                     RemoveCustomCoverForCurrentTrackAsync,
                     () => ForcedCoverStore.Has(_lastMediaPlayerTitle, _lastMediaPlayerArtist));
                 _mediaPlayerWindow.Closing += MediaPlayerWindow_Closing;
-                _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), () => _presenceService?.NextCurrentAsync() ?? Task.CompletedTask, () => _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask);
+                _mediaPlayerWindow.InitNextSongPanels(() => RescanNextSongLibraryAsync(), PredictiveNextAsync, PredictivePreviousAsync);
 
                 // Wire toast manager to the new media player window.
                 if (_toastManager != null)
@@ -2436,6 +2439,187 @@ namespace AndroidMusicPresenceLink
                     onComplete?.Invoke();
                 }
             });
+        }
+
+        // ── Predictive UI / covers ────────────────────────────────────────────
+        // Both features lean on the same library list as the next/previous-song
+        // panels. On every track change the neighbours around the current track are
+        // resolved ahead of time (titles always; covers only when predictive covers
+        // is on), so a next/prev click can flip the UI instantly while the real
+        // MediaSession state catches up and corrects any wrong guess.
+
+        private sealed record PredictedNeighbour(string Title, string RemotePath, string? CoverPath);
+
+        private readonly object _predictedNeighboursLock = new();
+        // Keyed by offset relative to the currently playing track (-2..+2, no 0).
+        private Dictionary<int, PredictedNeighbour> _predictedNeighbours = new();
+
+        private Task PredictivePauseAsync()
+        {
+            if (Config.MediaPlayer.PredictiveUi != PredictiveUiMode.Off)
+                _mediaPlayerWindow?.ApplyPredictedPlayPause();
+            return _presenceService?.PauseCurrentAsync() ?? Task.CompletedTask;
+        }
+
+        private Task PredictiveNextAsync()
+        {
+            ApplyPredictedTransport(forward: true);
+            return _presenceService?.NextCurrentAsync() ?? Task.CompletedTask;
+        }
+
+        private Task PredictivePreviousAsync()
+        {
+            ApplyPredictedTransport(forward: false);
+            return _presenceService?.PreviousCurrentAsync() ?? Task.CompletedTask;
+        }
+
+        // The image shown while a predicted track's real cover hasn't been resolved
+        // yet. Mirrors MediaController.EffectiveNoCoverPath so the placeholder looks
+        // identical to a genuine "no cover found" result.
+        private static string EffectiveNoCoverUiPath()
+        {
+            var custom = Config?.Paths?.NoCoverIconPath;
+            if (!string.IsNullOrWhiteSpace(custom) && File.Exists(custom))
+                return custom;
+            return AppPaths.GetResourcePath("AMPLLOGO.png");
+        }
+
+        /// <summary>
+        /// Pushes the predicted neighbour into the player window the instant next/prev
+        /// is clicked, then shifts the prediction map by one so a rapid second click
+        /// lines up with the deeper (2x) entries. Purely visual; the real state from
+        /// the phone overwrites it as soon as it arrives.
+        /// </summary>
+        private void ApplyPredictedTransport(bool forward)
+        {
+            try
+            {
+                var uiMode = Config.MediaPlayer.PredictiveUi;
+                int coverMode = Config.MediaPlayer.PredictiveCoverMode;
+                if (uiMode == PredictiveUiMode.Off && coverMode == 0) return;
+
+                var window = _mediaPlayerWindow;
+                if (window == null || !window.IsVisible) return;
+                if (string.IsNullOrWhiteSpace(_lastMediaPlayerTitle)) return;
+
+                int offset = forward ? 1 : -1;
+                PredictedNeighbour? data;
+                lock (_predictedNeighboursLock)
+                {
+                    _predictedNeighbours.TryGetValue(offset, out data);
+
+                    var shifted = new Dictionary<int, PredictedNeighbour>();
+                    foreach (var kvp in _predictedNeighbours)
+                        shifted[kvp.Key - offset] = kvp.Value;
+                    _predictedNeighbours = shifted;
+                }
+
+                // Full predicts the neighbour title from the library list; Safe skips
+                // the list entirely and just flags the switch with a loading title.
+                string? predictedTitle = uiMode switch
+                {
+                    PredictiveUiMode.Full => data?.Title,
+                    PredictiveUiMode.Safe => "Loading...",
+                    _ => null
+                };
+
+                string? predictedCover = coverMode > 0 ? data?.CoverPath : null;
+
+                // Nothing to show: Full without a list match, or covers-only with no
+                // prefetched cover in memory. Leave the display alone.
+                if (predictedTitle == null && predictedCover == null)
+                {
+                    Debugger.show($"[PREDICT] Nothing to apply for offset {offset} (mode {uiMode}, covers {coverMode}).");
+                    return;
+                }
+
+                window.ShowPredictedTrack(
+                    predictedTitle,
+                    predictedCover ?? EffectiveNoCoverUiPath(),
+                    applyCover: true);
+                Debugger.show($"[PREDICT] Applied prediction offset {offset}: \"{predictedTitle ?? "(cover only)"}\" (cover: {(predictedCover != null ? "prefetched" : "placeholder")}).");
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[PREDICT] ApplyPredictedTransport failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Resolves the neighbours around the given track and, when predictive covers
+        /// is on, pulls their cover art into the cache so a click can swap instantly.
+        /// Titles are installed immediately; covers fill in as each pull completes.
+        /// </summary>
+        private async Task PrefetchPredictiveNeighboursAsync(string? title, string? artist)
+        {
+            try
+            {
+                // Safe mode never reads the list, so prefetch only matters for Full
+                // titles and for predictive covers.
+                bool fullUi = Config.MediaPlayer.PredictiveUi == PredictiveUiMode.Full;
+                int coverMode = Config.MediaPlayer.PredictiveCoverMode;
+                if (!fullUi && coverMode == 0) return;
+
+                int radius = Math.Max(1, coverMode);
+                var neighbours = await _nextSongManager.FindNeighboursAtOffsetsAsync(title, artist, radius).ConfigureAwait(false);
+
+                var predicted = new Dictionary<int, PredictedNeighbour>();
+                foreach (var n in neighbours)
+                    predicted[n.Offset] = new PredictedNeighbour(n.Title, n.RemotePath, null);
+
+                lock (_predictedNeighboursLock)
+                    _predictedNeighbours = predicted;
+
+                Debugger.show($"[PREDICT] Prefetched {predicted.Count} neighbour titles for \"{title}\" (radius {radius}).");
+
+                if (coverMode == 0 || predicted.Count == 0) return;
+
+                var device = _presenceService?.CurrentDevice ?? string.Empty;
+                var cacheManager = _presenceService?.GetCoverCacheManager();
+                if (string.IsNullOrWhiteSpace(device) || cacheManager == null) return;
+
+                // Nearest neighbours first so the most likely click is covered soonest.
+                foreach (var n in neighbours.OrderBy(x => Math.Abs(x.Offset)))
+                {
+                    string? cover = null;
+                    try
+                    {
+                        var r = await cacheManager.GetImagePathForNowPlayingAsync(device, n.RemotePath, Config.Device.SelectedDeviceName).ConfigureAwait(false);
+                        if (!string.IsNullOrWhiteSpace(r.ImagePath) && File.Exists(r.ImagePath))
+                            cover = r.ImagePath;
+                    }
+                    catch { }
+
+                    lock (_predictedNeighboursLock)
+                    {
+                        // Only install into the map this prefetch built; a newer track
+                        // change (or a click-shift) replaces the map and makes these stale.
+                        if (ReferenceEquals(_predictedNeighbours, predicted) && predicted.TryGetValue(n.Offset, out var existing))
+                            predicted[n.Offset] = existing with { CoverPath = cover };
+                        else
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[PREDICT] PrefetchPredictiveNeighboursAsync failed: " + ex.Message);
+            }
+        }
+
+        // Called when either predictive toggle turns on: make sure the library list
+        // exists (scan once if missing) and warm the predictions for the current track.
+        internal void EnsurePredictiveLibraryAsync()
+        {
+            if (!_nextSongManager.IsListPresent)
+            {
+                RescanNextSongLibraryAsync(() =>
+                    Dispatcher.BeginInvoke(() => _ = PrefetchPredictiveNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist)));
+            }
+            else
+            {
+                _ = PrefetchPredictiveNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
+            }
         }
 
         internal void ResortNextSongListAsync()

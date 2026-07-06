@@ -490,6 +490,31 @@ namespace AndroidMusicPresenceLink
                 return;
             }
 
+            // Predictive pause: keep the flipped icon until the phone confirms the
+            // new state or the hold window expires (failed command -> corrected here).
+            if (_pausePredictedIsPlaying.HasValue)
+            {
+                if (isPlaying == _pausePredictedIsPlaying.Value || DateTime.UtcNow >= _pausePredictHoldUntil)
+                    _pausePredictedIsPlaying = null;
+                else
+                    isPlaying = _pausePredictedIsPlaying.Value;
+            }
+
+            // Predictive track switch: ignore updates still describing the pre-click
+            // track for a short window so an in-flight poll doesn't stomp the
+            // prediction before the phone has reacted. Anything else (the new track,
+            // or the old track after the hold expires) applies normally.
+            if (DateTime.UtcNow < _predictionHoldUntil
+                && string.Equals(title, _predictionPreClickTitle, StringComparison.Ordinal)
+                && string.Equals(artist, _predictionPreClickArtist, StringComparison.Ordinal))
+            {
+                return;
+            }
+            _predictionHoldUntil = DateTime.MinValue;
+
+            _lastRawTitle = title;
+            _lastRawArtist = artist;
+
             string normalizedTitle = NormalizeTrackText(title);
             string normalizedArtist = NormalizeTrackText(artist, replaceNullWithPlaceholder: true);
             string normalizedAlbum = NormalizeTrackText(album, replaceNullWithPlaceholder: true);
@@ -916,6 +941,7 @@ namespace AndroidMusicPresenceLink
             BtnFullscreen.Visibility = c.MediaPlayer.ShowFullscreenButton ? Visibility.Visible : Visibility.Collapsed;
 
             RefreshSeekButtonVisibility();
+            RefreshBatteryPollInterval();
 
             _lastGradientSourcePath = null;
             ApplyCoverGradientBackground(_hasSong ? _currentCoverPath : null);

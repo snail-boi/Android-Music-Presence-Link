@@ -11,19 +11,30 @@ namespace AndroidMusicPresenceLink
 {
     public partial class MediaPlayerWindow
     {
-        // 5 minutes between polls. The user explicitly asked for a long interval
-        // to keep ADB chatter minimal; the icon is purely informational.
-        private static readonly TimeSpan BatteryPollInterval = TimeSpan.FromMinutes(2.5);
-
         private DispatcherTimer? _batteryTimer;
+
+        // Poll rate comes from config (default 150s). Kept long by default to keep
+        // ADB chatter minimal; the icon is purely informational.
+        private static TimeSpan BatteryPollInterval
+            => TimeSpan.FromSeconds(Math.Max(5, App.Config.MediaPlayer.BatteryPollIntervalSeconds));
 
         // Last known values, kept so we can re-render on theme/song-state changes
         // without having to hit ADB again.
         private int _batteryLevel = -1;       // -1 = unknown yet
         private bool _batteryCharging = false;
 
+        // Re-reads the poll rate from config; called whenever a player setting changes.
+        // Setting Interval on a running DispatcherTimer restarts its period.
+        private void RefreshBatteryPollInterval()
+        {
+            if (_batteryTimer == null) return;
+            var interval = BatteryPollInterval;
+            if (_batteryTimer.Interval != interval)
+                _batteryTimer.Interval = interval;
+        }
+
         /// <summary>
-        /// Wires up the 5-minute battery poll and triggers an immediate first read
+        /// Wires up the battery poll timer and triggers an immediate first read
         /// so the icon isn't blank until the first tick.
         /// </summary>
         private void StartBatteryPolling()
