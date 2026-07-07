@@ -436,15 +436,17 @@ namespace AndroidMusicPresenceLink
         public void RefreshNextSongListStatus()
         {
             var path = AppPaths.GetDataPath("library_list.txt");
-            if (File.Exists(path))
-            {
-                var info = new FileInfo(path);
-                NextSongListStatus = $"Last scan: {info.LastWriteTime:g}";
-            }
-            else
-            {
-                NextSongListStatus = "No list yet";
-            }
+            var status = File.Exists(path)
+                ? $"Last scan: {new FileInfo(path).LastWriteTime:g}"
+                : "No list yet";
+
+            // The Subsonic song list is maintained alongside the local one for
+            // Subsonic-enabled apps; show its state when it exists.
+            var subPath = AppPaths.GetDataPath("subsonic_library_list.txt");
+            if (File.Exists(subPath))
+                status += $"\nSubsonic: {new FileInfo(subPath).LastWriteTime:g}";
+
+            NextSongListStatus = status;
         }
 
         // ── Predictive UI / covers ────────────────────────────────────────────

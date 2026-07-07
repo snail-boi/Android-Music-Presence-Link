@@ -90,6 +90,11 @@ namespace AndroidMusicPresenceLink
         private static readonly TimeSpan AdaptiveStage4 = TimeSpan.FromSeconds(30);
 
         internal string CurrentDevice => _currentDevice;
+        // Flags of the currently matched eligible app, refreshed every tick that finds
+        // an active session. Used by the neighbour/predictive features to decide
+        // between the local library list and the Subsonic one.
+        internal bool CurrentAppUseSubsonic { get; private set; }
+        internal bool CurrentAppCoverSearch { get; private set; }
         internal string? CurrentRemoteFilePath => _mediaController.CurrentRemoteFilePath;
         internal string? CurrentRemoteFileToken => _mediaController.CurrentRemoteFileToken;
         internal string? CurrentSubsonicSongId => _mediaController.CurrentSubsonicSongId;
@@ -1016,6 +1021,9 @@ namespace AndroidMusicPresenceLink
                     useSubsonicForApp = matchedApp.UseSubsonic;
                     enableSmtcForApp = matchedApp.PresenceMode == PresenceMode.Full;
                 }
+
+                CurrentAppUseSubsonic = useSubsonicForApp;
+                CurrentAppCoverSearch = enableCoverSearchForApp;
 
                 // Parse title/artist/album. If the scrambled string is identical to last tick
                 // we reuse the cached parse result so we don't re-run the notification parser

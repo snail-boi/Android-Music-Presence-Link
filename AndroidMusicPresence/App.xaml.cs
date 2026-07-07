@@ -61,6 +61,7 @@ namespace AndroidMusicPresenceLink
         private LyricsOverlayManager? _lyricsOverlayManager;
         private MediaPlayerWindow? _mediaPlayerWindow;
         private NextSongManager _nextSongManager = new NextSongManager();
+        private SubsonicSongListManager _subsonicSongList = new SubsonicSongListManager();
         private HwndSource? _hotkeySource;
         private NotificationToastManager? _toastManager;
         private const string StartupRunValueName = "AndroidMusicPresenceLink";
@@ -2301,6 +2302,37 @@ namespace AndroidMusicPresenceLink
 
         // ── Next / Previous song ──────────────────────────────────────────────
 
+        // Decrypted Subsonic credentials, or null when the server isn't fully configured.
+        private (string Url, string User, string Password)? GetSubsonicCredentials()
+        {
+            var sub = Config?.Subsonic;
+            if (sub == null || string.IsNullOrWhiteSpace(sub.ServerUrl) || string.IsNullOrWhiteSpace(sub.Username))
+                return null;
+            var password = SecretProtector.Unprotect(sub.EncryptedPassword);
+            if (string.IsNullOrEmpty(password))
+                return null;
+            return (sub.ServerUrl, sub.Username, password);
+        }
+
+        // Which song lists apply to the currently playing app:
+        //   Subsonic toggle only          -> Subsonic list.
+        //   cover collection + Subsonic   -> local list first, Subsonic as fallback.
+        //   otherwise                     -> local list only.
+        private (bool UseLocal, bool UseSubsonic) GetNeighbourSources()
+        {
+            bool subsonicApp = _presenceService?.CurrentAppUseSubsonic ?? false;
+            bool coverSearchApp = _presenceService?.CurrentAppCoverSearch ?? true;
+            bool subsonic = subsonicApp && GetSubsonicCredentials() != null;
+            bool local = !subsonicApp || coverSearchApp;
+            return (local, subsonic);
+        }
+
+        // True when the Subsonic list is worth maintaining at all: server configured
+        // and at least one active eligible app has the Subsonic toggle on.
+        private bool ShouldMaintainSubsonicList()
+            => GetSubsonicCredentials() != null
+            && (Config.Apps.EligibleApps?.Any(a => a.UseSubsonic && a.PresenceMode != PresenceMode.Off) ?? false);
+
         private async Task UpdateNextSongNeighboursAsync(string? title, string? artist)
         {
             try
@@ -2311,41 +2343,116 @@ namespace AndroidMusicPresenceLink
                 var window = _mediaPlayerWindow;
                 if (window == null || !window.IsVisible) return;
 
-                var device = _presenceService?.CurrentDevice ?? string.Empty;
-                var roots = Config.Library.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
+                var (useLocal, useSubsonic) = GetNeighbourSources();
 
-                // First enable and no list: trigger a scan automatically.
-                if (!_nextSongManager.IsListPresent)
+                if (useLocal)
                 {
-                    if (string.IsNullOrWhiteSpace(device) || roots.Count == 0)
+                    var device = _presenceService?.CurrentDevice ?? string.Empty;
+                    var roots = Config.Library.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
+
+                    // First enable and no list: trigger a scan automatically.
+                    if (!_nextSongManager.IsListPresent
+                        && !string.IsNullOrWhiteSpace(device) && roots.Count > 0)
                     {
-                        window.UpdateNeighbours(new NextSongManager.NeighbourResult(null, null, null, null, false), mode, null, null);
-                        return;
+                        await _nextSongManager.ScanAsync(device, roots, Config.NextSong.SortMode).ConfigureAwait(false);
                     }
 
-                    await _nextSongManager.ScanAsync(device, roots, Config.NextSong.SortMode).ConfigureAwait(false);
+                    var result = await _nextSongManager.FindNeighboursAsync(title, artist).ConfigureAwait(false);
+                    if (result.Found)
+                    {
+                        if (mode == NextSongMode.TextOnly)
+                        {
+                            await Dispatcher.InvokeAsync(() => window.UpdateNeighbours(result, mode, null, null));
+                        }
+                        else
+                        {
+                            // FullArt and Kirsten: fire and forget cover fetches for both neighbours.
+                            _ = FetchAndPushNeighbourCoversAsync(window, result, device, mode);
+                        }
+                        return;
+                    }
                 }
 
-                var result = await _nextSongManager.FindNeighboursAsync(title, artist).ConfigureAwait(false);
-
-                if (!result.Found)
-                {
-                    await Dispatcher.InvokeAsync(() => window.UpdateNeighbours(result, mode, null, null));
+                if (useSubsonic && await UpdateSubsonicNeighboursAsync(window, title, artist, mode).ConfigureAwait(false))
                     return;
-                }
 
-                if (mode == NextSongMode.TextOnly)
-                {
-                    await Dispatcher.InvokeAsync(() => window.UpdateNeighbours(result, mode, null, null));
-                    return;
-                }
-
-                // FullArt and Kirsten: fire and forget cover fetches for both neighbours.
-                _ = FetchAndPushNeighbourCoversAsync(window, result, device, mode);
+                await Dispatcher.InvokeAsync(() =>
+                    window.UpdateNeighbours(new NextSongManager.NeighbourResult(null, null, null, null, false), mode, null, null));
             }
             catch (Exception ex)
             {
                 Debugger.show("[NEXTSONG] UpdateNextSongNeighboursAsync failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Resolves neighbours from the Subsonic song list and pushes them into the
+        /// panels, downloading server cover art in the background. Returns false when
+        /// the list is unavailable or the current track can't be matched, so the
+        /// caller can fall through to the not-found state.
+        /// </summary>
+        private async Task<bool> UpdateSubsonicNeighboursAsync(MediaPlayerWindow window, string? title, string? artist, NextSongMode mode)
+        {
+            var creds = GetSubsonicCredentials();
+            if (creds == null) return false;
+            var (url, user, password) = creds.Value;
+
+            if (!await _subsonicSongList.EnsureFreshAsync(url, user, password, Config.NextSong.SortMode).ConfigureAwait(false))
+                return false;
+
+            var result = await _subsonicSongList.FindNeighboursAsync(title, artist).ConfigureAwait(false);
+            if (!result.Found || (result.Prev == null && result.Next == null))
+                return false;
+
+            // Adapt to the window's NeighbourResult shape; song ids stand in for the
+            // remote paths, which the window only null-checks.
+            var adapted = new NextSongManager.NeighbourResult(
+                result.Prev?.Id, result.Prev?.Title,
+                result.Next?.Id, result.Next?.Title, true);
+
+            if (mode == NextSongMode.TextOnly)
+            {
+                await Dispatcher.InvokeAsync(() => window.UpdateNeighbours(adapted, mode, null, null));
+                return true;
+            }
+
+            _ = FetchAndPushSubsonicNeighbourCoversAsync(window, adapted, result, url, user, password, mode);
+            return true;
+        }
+
+        private async Task FetchAndPushSubsonicNeighbourCoversAsync(
+            MediaPlayerWindow window, NextSongManager.NeighbourResult adapted,
+            SubsonicSongListManager.NeighbourResult result,
+            string url, string user, string password, NextSongMode mode)
+        {
+            try
+            {
+                var cacheManager = _presenceService?.GetCoverCacheManager();
+
+                string? prevCover = null;
+                string? nextCover = null;
+
+                if (cacheManager != null && result.Prev != null && !string.IsNullOrWhiteSpace(result.Prev.CoverArtId))
+                {
+                    try { prevCover = await cacheManager.CacheSubsonicCoverArtAsync(url, user, password, result.Prev.Id, result.Prev.CoverArtId).ConfigureAwait(false); }
+                    catch { }
+                }
+
+                if (cacheManager != null && result.Next != null && !string.IsNullOrWhiteSpace(result.Next.CoverArtId))
+                {
+                    try { nextCover = await cacheManager.CacheSubsonicCoverArtAsync(url, user, password, result.Next.Id, result.Next.CoverArtId).ConfigureAwait(false); }
+                    catch { }
+                }
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (_mediaPlayerWindow == null || !_mediaPlayerWindow.IsVisible) return;
+                    window.UpdateNeighbours(adapted, mode, prevCover, nextCover);
+                });
+            }
+            catch (Exception ex)
+            {
+                Debugger.show("[NEXTSONG] FetchAndPushSubsonicNeighbourCoversAsync failed: " + ex.Message);
             }
         }
 
@@ -2412,22 +2519,43 @@ namespace AndroidMusicPresenceLink
                 {
                     var device = _presenceService?.CurrentDevice ?? string.Empty;
                     var roots = Config.Library.MusicRemoteRoots ?? new System.Collections.Generic.List<string>();
+                    bool scannedAny = false;
 
-                    if (string.IsNullOrWhiteSpace(device) || roots.Count == 0)
+                    if (!string.IsNullOrWhiteSpace(device) && roots.Count > 0)
                     {
-                        Debugger.show("[NEXTSONG] Rescan skipped: no device or no roots configured.");
-                        onComplete?.Invoke();
-                        return;
+                        _nextSongManager.InvalidateCache();
+                        await _nextSongManager.ScanAsync(device, roots, Config.NextSong.SortMode).ConfigureAwait(false);
+                        scannedAny = true;
+                    }
+                    else
+                    {
+                        Debugger.show("[NEXTSONG] Local rescan skipped: no device or no roots configured.");
                     }
 
-                    _nextSongManager.InvalidateCache();
-                    await _nextSongManager.ScanAsync(device, roots, Config.NextSong.SortMode).ConfigureAwait(false);
+                    // The Subsonic list is maintained alongside the local one whenever
+                    // a Subsonic-enabled app could use it.
+                    if (ShouldMaintainSubsonicList())
+                    {
+                        var creds = GetSubsonicCredentials();
+                        if (creds != null)
+                        {
+                            _subsonicSongList.InvalidateCache();
+                            await _subsonicSongList.ScanAsync(creds.Value.Url, creds.Value.User, creds.Value.Password, Config.NextSong.SortMode).ConfigureAwait(false);
+                            scannedAny = true;
+                        }
+                    }
 
-                    // Re-run neighbour lookup with the last known track.
+                    if (!scannedAny)
+                        return;
+
+                    // Re-run neighbour lookup and predictions with the last known track.
                     await Dispatcher.InvokeAsync(async () =>
                     {
                         if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible && Config.NextSong.Mode != NextSongMode.Off)
                             await UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
+
+                        if (Config.MediaPlayer.PredictiveUi == PredictiveUiMode.Full || Config.MediaPlayer.PredictiveCoverMode > 0)
+                            _ = PrefetchPredictiveNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
                     });
                 }
                 catch (Exception ex)
@@ -2448,7 +2576,7 @@ namespace AndroidMusicPresenceLink
         // is on), so a next/prev click can flip the UI instantly while the real
         // MediaSession state catches up and corrects any wrong guess.
 
-        private sealed record PredictedNeighbour(string Title, string RemotePath, string? CoverPath);
+        private sealed record PredictedNeighbour(string Title, string? CoverPath);
 
         private readonly object _predictedNeighboursLock = new();
         // Keyed by offset relative to the currently playing track (-2..+2, no 0).
@@ -2549,6 +2677,8 @@ namespace AndroidMusicPresenceLink
         /// Resolves the neighbours around the given track and, when predictive covers
         /// is on, pulls their cover art into the cache so a click can swap instantly.
         /// Titles are installed immediately; covers fill in as each pull completes.
+        /// Sources follow the same rule as the panels: local list first, Subsonic
+        /// when the app's toggle says so (fallback when both are enabled).
         /// </summary>
         private async Task PrefetchPredictiveNeighboursAsync(string? title, string? artist)
         {
@@ -2561,11 +2691,54 @@ namespace AndroidMusicPresenceLink
                 if (!fullUi && coverMode == 0) return;
 
                 int radius = Math.Max(1, coverMode);
-                var neighbours = await _nextSongManager.FindNeighboursAtOffsetsAsync(title, artist, radius).ConfigureAwait(false);
+                var (useLocal, useSubsonic) = GetNeighbourSources();
+                var cacheManager = _presenceService?.GetCoverCacheManager();
+
+                // Neighbour entries paired with a source-appropriate cover resolver.
+                var entries = new List<(int Offset, string Title, Func<Task<string?>> ResolveCover)>();
+
+                if (useLocal)
+                {
+                    var neighbours = await _nextSongManager.FindNeighboursAtOffsetsAsync(title, artist, radius).ConfigureAwait(false);
+                    var device = _presenceService?.CurrentDevice ?? string.Empty;
+                    foreach (var n in neighbours)
+                    {
+                        var path = n.RemotePath;
+                        entries.Add((n.Offset, n.Title, async () =>
+                        {
+                            if (cacheManager == null || string.IsNullOrWhiteSpace(device)) return null;
+                            var r = await cacheManager.GetImagePathForNowPlayingAsync(device, path, Config.Device.SelectedDeviceName).ConfigureAwait(false);
+                            return !string.IsNullOrWhiteSpace(r.ImagePath) && File.Exists(r.ImagePath) ? r.ImagePath : null;
+                        }));
+                    }
+                }
+
+                if (entries.Count == 0 && useSubsonic)
+                {
+                    var creds = GetSubsonicCredentials();
+                    if (creds != null)
+                    {
+                        var (url, user, password) = creds.Value;
+                        if (await _subsonicSongList.EnsureFreshAsync(url, user, password, Config.NextSong.SortMode).ConfigureAwait(false))
+                        {
+                            var neighbours = await _subsonicSongList.FindNeighboursAtOffsetsAsync(title, artist, radius).ConfigureAwait(false);
+                            foreach (var n in neighbours)
+                            {
+                                var songId = n.Id;
+                                var coverArtId = n.CoverArtId;
+                                entries.Add((n.Offset, n.Title, async () =>
+                                {
+                                    if (cacheManager == null || string.IsNullOrWhiteSpace(coverArtId)) return null;
+                                    return await cacheManager.CacheSubsonicCoverArtAsync(url, user, password, songId, coverArtId).ConfigureAwait(false);
+                                }));
+                            }
+                        }
+                    }
+                }
 
                 var predicted = new Dictionary<int, PredictedNeighbour>();
-                foreach (var n in neighbours)
-                    predicted[n.Offset] = new PredictedNeighbour(n.Title, n.RemotePath, null);
+                foreach (var e in entries)
+                    predicted[e.Offset] = new PredictedNeighbour(e.Title, null);
 
                 lock (_predictedNeighboursLock)
                     _predictedNeighbours = predicted;
@@ -2574,28 +2747,19 @@ namespace AndroidMusicPresenceLink
 
                 if (coverMode == 0 || predicted.Count == 0) return;
 
-                var device = _presenceService?.CurrentDevice ?? string.Empty;
-                var cacheManager = _presenceService?.GetCoverCacheManager();
-                if (string.IsNullOrWhiteSpace(device) || cacheManager == null) return;
-
                 // Nearest neighbours first so the most likely click is covered soonest.
-                foreach (var n in neighbours.OrderBy(x => Math.Abs(x.Offset)))
+                foreach (var e in entries.OrderBy(x => Math.Abs(x.Offset)))
                 {
                     string? cover = null;
-                    try
-                    {
-                        var r = await cacheManager.GetImagePathForNowPlayingAsync(device, n.RemotePath, Config.Device.SelectedDeviceName).ConfigureAwait(false);
-                        if (!string.IsNullOrWhiteSpace(r.ImagePath) && File.Exists(r.ImagePath))
-                            cover = r.ImagePath;
-                    }
+                    try { cover = await e.ResolveCover().ConfigureAwait(false); }
                     catch { }
 
                     lock (_predictedNeighboursLock)
                     {
                         // Only install into the map this prefetch built; a newer track
                         // change (or a click-shift) replaces the map and makes these stale.
-                        if (ReferenceEquals(_predictedNeighbours, predicted) && predicted.TryGetValue(n.Offset, out var existing))
-                            predicted[n.Offset] = existing with { CoverPath = cover };
+                        if (ReferenceEquals(_predictedNeighbours, predicted) && predicted.TryGetValue(e.Offset, out var existing))
+                            predicted[e.Offset] = existing with { CoverPath = cover };
                         else
                             break;
                     }
@@ -2607,11 +2771,12 @@ namespace AndroidMusicPresenceLink
             }
         }
 
-        // Called when either predictive toggle turns on: make sure the library list
-        // exists (scan once if missing) and warm the predictions for the current track.
+        // Called when either predictive toggle turns on: make sure the library list(s)
+        // exist (scan once if missing) and warm the predictions for the current track.
         internal void EnsurePredictiveLibraryAsync()
         {
-            if (!_nextSongManager.IsListPresent)
+            bool subsonicMissing = ShouldMaintainSubsonicList() && !_subsonicSongList.IsListPresent;
+            if (!_nextSongManager.IsListPresent || subsonicMissing)
             {
                 RescanNextSongLibraryAsync(() =>
                     Dispatcher.BeginInvoke(() => _ = PrefetchPredictiveNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist)));
@@ -2629,11 +2794,15 @@ namespace AndroidMusicPresenceLink
                 try
                 {
                     await _nextSongManager.ResortAsync(Config.NextSong.SortMode).ConfigureAwait(false);
+                    await _subsonicSongList.ResortAsync(Config.NextSong.SortMode).ConfigureAwait(false);
 
                     await Dispatcher.InvokeAsync(async () =>
                     {
                         if (_mediaPlayerWindow != null && _mediaPlayerWindow.IsVisible && Config.NextSong.Mode != NextSongMode.Off)
                             await UpdateNextSongNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
+
+                        if (Config.MediaPlayer.PredictiveUi == PredictiveUiMode.Full || Config.MediaPlayer.PredictiveCoverMode > 0)
+                            _ = PrefetchPredictiveNeighboursAsync(_lastMediaPlayerTitle, _lastMediaPlayerArtist);
                     });
                 }
                 catch (Exception ex)

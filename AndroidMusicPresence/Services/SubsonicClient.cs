@@ -24,6 +24,107 @@ namespace AndroidMusicPresenceLink
 
         internal sealed record SongMatch(string Id, string? CoverArtId, double? DurationSeconds, string Title, string Artist, string? Suffix);
 
+        internal sealed record LibrarySong(string Id, string Title, string Artist, string? Path, string? CoverArtId, DateTime CreatedUtc);
+
+        // Fetches the server's entire song library by paging search3 with a match-all
+        // query. Modern servers (Navidrome, Gonic, Airsonic-Advanced) return everything
+        // for an empty query; the literal `""` query is the older offline-client
+        // convention, tried as a fallback when the empty query yields nothing.
+        // Returns an empty list on any failure. Never throws.
+        internal static async Task<System.Collections.Generic.List<LibrarySong>> FetchAllSongsAsync(
+            string serverUrl, string username, string password, CancellationToken ct = default)
+        {
+            var result = new System.Collections.Generic.List<LibrarySong>();
+            if (string.IsNullOrWhiteSpace(serverUrl) || string.IsNullOrWhiteSpace(username)
+                || string.IsNullOrEmpty(password))
+                return result;
+
+            const int pageSize = 500;
+            const int maxSongs = 100_000;
+
+            try
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(ClientName + "/1.0");
+
+                string query = string.Empty;
+                int offset = 0;
+                while (result.Count < maxSongs)
+                {
+                    int got = await FetchSongPageAsync(client, serverUrl, username, password, query, offset, pageSize, result, ct).ConfigureAwait(false);
+
+                    // Empty query not supported by this server: retry once with the
+                    // literal "" convention before giving up.
+                    if (got == 0 && offset == 0 && query.Length == 0)
+                    {
+                        query = "\"\"";
+                        got = await FetchSongPageAsync(client, serverUrl, username, password, query, offset, pageSize, result, ct).ConfigureAwait(false);
+                    }
+
+                    if (got < pageSize)
+                        break;
+                    offset += pageSize;
+                }
+
+                Debugger.show($"[SUBSONIC] FetchAllSongs: {result.Count} songs collected.");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Debugger.show($"[SUBSONIC] FetchAllSongs failed: {ex.Message}");
+                return result;
+            }
+        }
+
+        // Fetches one search3 page into `into`. Returns the number of songs the page
+        // contained (0 on error), so the caller can page and detect the last page.
+        private static async Task<int> FetchSongPageAsync(
+            HttpClient client, string serverUrl, string username, string password,
+            string query, int offset, int pageSize,
+            System.Collections.Generic.List<LibrarySong> into, CancellationToken ct)
+        {
+            string url = BuildUrl(serverUrl, username, password, "search3",
+                $"&query={Uri.EscapeDataString(query)}&songCount={pageSize}&songOffset={offset}&artistCount=0&albumCount=0");
+
+            string json = await client.GetStringAsync(url, ct).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+
+            if (!TryGetOkResponse(doc, out var response, out string? error))
+            {
+                Debugger.show($"[SUBSONIC] FetchAllSongs page at offset {offset} rejected: {error}");
+                return 0;
+            }
+
+            if (!response.TryGetProperty("searchResult3", out var searchResult)
+                || !searchResult.TryGetProperty("song", out var songs)
+                || songs.ValueKind != JsonValueKind.Array)
+                return 0;
+
+            int count = 0;
+            foreach (var song in songs.EnumerateArray())
+            {
+                count++;
+                string id = GetString(song, "id");
+                if (string.IsNullOrEmpty(id))
+                    continue;
+
+                DateTime created = DateTime.MinValue;
+                if (song.TryGetProperty("created", out var cr) && cr.ValueKind == JsonValueKind.String
+                    && DateTime.TryParse(cr.GetString(), null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var parsed))
+                    created = parsed;
+
+                into.Add(new LibrarySong(
+                    id,
+                    GetString(song, "title"),
+                    GetString(song, "artist"),
+                    song.TryGetProperty("path", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null,
+                    song.TryGetProperty("coverArt", out var ca) && ca.ValueKind == JsonValueKind.String ? ca.GetString() : null,
+                    created));
+            }
+
+            return count;
+        }
+
         // Resolves the currently-playing title/artist to the best matching library song.
         // Returns null on any failure (network, auth, malformed response, no match).
         internal static async Task<SongMatch?> Search3Async(
