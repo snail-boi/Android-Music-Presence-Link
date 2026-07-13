@@ -42,10 +42,52 @@ namespace AndroidMusicPresenceLink
             }
             else
             {
-                level = VolumeIconLevel.High;
+                // No scrcpy audio session: fall back to the phone's own volume (read over
+                // ADB, cached so this stays synchronous). Unknown -> High, like before.
+                level = _lastKnownPhoneVolumeRatio >= 0f
+                    ? LevelFromVolume(_lastKnownPhoneVolumeRatio)
+                    : VolumeIconLevel.High;
+                KickPhoneVolumeRefresh();
             }
 
             BtnVolume.Content = BuildVolumeIcon(iconBrush, auxIconSize, level);
+        }
+
+        /// <summary>
+        /// Refreshes the cached phone volume in the background so the glyph tracks the
+        /// device's real volume while scrcpy audio is unavailable. Throttled (unless
+        /// forced) because each read is an ADB dumpsys round-trip; re-renders the icon
+        /// when the value comes back. UI thread only.
+        /// </summary>
+        private async void KickPhoneVolumeRefresh(bool force = false)
+        {
+            if (_getPhoneVolume == null || _phoneVolumeFetchInFlight)
+                return;
+            if (_isScrcpyAudioAvailable?.Invoke() == true)
+                return;
+            if (!force && DateTime.UtcNow - _lastPhoneVolumeFetchUtc < PhoneVolumeRefreshInterval)
+                return;
+
+            _phoneVolumeFetchInFlight = true;
+            try
+            {
+                var (current, max) = await _getPhoneVolume().ConfigureAwait(true);
+                _lastPhoneVolumeFetchUtc = DateTime.UtcNow;
+                if (current >= 0 && max > 0)
+                {
+                    float ratio = Math.Clamp(current / (float)max, 0f, 1f);
+                    if (ratio != _lastKnownPhoneVolumeRatio)
+                    {
+                        _lastKnownPhoneVolumeRatio = ratio;
+                        RefreshVolumeIcon(); // throttle stops this from re-fetching
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                _phoneVolumeFetchInFlight = false;
+            }
         }
         private void BtnVolume_Click(object sender, RoutedEventArgs e)
         {
@@ -80,6 +122,15 @@ namespace AndroidMusicPresenceLink
                 TxtVolumePercent.Text = $"{(int)Math.Round(VolumeSlider.Value)}%";
                 VolumeSliderHost.Visibility = Visibility.Visible;
                 VolumeStepHost.Visibility = Visibility.Collapsed;
+                VolumeNoDeviceHost.Visibility = Visibility.Collapsed;
+            }
+            else if (!_isDeviceConnected)
+            {
+                // No scrcpy audio and no device: there's no volume to control, so show
+                // a short notice instead of a dead slider.
+                VolumeSliderHost.Visibility = Visibility.Collapsed;
+                VolumeStepHost.Visibility = Visibility.Collapsed;
+                VolumeNoDeviceHost.Visibility = Visibility.Visible;
             }
             else
             {
@@ -99,6 +150,11 @@ namespace AndroidMusicPresenceLink
 
             _lastPhoneVolumeMax = max > 0 ? max : 15;
             _lastSentPhoneVolumeIndex = current;
+            if (current >= 0)
+            {
+                _lastKnownPhoneVolumeRatio = Math.Clamp(current / (float)_lastPhoneVolumeMax, 0f, 1f);
+                _lastPhoneVolumeFetchUtc = DateTime.UtcNow;
+            }
 
             _suppressVolumeSliderEcho = true;
             try
@@ -115,6 +171,7 @@ namespace AndroidMusicPresenceLink
             TxtVolumePercent.Text = $"{(int)Math.Round(current / (double)_lastPhoneVolumeMax * 100.0)}%";
             VolumeSliderHost.Visibility = Visibility.Visible;
             VolumeStepHost.Visibility = Visibility.Collapsed;
+            VolumeNoDeviceHost.Visibility = Visibility.Collapsed;
             VolumePopup.IsOpen = true;
             RefreshVolumeIcon();
         }
@@ -140,20 +197,27 @@ namespace AndroidMusicPresenceLink
                     _lastSentPhoneVolumeIndex = newIndex;
                     _ = _setPhoneVolume?.Invoke(previousIndex, newIndex, _lastPhoneVolumeMax);
                 }
+                _lastKnownPhoneVolumeRatio = Math.Clamp(_lastSentPhoneVolumeIndex / (float)_lastPhoneVolumeMax, 0f, 1f);
                 TxtVolumePercent.Text = $"{(int)Math.Round(_lastSentPhoneVolumeIndex / (double)_lastPhoneVolumeMax * 100.0)}%";
             }
 
             RefreshVolumeIcon();
         }
-        private void BtnVolumeDown_Click(object sender, RoutedEventArgs e)
+        private async void BtnVolumeDown_Click(object sender, RoutedEventArgs e)
         {
             _stepVolume?.Invoke(false);
             RefreshVolumeIcon();
+            // The step may have gone to the phone via ADB keyevent; give it a moment
+            // to land, then re-read so the glyph reflects the new level.
+            await Task.Delay(600);
+            KickPhoneVolumeRefresh(force: true);
         }
-        private void BtnVolumeUp_Click(object sender, RoutedEventArgs e)
+        private async void BtnVolumeUp_Click(object sender, RoutedEventArgs e)
         {
             _stepVolume?.Invoke(true);
             RefreshVolumeIcon();
+            await Task.Delay(600);
+            KickPhoneVolumeRefresh(force: true);
         }
 
         private async void BtnSeekBack_Click(object sender, RoutedEventArgs e)

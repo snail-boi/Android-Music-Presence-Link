@@ -671,6 +671,14 @@
                                                 ToolTip="Volume up"
                                                 Click="BtnVolumeUp_Click" />
                                         </StackPanel>
+
+                                        <!-- No-device variant: volume can't be read or set. -->
+                                        <TextBlock x:Name="VolumeNoDeviceHost"
+                                               Text="No device connected"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Opacity="0.85"
+                                               Visibility="Collapsed" />
                                     </Grid>
                                 </Border>
                             </Popup>

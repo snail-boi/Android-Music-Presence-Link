@@ -226,19 +226,18 @@ namespace AndroidMusicPresenceLink
             // without clipping. Viewbox scales the whole thing to the requested size.
             var canvas = new Canvas { Width = 22, Height = 20 };
 
-            // Speaker body: small rectangle (back) + triangle horn projecting right.
-            var speaker = new Polygon
+            // Speaker body: small rectangle (back) + horn projecting right. Drawn as a
+            // slightly inset path stroked with the same brush and round line joins, so
+            // every corner of the silhouette comes out softly rounded instead of angular.
+            var speaker = new System.Windows.Shapes.Path
             {
                 Fill = brush,
-                Points = new PointCollection
-                {
-                    new Point(2, 7.5),
-                    new Point(6, 7.5),
-                    new Point(11, 3),
-                    new Point(11, 17),
-                    new Point(6, 12.5),
-                    new Point(2, 12.5)
-                }
+                Stroke = brush,
+                StrokeThickness = 2.4,
+                StrokeLineJoin = PenLineJoin.Round,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                Data = Geometry.Parse("M 3.2,8.7 L 6.6,8.7 L 10.3,4.9 L 10.3,15.1 L 6.6,11.3 L 3.2,11.3 Z")
             };
             canvas.Children.Add(speaker);
 

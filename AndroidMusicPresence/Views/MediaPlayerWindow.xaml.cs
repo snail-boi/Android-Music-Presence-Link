@@ -52,6 +52,13 @@ namespace AndroidMusicPresenceLink
         private int _lastSentPhoneVolumeIndex = -1;
         private int _lastPhoneVolumeMax = 15;
         private bool _suppressVolumeSliderEcho;
+        // Cached phone volume (0..1, -1 = unknown) so the volume glyph can track the
+        // device's real volume when no scrcpy audio session exists. Refreshed via a
+        // throttled background ADB read; only touched on the UI thread.
+        private float _lastKnownPhoneVolumeRatio = -1f;
+        private DateTime _lastPhoneVolumeFetchUtc = DateTime.MinValue;
+        private bool _phoneVolumeFetchInFlight;
+        private static readonly TimeSpan PhoneVolumeRefreshInterval = TimeSpan.FromSeconds(10);
         private string? _currentCoverPath;
         private string? _lastGradientSourcePath;
         private bool? _lastIdleIsDark;
@@ -103,6 +110,9 @@ namespace AndroidMusicPresenceLink
         private bool _alwaysOnTop = false;
 
         private string _connectionStatusText = "Not connected";
+        // Whether a device is currently reachable; maintained by SetConnectionStatus.
+        // Gates the phone-volume popup, which is useless without a device.
+        private bool _isDeviceConnected;
         private string _connectionDetailText = "";
 
         private readonly MediaPlayerViewModel _vm = new MediaPlayerViewModel();
@@ -734,6 +744,7 @@ namespace AndroidMusicPresenceLink
             _connectionStatusText = status;
             _connectionDetailText = detail;
             _connectionColor = statusColor;
+            _isDeviceConnected = isConnected;
             RefreshConnectionButton();
 
             // Fire an immediate battery poll the first time a device becomes reachable
