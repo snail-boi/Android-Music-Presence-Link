@@ -42,6 +42,19 @@
 
         public bool IsDisabled => !_inRotation;
 
+        // Transient UI state (never persisted): whether this item is the active/applied
+        // theme (drives the accent border + checkmark in the paged list) and whether its
+        // Remove button is in the "Are you sure?" confirm state.
+        private bool _isActiveTheme;
+        public bool IsActiveTheme { get => _isActiveTheme; set => Set(ref _isActiveTheme, value); }
+
+        private bool _isConfirmingRemove;
+        public bool IsConfirmingRemove { get => _isConfirmingRemove; set => Set(ref _isConfirmingRemove, value); }
+
+        // Whether this theme's editor panel is open (the row's Edit button reads Save).
+        private bool _isEditing;
+        public bool IsEditing { get => _isEditing; set => Set(ref _isEditing, value); }
+
         public ThemeProfile ToProfile() => new ThemeProfile
         {
             Name = _name ?? string.Empty,

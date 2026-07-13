@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -35,19 +36,24 @@ namespace AndroidMusicPresenceLink
                     return;
 
                 if (_selectedTheme != null)
+                {
                     _selectedTheme.PropertyChanged -= SelectedTheme_PropertyChanged;
+                    _selectedTheme.IsActiveTheme = false;
+                }
 
                 _selectedTheme = value;
 
                 if (_selectedTheme != null)
+                {
+                    _selectedTheme.IsActiveTheme = true;
                     _selectedTheme.PropertyChanged += SelectedTheme_PropertyChanged;
+                }
 
                 RaisePropertyChanged();
                 RaisePropertyChanged(nameof(ActiveThemeName));
                 RaisePropertyChanged(nameof(SelectedThemeName));
                 RaisePropertyChanged(nameof(IsCustomSelected));
                 RaisePropertyChanged(nameof(IsBuiltInSelected));
-                RaisePropertyChanged(nameof(RotationToggleLabel));
                 NotifyThemePreview();
             }
         }
@@ -55,9 +61,6 @@ namespace AndroidMusicPresenceLink
         // Random-theme-at-startup toggle.
         private bool _randomThemeAtStartup;
         public bool RandomThemeAtStartup { get => _randomThemeAtStartup; set => Set(ref _randomThemeAtStartup, value); }
-
-        // Label for the built-in theme's rotation toggle button.
-        public string RotationToggleLabel => (_selectedTheme?.InRotation ?? true) ? "Disable" : "Enable";
 
         // Name of the active theme — shown on the header cycle button.
         public string ActiveThemeName => _selectedTheme?.Name ?? string.Empty;
@@ -99,6 +102,12 @@ namespace AndroidMusicPresenceLink
 
         private void SelectedTheme_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            // Transient UI state doesn't affect the applied theme — no preview re-apply.
+            if (e.PropertyName == nameof(ThemeListItem.IsActiveTheme) ||
+                e.PropertyName == nameof(ThemeListItem.IsConfirmingRemove) ||
+                e.PropertyName == nameof(ThemeListItem.IsEditing))
+                return;
+
             if (e.PropertyName == nameof(ThemeListItem.Name))
             {
                 RaisePropertyChanged(nameof(ActiveThemeName));
@@ -107,6 +116,152 @@ namespace AndroidMusicPresenceLink
             // Any change to the active theme (color or name) re-applies the live preview.
             NotifyThemePreview();
         }
+
+        // ── Category tabs + paging ────────────────────────────────────────────
+        // Themes are browsed in three categories, each with its own 5-per-page pager:
+        //   Default  — built-in themes still in rotation
+        //   Custom   — user themes still in rotation
+        //   Disabled — any theme removed from the random/cycle rotation
+        private const int ThemesPerPage = 5;
+        private const string TabDefault = "Default";
+        private const string TabCustom = "Custom";
+        private const string TabDisabled = "Disabled";
+
+        private string _themeTab = TabDefault;
+        private int _themePageCount = 1;
+        private readonly Dictionary<string, int> _themePages = new Dictionary<string, int>
+        {
+            [TabDefault] = 0,
+            [TabCustom] = 0,
+            [TabDisabled] = 0
+        };
+
+        /// <summary>The slice of themes shown on the current tab's current page.</summary>
+        public ObservableCollection<ThemeListItem> ThemePageItems { get; } = new ObservableCollection<ThemeListItem>();
+
+        public bool IsDefaultThemeTab { get => _themeTab == TabDefault; set { if (value) SetThemeTab(TabDefault); } }
+        public bool IsCustomThemeTab { get => _themeTab == TabCustom; set { if (value) SetThemeTab(TabCustom); } }
+        public bool IsDisabledThemeTab { get => _themeTab == TabDisabled; set { if (value) SetThemeTab(TabDisabled); } }
+
+        public string ThemePageLabel => $"{_themePages[_themeTab] + 1} / {_themePageCount}";
+        public bool CanPrevThemePage => _themePages[_themeTab] > 0;
+        public bool CanNextThemePage => _themePages[_themeTab] < _themePageCount - 1;
+        public bool ThemePagerVisible => _themePageCount > 1;
+        public bool ThemePageEmpty => ThemePageItems.Count == 0;
+
+        public string ThemePageEmptyHint => _themeTab switch
+        {
+            TabCustom => "No custom themes yet — press New theme to create one.",
+            TabDisabled => "No disabled themes.",
+            _ => "All built-in themes are disabled."
+        };
+
+        private void SetThemeTab(string tab)
+        {
+            if (_themeTab == tab)
+                return;
+            _themeTab = tab;
+            ClearRemoveConfirms();
+            RaisePropertyChanged(nameof(IsDefaultThemeTab));
+            RaisePropertyChanged(nameof(IsCustomThemeTab));
+            RaisePropertyChanged(nameof(IsDisabledThemeTab));
+            RefreshThemePage();
+        }
+
+        private List<ThemeListItem> CurrentCategoryThemes() => _themeTab switch
+        {
+            TabCustom => Themes.Where(t => !t.IsBuiltIn && t.InRotation).ToList(),
+            TabDisabled => Themes.Where(t => !t.InRotation).ToList(),
+            _ => Themes.Where(t => t.IsBuiltIn && t.InRotation).ToList()
+        };
+
+        private void RefreshThemePage()
+        {
+            var list = CurrentCategoryThemes();
+            _themePageCount = Math.Max(1, (list.Count + ThemesPerPage - 1) / ThemesPerPage);
+            int page = Math.Clamp(_themePages[_themeTab], 0, _themePageCount - 1);
+            _themePages[_themeTab] = page;
+
+            ThemePageItems.Clear();
+            foreach (var t in list.Skip(page * ThemesPerPage).Take(ThemesPerPage))
+                ThemePageItems.Add(t);
+
+            // If the theme being edited scrolled out of view (tab switch, paging, disable,
+            // remove), close the editor rather than leaving it open with no Save button.
+            if (IsThemeEditorOpen && !ThemePageItems.Any(t => t.IsEditing))
+                CloseThemeEditor();
+
+            RaisePropertyChanged(nameof(ThemePageLabel));
+            RaisePropertyChanged(nameof(CanPrevThemePage));
+            RaisePropertyChanged(nameof(CanNextThemePage));
+            RaisePropertyChanged(nameof(ThemePagerVisible));
+            RaisePropertyChanged(nameof(ThemePageEmpty));
+            RaisePropertyChanged(nameof(ThemePageEmptyHint));
+        }
+
+        private void ClearRemoveConfirms()
+        {
+            foreach (var t in Themes)
+                t.IsConfirmingRemove = false;
+        }
+
+        // ── Edit mode ─────────────────────────────────────────────────────────
+        // The name/color editor is hidden until a row's Edit button opens it; the same
+        // button reads Save while open and closes the editor again. Edits apply to the
+        // item immediately (live preview) and persist with the window's Save like before.
+        private bool _isThemeEditorOpen;
+        public bool IsThemeEditorOpen
+        {
+            get => _isThemeEditorOpen;
+            private set => Set(ref _isThemeEditorOpen, value);
+        }
+
+        private void CloseThemeEditor()
+        {
+            foreach (var t in Themes)
+                t.IsEditing = false;
+            IsThemeEditorOpen = false;
+        }
+
+        private void OpenThemeEditor(ThemeListItem item)
+        {
+            ClearRemoveConfirms();
+            CloseThemeEditor();
+            SelectedTheme = item; // editing also applies the theme, so edits preview live
+            item.IsEditing = true;
+            IsThemeEditorOpen = true;
+        }
+
+        private RelayCommand<ThemeListItem>? _toggleEditThemeCommand;
+        public RelayCommand<ThemeListItem> ToggleEditThemeCommand => _toggleEditThemeCommand ??= new RelayCommand<ThemeListItem>(item =>
+        {
+            if (item == null || item.IsBuiltIn)
+                return;
+            if (item.IsEditing)
+                CloseThemeEditor(); // Save: edits are already on the item, just close
+            else
+                OpenThemeEditor(item);
+        });
+
+        private RelayCommand? _prevThemePageCommand;
+        public RelayCommand PrevThemePageCommand => _prevThemePageCommand ??= new RelayCommand(() =>
+        {
+            if (!CanPrevThemePage)
+                return;
+            _themePages[_themeTab]--;
+            ClearRemoveConfirms();
+            RefreshThemePage();
+        });
+
+        private RelayCommand? _nextThemePageCommand;
+        public RelayCommand NextThemePageCommand => _nextThemePageCommand ??= new RelayCommand(() =>
+        {
+            if (!CanNextThemePage)
+                return;
+            _themePages[_themeTab]++;
+            ClearRemoveConfirms();
+            RefreshThemePage();
+        });
 
         // ── Cycle / select / add / delete ─────────────────────────────────────
 
@@ -132,12 +287,59 @@ namespace AndroidMusicPresenceLink
             }
         });
 
-        // Built-in themes can't be deleted, but can be removed from / added back to the cycle
-        // rotation. The last in-rotation theme can't be disabled (cycling needs a target).
-        private RelayCommand? _toggleRotationCommand;
-        public RelayCommand ToggleRotationCommand => _toggleRotationCommand ??= new RelayCommand(() =>
+        // Clicking a row applies that theme (live preview; persisted on Save).
+        private RelayCommand<ThemeListItem>? _selectThemeItemCommand;
+        public RelayCommand<ThemeListItem> SelectThemeItemCommand => _selectThemeItemCommand ??= new RelayCommand<ThemeListItem>(item =>
         {
-            var item = _selectedTheme;
+            if (item == null)
+                return;
+            ClearRemoveConfirms();
+            if (!item.IsEditing)
+                CloseThemeEditor();
+            SelectedTheme = item;
+        });
+
+        // Remove is a two-step confirm: the first click flips the row's buttons to
+        // "Are you sure?" (Yes/No); only Yes actually deletes. Built-ins can't be removed.
+        private RelayCommand<ThemeListItem>? _requestRemoveThemeCommand;
+        public RelayCommand<ThemeListItem> RequestRemoveThemeCommand => _requestRemoveThemeCommand ??= new RelayCommand<ThemeListItem>(item =>
+        {
+            if (item == null || item.IsBuiltIn)
+                return;
+            ClearRemoveConfirms();
+            item.IsConfirmingRemove = true;
+        });
+
+        private RelayCommand<ThemeListItem>? _cancelRemoveThemeCommand;
+        public RelayCommand<ThemeListItem> CancelRemoveThemeCommand => _cancelRemoveThemeCommand ??= new RelayCommand<ThemeListItem>(item =>
+        {
+            if (item != null)
+                item.IsConfirmingRemove = false;
+        });
+
+        private RelayCommand<ThemeListItem>? _confirmRemoveThemeCommand;
+        public RelayCommand<ThemeListItem> ConfirmRemoveThemeCommand => _confirmRemoveThemeCommand ??= new RelayCommand<ThemeListItem>(item =>
+        {
+            if (item == null || item.IsBuiltIn)
+                return;
+
+            int idx = Themes.IndexOf(item);
+            Themes.Remove(item);
+
+            if (ReferenceEquals(_selectedTheme, item))
+            {
+                int next = Math.Clamp(idx - 1, 0, Math.Max(0, Themes.Count - 1));
+                SelectedTheme = Themes.Count > 0 ? Themes[next] : null;
+            }
+            RefreshThemePage();
+        });
+
+        // Disable moves a theme to the Disabled category: it's skipped by cycling and the
+        // random-at-startup pick. The last in-rotation theme can't be disabled (cycling
+        // needs a target). Enable moves it back to its home category.
+        private RelayCommand<ThemeListItem>? _toggleThemeDisabledCommand;
+        public RelayCommand<ThemeListItem> ToggleThemeDisabledCommand => _toggleThemeDisabledCommand ??= new RelayCommand<ThemeListItem>(item =>
+        {
             if (item == null)
                 return;
 
@@ -148,9 +350,12 @@ namespace AndroidMusicPresenceLink
             }
 
             item.InRotation = !item.InRotation;
-            RaisePropertyChanged(nameof(RotationToggleLabel));
+            ClearRemoveConfirms();
+            RefreshThemePage();
         });
 
+        // New theme: creates an editable copy of the current theme, selects it (which pops
+        // the name/color editors open) and jumps the pager to it on the Custom tab.
         private RelayCommand? _addThemeCommand;
         public RelayCommand AddThemeCommand => _addThemeCommand ??= new RelayCommand(() =>
         {
@@ -165,21 +370,12 @@ namespace AndroidMusicPresenceLink
             }, isBuiltIn: false);
 
             Themes.Add(item);
-            SelectedTheme = item;
-        });
 
-        private RelayCommand? _deleteThemeCommand;
-        public RelayCommand DeleteThemeCommand => _deleteThemeCommand ??= new RelayCommand(() =>
-        {
-            var item = _selectedTheme;
-            if (item == null || item.IsBuiltIn)
-                return;
-
-            int idx = Themes.IndexOf(item);
-            Themes.Remove(item);
-
-            int next = Math.Clamp(idx - 1, 0, Math.Max(0, Themes.Count - 1));
-            SelectedTheme = Themes.Count > 0 ? Themes[next] : null;
+            var customs = Themes.Where(t => !t.IsBuiltIn && t.InRotation).ToList();
+            _themePages[TabCustom] = Math.Max(0, customs.IndexOf(item)) / ThemesPerPage;
+            SetThemeTab(TabCustom);
+            RefreshThemePage();
+            OpenThemeEditor(item);
         });
 
         // ── Pick (color dialog) commands — edit the active custom theme ────────
@@ -213,7 +409,7 @@ namespace AndroidMusicPresenceLink
                 _selectedTheme.PropertyChanged -= SelectedTheme_PropertyChanged;
             _selectedTheme = null;
 
-            var disabled = new System.Collections.Generic.HashSet<string>(
+            var disabled = new HashSet<string>(
                 _config.Theme.DisabledProfiles ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
 
             Themes.Clear();
@@ -227,6 +423,17 @@ namespace AndroidMusicPresenceLink
             var active = Themes.FirstOrDefault(t => string.Equals(t.Name, _config.Theme.ActiveProfile, StringComparison.Ordinal))
                          ?? Themes.FirstOrDefault();
             SelectedTheme = active;
+
+            // Reset the browser to the first page of the tab holding the active theme.
+            _themePages[TabDefault] = _themePages[TabCustom] = _themePages[TabDisabled] = 0;
+            _themeTab = active == null ? TabDefault
+                      : !active.InRotation ? TabDisabled
+                      : active.IsBuiltIn ? TabDefault
+                      : TabCustom;
+            RaisePropertyChanged(nameof(IsDefaultThemeTab));
+            RaisePropertyChanged(nameof(IsCustomThemeTab));
+            RaisePropertyChanged(nameof(IsDisabledThemeTab));
+            RefreshThemePage();
         }
 
         partial void ApplyThemingToConfig(MusicConfig config)

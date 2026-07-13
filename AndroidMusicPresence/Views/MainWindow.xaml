@@ -346,6 +346,43 @@
             </Setter>
         </Style>
 
+        <!-- Theme category tab: segmented radio button (Default / Custom / Disabled) -->
+        <Style x:Key="ThemeTabStyle" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeControlForegroundBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd"
+                                Background="{DynamicResource ThemeControlBackgroundBrush}"
+                                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="0,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentPressedBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Compact secondary button for theme-row actions and the pager -->
+        <Style x:Key="ThemeRowButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+
         <!-- ============ CARD-STYLE EXPANDER ============ -->
         <Style TargetType="Expander">
             <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
@@ -1309,122 +1346,237 @@
                     <!-- ====== THEMING ====== -->
                     <Expander Header="Theming" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
-                            <TextBlock Text="Pick a theme or make a new one, the button in the header cycles between themes, built in theme's can't be removed, but can be disabled, don't forget to save."
+                            <TextBlock Text="Click a theme to apply it. Default holds the built-in themes, Custom holds yours, and Disabled holds themes skipped by cycling and the random-at-startup pick. Don't forget to save."
                                        Style="{StaticResource HintTextStyle}" />
 
-                            <!-- ── Theme selector + actions ── -->
-                            <Grid Margin="0,4,0,12">
+                            <!-- ── Category tabs ── -->
+                            <Grid Margin="0,4,0,10">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Active theme" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <ComboBox Grid.Column="1"
-                                          ItemsSource="{Binding Themes}"
-                                          SelectedItem="{Binding SelectedTheme, Mode=TwoWay}">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding Name}" />
-                                                <TextBlock Text=" (disabled)" Opacity="0.6"
-                                                           Visibility="{Binding IsDisabled, Converter={StaticResource BoolToVis}}" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Grid.Column="2" Content="New" Width="64" Margin="8,0,0,0"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Command="{Binding AddThemeCommand}" />
-                                <!-- Custom themes are deleted; built-in themes are toggled in/out of the cycle. -->
-                                <Button Grid.Column="3" Content="Delete" Width="80" Margin="8,0,0,0"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Visibility="{Binding IsCustomSelected, Converter={StaticResource BoolToVis}}"
-                                        Command="{Binding DeleteThemeCommand}" />
-                                <Button Grid.Column="3" Content="{Binding RotationToggleLabel}" Width="80" Margin="8,0,0,0"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Visibility="{Binding IsBuiltInSelected, Converter={StaticResource BoolToVis}}"
-                                        ToolTip="Remove this theme from / add it back to the cycle rotation"
-                                        Command="{Binding ToggleRotationCommand}" />
+                                <RadioButton Grid.Column="0" Content="Default" GroupName="ThemeTabs" Margin="0,0,4,0"
+                                             Style="{StaticResource ThemeTabStyle}"
+                                             IsChecked="{Binding IsDefaultThemeTab, Mode=TwoWay}" />
+                                <RadioButton Grid.Column="1" Content="Custom" GroupName="ThemeTabs" Margin="4,0"
+                                             Style="{StaticResource ThemeTabStyle}"
+                                             IsChecked="{Binding IsCustomThemeTab, Mode=TwoWay}" />
+                                <RadioButton Grid.Column="2" Content="Disabled" GroupName="ThemeTabs" Margin="4,0,0,0"
+                                             Style="{StaticResource ThemeTabStyle}"
+                                             IsChecked="{Binding IsDisabledThemeTab, Mode=TwoWay}" />
                             </Grid>
 
-                            <TextBlock Text="This is a built-in theme. Click New to create an editable copy."
+                            <!-- ── Paged theme list (5 per page) ── -->
+                            <ItemsControl ItemsSource="{Binding ThemePageItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Margin="0,0,0,6" Focusable="False"
+                                                Command="{Binding DataContext.SelectThemeItemCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="Bd"
+                                                            Background="{DynamicResource ThemeBackgroundBrush}"
+                                                            BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="8"
+                                                            Padding="10,7"
+                                                            Cursor="Hand">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <!-- Swatch: background chip with accent + text dots -->
+                                                            <Border Grid.Column="0" Width="32" Height="32" CornerRadius="7" Margin="0,0,10,0"
+                                                                    Background="{Binding Background, Converter={StaticResource HexToBrush}}"
+                                                                    BorderBrush="#40808080" BorderThickness="1">
+                                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <Ellipse Width="9" Height="9" Margin="0,0,3,0"
+                                                                             Fill="{Binding Accent, Converter={StaticResource HexToBrush}}" />
+                                                                    <Ellipse Width="9" Height="9"
+                                                                             Fill="{Binding Foreground, Converter={StaticResource HexToBrush}}" />
+                                                                </StackPanel>
+                                                            </Border>
+
+                                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13"
+                                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+
+                                                            <!-- Active-theme check -->
+                                                            <Path x:Name="Check" Grid.Column="2" Width="14" Height="11" Margin="6,0,10,0"
+                                                                  VerticalAlignment="Center" Stretch="Uniform" Visibility="Collapsed"
+                                                                  Fill="{DynamicResource ThemeAccentBrush}"
+                                                                  Data="M 0 5 L 5 10 L 14 0 L 12 -1 L 5 7 L 2 4 Z" />
+
+                                                            <!-- Row actions -->
+                                                            <StackPanel x:Name="Actions" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Button x:Name="EditBtn" Content="Edit" Margin="0,0,6,0"
+                                                                        Style="{StaticResource ThemeRowButtonStyle}"
+                                                                        ToolTip="Edit this theme's name and colors"
+                                                                        Command="{Binding DataContext.ToggleEditThemeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                        CommandParameter="{Binding}" />
+                                                                <Button x:Name="RemoveBtn" Content="Remove" Margin="0,0,6,0"
+                                                                        Style="{StaticResource ThemeRowButtonStyle}"
+                                                                        Command="{Binding DataContext.RequestRemoveThemeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                        CommandParameter="{Binding}" />
+                                                                <Button x:Name="DisableBtn" Content="Disable"
+                                                                        Style="{StaticResource ThemeRowButtonStyle}"
+                                                                        ToolTip="Disabled themes are skipped by cycling and the random-at-startup pick"
+                                                                        Command="{Binding DataContext.ToggleThemeDisabledCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                        CommandParameter="{Binding}" />
+                                                            </StackPanel>
+
+                                                            <!-- Remove confirm state -->
+                                                            <StackPanel x:Name="ConfirmActions" Grid.Column="3" Orientation="Horizontal"
+                                                                        VerticalAlignment="Center" Visibility="Collapsed">
+                                                                <TextBlock Text="Are you sure?" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                           Foreground="{DynamicResource ThemeForegroundBrush}" />
+                                                                <Button Content="Yes" Margin="0,0,6,0"
+                                                                        Style="{StaticResource ThemeRowButtonStyle}"
+                                                                        Command="{Binding DataContext.ConfirmRemoveThemeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                        CommandParameter="{Binding}" />
+                                                                <Button Content="No"
+                                                                        Style="{StaticResource ThemeRowButtonStyle}"
+                                                                        Command="{Binding DataContext.CancelRemoveThemeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                        CommandParameter="{Binding}" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeForegroundBrush}" />
+                                                        </Trigger>
+                                                        <DataTrigger Binding="{Binding IsActiveTheme}" Value="True">
+                                                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+                                                            <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                                                            <Setter TargetName="Bd" Property="Padding" Value="9,6" />
+                                                            <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsBuiltIn}" Value="True">
+                                                            <Setter TargetName="EditBtn" Property="Visibility" Value="Collapsed" />
+                                                            <Setter TargetName="RemoveBtn" Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsDisabled}" Value="True">
+                                                            <Setter TargetName="DisableBtn" Property="Content" Value="Enable" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                            <Setter TargetName="EditBtn" Property="Content" Value="Save" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsConfirmingRemove}" Value="True">
+                                                            <Setter TargetName="Actions" Property="Visibility" Value="Collapsed" />
+                                                            <Setter TargetName="ConfirmActions" Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="{Binding ThemePageEmptyHint}"
+                                       Style="{StaticResource HintTextStyle}"
+                                       Visibility="{Binding ThemePageEmpty, Converter={StaticResource BoolToVis}}" />
+
+                            <!-- ── Pager + New theme ── -->
+                            <Grid Margin="0,2,0,10">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"
+                                            Visibility="{Binding ThemePagerVisible, Converter={StaticResource BoolToVis}}">
+                                    <Button Content="Prev" Width="52"
+                                            Style="{StaticResource ThemeRowButtonStyle}"
+                                            IsEnabled="{Binding CanPrevThemePage}"
+                                            Command="{Binding PrevThemePageCommand}" />
+                                    <TextBlock Text="{Binding ThemePageLabel}" FontSize="11" VerticalAlignment="Center" Margin="10,0" />
+                                    <Button Content="Next" Width="52"
+                                            Style="{StaticResource ThemeRowButtonStyle}"
+                                            IsEnabled="{Binding CanNextThemePage}"
+                                            Command="{Binding NextThemePageCommand}" />
+                                </StackPanel>
+                                <Button Content="New theme" Width="90" HorizontalAlignment="Right"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding AddThemeCommand}" />
+                            </Grid>
+
+                            <TextBlock Text="This is a built-in theme. Press New theme to create an editable copy."
                                        Style="{StaticResource HintTextStyle}"
                                        Visibility="{Binding IsBuiltInSelected, Converter={StaticResource BoolToVis}}" />
 
-                            <!-- ── Name (custom themes only) ── -->
-                            <Grid Margin="0,0,0,8"
-                                  Visibility="{Binding IsCustomSelected, Converter={StaticResource BoolToVis}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <TextBox Grid.Column="1" MaxLength="30"
-                                         Text="{Binding SelectedThemeName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-                            </Grid>
+                            <!-- ── Editor (opened by a row's Edit button, closed by Save) ── -->
+                            <Border Background="{DynamicResource ThemeBackgroundBrush}"
+                                    BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                    BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10"
+                                    Visibility="{Binding IsThemeEditorOpen, Converter={StaticResource BoolToVis}}">
+                              <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1" MaxLength="30"
+                                             Text="{Binding SelectedThemeName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                                </Grid>
 
-                            <!-- ── Colors (editable for custom, read-only for built-in) ── -->
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Background" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding SelectedTheme.Background, Converter={StaticResource HexToBrush}}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         IsEnabled="{Binding IsCustomSelected}"
-                                         Text="{Binding SelectedTheme.Background, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        IsEnabled="{Binding IsCustomSelected}"
-                                        Command="{Binding PickBackgroundCommand}" />
-                            </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Background" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                    <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
+                                            BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
+                                            Background="{Binding SelectedTheme.Background, Converter={StaticResource HexToBrush}}" />
+                                    <TextBox Grid.Column="2" Margin="0,0,8,0"
+                                             Text="{Binding SelectedTheme.Background, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="3" Content="Pick" Width="64"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding PickBackgroundCommand}" />
+                                </Grid>
 
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Buttons / accent" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding SelectedTheme.Accent, Converter={StaticResource HexToBrush}}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         IsEnabled="{Binding IsCustomSelected}"
-                                         Text="{Binding SelectedTheme.Accent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        IsEnabled="{Binding IsCustomSelected}"
-                                        Command="{Binding PickAccentCommand}" />
-                            </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Buttons / accent" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                    <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
+                                            BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
+                                            Background="{Binding SelectedTheme.Accent, Converter={StaticResource HexToBrush}}" />
+                                    <TextBox Grid.Column="2" Margin="0,0,8,0"
+                                             Text="{Binding SelectedTheme.Accent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="3" Content="Pick" Width="64"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding PickAccentCommand}" />
+                                </Grid>
 
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Text" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
-                                <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
-                                        BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
-                                        Background="{Binding SelectedTheme.Foreground, Converter={StaticResource HexToBrush}}" />
-                                <TextBox Grid.Column="2" Margin="0,0,8,0"
-                                         IsEnabled="{Binding IsCustomSelected}"
-                                         Text="{Binding SelectedTheme.Foreground, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="3" Content="Pick" Width="64"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        IsEnabled="{Binding IsCustomSelected}"
-                                        Command="{Binding PickForegroundCommand}" />
-                            </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Text" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" />
+                                    <Border Grid.Column="1" Width="24" Height="24" CornerRadius="4" Margin="0,0,8,0"
+                                            BorderBrush="{DynamicResource ThemeControlBorderBrush}" BorderThickness="1"
+                                            Background="{Binding SelectedTheme.Foreground, Converter={StaticResource HexToBrush}}" />
+                                    <TextBox Grid.Column="2" Margin="0,0,8,0"
+                                             Text="{Binding SelectedTheme.Foreground, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="3" Content="Pick" Width="64"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding PickForegroundCommand}" />
+                                </Grid>
+                              </StackPanel>
+                            </Border>
 
                             <CheckBox Content="Pick a random theme at startup"
                                       IsChecked="{Binding RandomThemeAtStartup, Mode=TwoWay}"

@@ -6,7 +6,7 @@ using System.Windows.Media;
 namespace AndroidMusicPresenceLink
 {
     /// <summary>
-    /// The three built-in theme profiles and a couple of small helpers for converting
+    /// The built-in theme profiles and a couple of small helpers for converting
     /// legacy overrides into a fully-specified profile. Built-in profiles are defined in
     /// code (not stored in config) so they can be tweaked in future versions and so they
     /// can never be deleted by the user. Each accessor returns a fresh instance to avoid
@@ -30,6 +30,15 @@ namespace AndroidMusicPresenceLink
             Foreground = "#EAEAEA"
         };
 
+        // Ported from SnailPlayer's Midnight theme.
+        public static ThemeProfile Midnight => new ThemeProfile
+        {
+            Name = "Midnight",
+            Background = "#12131A",
+            Accent = "#7C6CFF",
+            Foreground = "#E6E8F0"
+        };
+
         public static ThemeProfile HighContrast => new ThemeProfile
         {
             Name = "High Contrast",
@@ -39,7 +48,7 @@ namespace AndroidMusicPresenceLink
         };
 
         // Display/cycle order for the built-ins.
-        public static IReadOnlyList<ThemeProfile> All => new[] { DefaultLight, DefaultDark, HighContrast };
+        public static IReadOnlyList<ThemeProfile> All => new[] { DefaultLight, DefaultDark, Midnight, HighContrast };
 
         /// <summary>
         /// Builds a fully-specified profile from a partial legacy <see cref="ThemeOverrides"/>.
