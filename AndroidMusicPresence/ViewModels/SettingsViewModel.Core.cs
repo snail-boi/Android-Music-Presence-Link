@@ -145,6 +145,11 @@ namespace AndroidMusicPresenceLink
         private string _cacheClearText = "10";
         public string CacheClearText { get => _cacheClearText; set => Set(ref _cacheClearText, value); }
 
+        // Cover cache quality combobox. Index maps into CoverQualitySizes; 0 = max quality.
+        private static readonly int[] CoverQualitySizes = { 0, 1024, 512, 256, 128 };
+        private int _coverQualityIndex;
+        public int CoverQualityIndex { get => _coverQualityIndex; set => Set(ref _coverQualityIndex, value); }
+
         private string _pauseClearDelayText = "3";
         public string PauseClearDelayText { get => _pauseClearDelayText; set => Set(ref _pauseClearDelayText, value); }
 
@@ -337,6 +342,7 @@ namespace AndroidMusicPresenceLink
             _adaptivePollingAlertEnabled = _config.Polling.AdaptiveAlertEnabled;
 
             _cacheClearText = _config.AppSettings.CachClearInMB.ToString();
+            _coverQualityIndex = Math.Max(0, Array.IndexOf(CoverQualitySizes, _config.AppSettings.CoverMaxSizePx));
             _pauseClearDelayText = _config.MediaPlayer.SmtcPauseClearDelayMinutes.ToString();
             _coverPatterns = _config.Library.CoverArtFileNamePatterns ?? string.Empty;
             _copyTrackTemplate = _config.MediaPlayer.CopyTrackInfoTemplate ?? string.Empty;
@@ -388,6 +394,11 @@ namespace AndroidMusicPresenceLink
                 CacheClearText = "10";
                 config.AppSettings.CachClearInMB = 10;
             }
+
+            config.AppSettings.CoverMaxSizePx =
+                (CoverQualityIndex >= 0 && CoverQualityIndex < CoverQualitySizes.Length)
+                    ? CoverQualitySizes[CoverQualityIndex]
+                    : 0;
 
             if (int.TryParse(PauseClearDelayText.Trim(), out var pause))
             {
@@ -565,6 +576,7 @@ namespace AndroidMusicPresenceLink
             if (left.AudioLink.FlacCompressionLevel != right.AudioLink.FlacCompressionLevel) return false;
             if (left.MediaPlayer.SmtcPauseClearDelayMinutes != right.MediaPlayer.SmtcPauseClearDelayMinutes) return false;
             if (left.AppSettings.CachClearInMB != right.AppSettings.CachClearInMB) return false;
+            if (left.AppSettings.CoverMaxSizePx != right.AppSettings.CoverMaxSizePx) return false;
             if (left.Hotkeys.VolumeUp != right.Hotkeys.VolumeUp) return false;
             if (left.Hotkeys.VolumeDown != right.Hotkeys.VolumeDown) return false;
             if (left.Hotkeys.ToggleScrcpy != right.Hotkeys.ToggleScrcpy) return false;

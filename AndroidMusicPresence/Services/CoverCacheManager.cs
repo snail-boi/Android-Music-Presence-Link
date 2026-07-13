@@ -19,6 +19,8 @@ namespace AndroidMusicPresenceLink
         private readonly string ffmpegPath;
         private long maxCacheBytes;
         private readonly string coverFilePatterns;
+        // Longest side newly cached covers are downscaled to; 0 = keep original size.
+        private readonly int maxCoverSizePx;
 
         private readonly string indexFile;
         private readonly string folderIndexFile;
@@ -28,9 +30,10 @@ namespace AndroidMusicPresenceLink
         private Dictionary<string, string> folderIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, DateTime> nocover = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
 
-        public CoverCacheManager(string ffmpegPath, string cachePath, int MaxCacheSizeInBytes, string? coverFilePatterns = null)
+        public CoverCacheManager(string ffmpegPath, string cachePath, int MaxCacheSizeInBytes, string? coverFilePatterns = null, int maxCoverSizePx = 0)
         {
             this.maxCacheBytes = MaxCacheSizeInBytes * 1024L * 1024L;
+            this.maxCoverSizePx = Math.Max(0, maxCoverSizePx);
             this.ffmpegPath = ffmpegPath;
             this.cachePath = cachePath;
             this.tempPath = Path.Combine(cachePath, "temp");
@@ -450,7 +453,7 @@ namespace AndroidMusicPresenceLink
                 string cachedFilename = key + ".jpg";
                 string cachedFull = Path.Combine(cachePath, cachedFilename);
 
-                var downloaded = await SubsonicClient.DownloadCoverArtAsync(serverUrl, username, password, coverArtId!, cachedFull)
+                var downloaded = await SubsonicClient.DownloadCoverArtAsync(serverUrl, username, password, coverArtId!, cachedFull, maxCoverSizePx)
                     .ConfigureAwait(false);
                 if (downloaded == null || !File.Exists(cachedFull))
                     return null;
@@ -597,7 +600,7 @@ namespace AndroidMusicPresenceLink
                 if (!File.Exists(cachedPath))
                 {
                     var pulledExt = Path.GetExtension(tempImagePath).ToLowerInvariant();
-                    if (new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" }.Contains(pulledExt))
+                    if (maxCoverSizePx <= 0 && new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp" }.Contains(pulledExt))
                     {
                         try { File.Copy(tempImagePath, cachedPath, true); } catch { }
                     }
@@ -632,6 +635,14 @@ namespace AndroidMusicPresenceLink
             }
         }
 
+        // ffmpeg filter that shrinks covers to fit within maxCoverSizePx without ever upscaling
+        // smaller images. Null when the user chose max quality, so callers keep the copy path.
+        private string? BuildDownscaleFilter()
+        {
+            if (maxCoverSizePx <= 0) return null;
+            return $"scale='min(iw,{maxCoverSizePx})':'min(ih,{maxCoverSizePx})':force_original_aspect_ratio=decrease";
+        }
+
         private async Task<bool> RunFfmpegExtractAsync(string inputPath, string outputJpgPath)
         {
             try
@@ -647,13 +658,16 @@ namespace AndroidMusicPresenceLink
 
                 var imgExts = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
                 var inExt = Path.GetExtension(inputPath).ToLowerInvariant();
-                if (imgExts.Contains(inExt))
+                var scaleFilter = BuildDownscaleFilter();
+                if (imgExts.Contains(inExt) && scaleFilter == null)
                 {
                     try { File.Copy(inputPath, outputJpgPath, true); } catch (Exception ex) { Debugger.show("Copy image failed: " + ex.Message); }
                     return File.Exists(outputJpgPath) && new FileInfo(outputJpgPath).Length > 0;
                 }
 
-                var args = $"-i \"{inputPath}\" -map 0:v -an -y \"{outputJpgPath}\"";
+                var args = scaleFilter == null
+                    ? $"-i \"{inputPath}\" -map 0:v -an -y \"{outputJpgPath}\""
+                    : $"-i \"{inputPath}\" -map 0:v -an -vf \"{scaleFilter}\" -y \"{outputJpgPath}\"";
 
                 var psi = new ProcessStartInfo
                 {

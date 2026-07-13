@@ -81,7 +81,7 @@ namespace AndroidMusicPresenceLink
             this.updateCurrentSongCallback = updateCurrentSongCallback;
             this.onUserInteraction = onUserInteraction;
 
-            cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.AppSettings.CachClearInMB, config.Library.CoverArtFileNamePatterns);
+            cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.AppSettings.CachClearInMB, config.Library.CoverArtFileNamePatterns, config.AppSettings.CoverMaxSizePx);
             remoteRoots = GetNormalizedRemoteRoots(config);
             deviceName = config.Device.SelectedDeviceName?.Trim() ?? string.Empty;
             _noCoverIconPath = config.Paths?.NoCoverIconPath ?? string.Empty;
@@ -100,7 +100,7 @@ namespace AndroidMusicPresenceLink
         {
             try
             {
-                cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.AppSettings.CachClearInMB, config.Library.CoverArtFileNamePatterns);
+                cacheManager = new CoverCacheManager(config.Paths.FfmpegPath, config.Paths.CoverCachePath, config.AppSettings.CachClearInMB, config.Library.CoverArtFileNamePatterns, config.AppSettings.CoverMaxSizePx);
                 remoteRoots = GetNormalizedRemoteRoots(config);
                 deviceName = config.Device.SelectedDeviceName?.Trim() ?? string.Empty;
                 _noCoverIconPath = config.Paths?.NoCoverIconPath ?? string.Empty;

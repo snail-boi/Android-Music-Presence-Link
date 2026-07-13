@@ -769,6 +769,27 @@
                                        Style="{StaticResource FieldLabelStyle}" />
                             </Grid>
 
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Cached cover quality"
+                                       Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <ComboBox Grid.Column="1"
+                                      SelectedIndex="{Binding CoverQualityIndex, Mode=TwoWay}">
+                                    <ComboBoxItem>Max (original size)</ComboBoxItem>
+                                    <ComboBoxItem>High (1024 px)</ComboBoxItem>
+                                    <ComboBoxItem>Medium (512 px)</ComboBoxItem>
+                                    <ComboBoxItem>Low (256 px)</ComboBoxItem>
+                                    <ComboBoxItem>Tiny (128 px)</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+                            <TextBlock Text="Covers cached from now on are downscaled to this size so the cache holds more art. Only affects new covers; clear the cache to re-fetch existing ones."
+                                   Style="{StaticResource HintTextStyle}"
+                                   Margin="0,0,0,12" />
+
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="Clear cache"
                                     Style="{StaticResource SecondaryButtonStyle}"

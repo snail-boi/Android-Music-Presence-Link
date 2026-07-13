@@ -212,15 +212,20 @@ namespace AndroidMusicPresenceLink
         // null on failure (including when the server returns a JSON/XML error instead of an image).
         internal static async Task<string?> DownloadCoverArtAsync(
             string serverUrl, string username, string password, string coverArtId, string destPath,
-            CancellationToken ct = default)
+            int maxSizePx = 0, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(coverArtId) || string.IsNullOrWhiteSpace(destPath))
                 return null;
 
             try
             {
-                string url = BuildUrl(serverUrl, username, password, "getCoverArt",
-                    $"&id={Uri.EscapeDataString(coverArtId)}");
+                // getCoverArt's size param asks the server to scale the image before sending,
+                // so lower cache-quality settings also save download bandwidth.
+                string extraParams = $"&id={Uri.EscapeDataString(coverArtId)}";
+                if (maxSizePx > 0)
+                    extraParams += $"&size={maxSizePx}";
+
+                string url = BuildUrl(serverUrl, username, password, "getCoverArt", extraParams);
 
                 using var client = new HttpClient { Timeout = RequestTimeout };
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(ClientName + "/1.0");

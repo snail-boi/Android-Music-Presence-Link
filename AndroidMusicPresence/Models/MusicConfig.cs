@@ -400,6 +400,8 @@ namespace AndroidMusicPresenceLink
         // adb command and its output. Persisted so it can capture app startup too.
         public bool AdvancedDebugMode { get; set; } = false;
         public int CachClearInMB { get; set; } = 200;
+        // Longest side (px) newly cached covers are downscaled to. 0 = max quality (no downscale).
+        public int CoverMaxSizePx { get; set; } = 0;
     }
 
     // ── Root config ────────────────────────────────────────────────────────────
@@ -585,7 +587,8 @@ namespace AndroidMusicPresenceLink
                     OnboardingCompleted = AppSettings.OnboardingCompleted,
                     DebugMode = AppSettings.DebugMode,
                     AdvancedDebugMode = AppSettings.AdvancedDebugMode,
-                    CachClearInMB = AppSettings.CachClearInMB
+                    CachClearInMB = AppSettings.CachClearInMB,
+                    CoverMaxSizePx = AppSettings.CoverMaxSizePx
                 }
             };
         }
