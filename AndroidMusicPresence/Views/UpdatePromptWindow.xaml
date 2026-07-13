@@ -82,8 +82,9 @@
             <Border Grid.Row="2" Margin="0,14,0,0" Padding="12" Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8">
                 <StackPanel>
                     <TextBlock Text="What's included" FontWeight="SemiBold" Margin="0,0,0,6" />
-                    <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                        <TextBlock TextWrapping="Wrap" Text="{Binding Notes}" />
+                    <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
+                        <!-- Populated in code-behind by PatchNotesRenderer (formatted release notes). -->
+                        <ContentControl x:Name="NotesContent" Focusable="False" Margin="0,0,8,0" />
                     </ScrollViewer>
                 </StackPanel>
             </Border>

@@ -26,6 +26,10 @@ namespace AndroidMusicPresenceLink
             _vm = new UpdatePromptViewModel(latestVersion, patchNotes, allowRemindLater);
             DataContext = _vm;
             _vm.RequestClose += OnRequestClose;
+
+            // Release notes follow the repo's release template (headings, bullets, links,
+            // @mentions), so render them formatted instead of as one plain-text block.
+            NotesContent.Content = PatchNotesRenderer.Render(_vm.Notes);
         }
 
         private void OnRequestClose()
