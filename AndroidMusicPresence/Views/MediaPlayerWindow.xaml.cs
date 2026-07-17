@@ -236,6 +236,7 @@ namespace AndroidMusicPresenceLink
             Height = config.PlayerWindow.Height;
             Top = config.PlayerWindow.Top;
             Left = config.PlayerWindow.Left;
+            WindowPlacement.ClampToVisibleArea(this);
             WindowState = config.PlayerWindow.State;
         }
 
