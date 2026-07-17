@@ -493,20 +493,17 @@ namespace AndroidMusicPresenceLink
                 var psi = new ProcessStartInfo
                 {
                     FileName = ffmpegPath,
-                    Arguments = args,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    StandardErrorEncoding = Encoding.UTF8,
-                    StandardOutputEncoding = Encoding.UTF8
+                    Arguments = args
                 };
 
-                using var proc = Process.Start(psi);
-                if (proc == null) return null;
-
-                string stderr = await proc.StandardError.ReadToEndAsync();
-                proc.WaitForExit();
+                var result = await FfmpegRunner.RunAsync(psi);
+                if (!result.Started) return null;
+                if (result.TimedOut)
+                {
+                    Debugger.show("ffmpeg (metadata) timed out and was killed.");
+                    return null;
+                }
+                string stderr = result.StdErr;
 
                 string? title = null;
                 string? artist = null;
@@ -672,30 +669,26 @@ namespace AndroidMusicPresenceLink
                 var psi = new ProcessStartInfo
                 {
                     FileName = ffmpegPath,
-                    Arguments = args,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    StandardErrorEncoding = Encoding.UTF8,
-                    StandardOutputEncoding = Encoding.UTF8
+                    Arguments = args
                 };
 
                 Debugger.show("Running ffmpeg: " + psi.FileName + " " + psi.Arguments);
 
-                using var proc = Process.Start(psi);
-                if (proc == null)
+                var result = await FfmpegRunner.RunAsync(psi);
+                if (!result.Started)
                 {
                     Debugger.show("Failed to start ffmpeg process");
                     return false;
                 }
-
-                string stderr = await proc.StandardError.ReadToEndAsync();
-                string stdout = await proc.StandardOutput.ReadToEndAsync();
-                proc.WaitForExit();
-
-                Debugger.show("ffmpeg exit code: " + proc.ExitCode);
-                if (!string.IsNullOrWhiteSpace(stderr)) Debugger.show("ffmpeg stderr: " + stderr);
+                if (result.TimedOut)
+                {
+                    Debugger.show("ffmpeg (cover extract) timed out and was killed.");
+                }
+                else
+                {
+                    Debugger.show("ffmpeg exit code: " + result.ExitCode);
+                    if (!string.IsNullOrWhiteSpace(result.StdErr)) Debugger.show("ffmpeg stderr: " + result.StdErr);
+                }
 
                 if (!File.Exists(outputJpgPath) || new FileInfo(outputJpgPath).Length == 0)
                 {
@@ -703,22 +696,17 @@ namespace AndroidMusicPresenceLink
                     var psi2 = new ProcessStartInfo
                     {
                         FileName = ffmpegPath,
-                        Arguments = args2,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardError = true,
-                        RedirectStandardOutput = true,
-                        StandardErrorEncoding = Encoding.UTF8,
-                        StandardOutputEncoding = Encoding.UTF8
+                        Arguments = args2
                     };
-                    using var proc2 = Process.Start(psi2);
-                    if (proc2 != null)
+                    var result2 = await FfmpegRunner.RunAsync(psi2);
+                    if (result2.TimedOut)
                     {
-                        string stderr2 = await proc2.StandardError.ReadToEndAsync();
-                        string stdout2 = await proc2.StandardOutput.ReadToEndAsync();
-                        proc2.WaitForExit();
-                        Debugger.show("ffmpeg fallback exit code: " + proc2.ExitCode);
-                        if (!string.IsNullOrWhiteSpace(stderr2)) Debugger.show("ffmpeg fallback stderr: " + stderr2);
+                        Debugger.show("ffmpeg (cover extract fallback) timed out and was killed.");
+                    }
+                    else if (result2.Started)
+                    {
+                        Debugger.show("ffmpeg fallback exit code: " + result2.ExitCode);
+                        if (!string.IsNullOrWhiteSpace(result2.StdErr)) Debugger.show("ffmpeg fallback stderr: " + result2.StdErr);
                     }
                 }
 
@@ -745,20 +733,17 @@ namespace AndroidMusicPresenceLink
                 var psi = new ProcessStartInfo
                 {
                     FileName = ffmpegPath,
-                    Arguments = args,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    StandardErrorEncoding = Encoding.UTF8,
-                    StandardOutputEncoding = Encoding.UTF8
+                    Arguments = args
                 };
 
-                using var proc = Process.Start(psi);
-                if (proc == null) return null;
-
-                string stderr = await proc.StandardError.ReadToEndAsync();
-                proc.WaitForExit();
+                var result = await FfmpegRunner.RunAsync(psi);
+                if (!result.Started) return null;
+                if (result.TimedOut)
+                {
+                    Debugger.show("ffmpeg (duration) timed out and was killed.");
+                    return null;
+                }
+                string stderr = result.StdErr;
 
                 var m = Regex.Match(stderr, "Duration:\\s*(\\d+):(\\d+):(\\d+(?:\\.\\d+)?)");
                 if (m.Success)

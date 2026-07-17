@@ -662,30 +662,22 @@ namespace AndroidMusicPresenceLink
                     return false;
                 }
 
-                var psi = new ProcessStartInfo
-                {
-                    FileName = ffmpegPath,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    StandardErrorEncoding = Encoding.UTF8,
-                    StandardOutputEncoding = Encoding.UTF8
-                };
+                var psi = new ProcessStartInfo { FileName = ffmpegPath };
                 psi.ArgumentList.Add("-hide_banner");
                 foreach (var a in argList) psi.ArgumentList.Add(a);
 
-                using var proc = Process.Start(psi);
-                if (proc == null) return false;
+                var result = await FfmpegRunner.RunAsync(psi).ConfigureAwait(false);
+                if (!result.Started) return false;
+                if (result.TimedOut)
+                {
+                    Debugger.show("[TAGEDIT] ffmpeg timed out and was killed.");
+                    return false;
+                }
 
-                string stderr = await proc.StandardError.ReadToEndAsync().ConfigureAwait(false);
-                _ = await proc.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
-                await proc.WaitForExitAsync().ConfigureAwait(false);
+                if (result.ExitCode != 0)
+                    Debugger.show("[TAGEDIT] ffmpeg exit " + result.ExitCode + ": " + result.StdErr);
 
-                if (proc.ExitCode != 0)
-                    Debugger.show("[TAGEDIT] ffmpeg exit " + proc.ExitCode + ": " + stderr);
-
-                return proc.ExitCode == 0;
+                return result.ExitCode == 0;
             }
             catch (Exception ex)
             {
