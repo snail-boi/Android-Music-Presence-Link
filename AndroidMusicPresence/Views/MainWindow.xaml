@@ -1119,7 +1119,7 @@
                                 <TextBlock Text="Volume up"
                                        Grid.Row="0" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding VolumeUpHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox IsReadOnly="True" Text="{Binding VolumeUpHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="0" Grid.Column="1"
                                      Margin="0,0,0,6"
                                      Visibility="{Binding VolumeUpHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
@@ -1145,7 +1145,7 @@
                                 <TextBlock Text="Volume down"
                                        Grid.Row="1" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding VolumeDownHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox IsReadOnly="True" Text="{Binding VolumeDownHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="1" Grid.Column="1"
                                      Margin="0,0,0,6"
                                      Visibility="{Binding VolumeDownHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
@@ -1171,7 +1171,7 @@
                                 <TextBlock Text="Toggle audio link"
                                        Grid.Row="2" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding ToggleScrcpyHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox IsReadOnly="True" Text="{Binding ToggleScrcpyHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="2" Grid.Column="1"
                                      Margin="0,0,0,6"
                                      Visibility="{Binding ToggleScrcpyHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
@@ -1197,7 +1197,7 @@
                                 <TextBlock Text="Toggle lyrics"
                                        Grid.Row="3" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding ToggleLyricsOverlayHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox IsReadOnly="True" Text="{Binding ToggleLyricsOverlayHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="3" Grid.Column="1"
                                      Margin="0,0,0,6"
                                      Visibility="{Binding ToggleLyricsOverlayHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
@@ -1223,7 +1223,7 @@
                                 <TextBlock Text="Copy track info"
                                        Grid.Row="4" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding CopyTrackInfoHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox IsReadOnly="True" Text="{Binding CopyTrackInfoHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="4" Grid.Column="1"
                                      Margin="0,0,0,6"
                                      Visibility="{Binding CopyTrackInfoHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
@@ -1249,7 +1249,7 @@
                                 <TextBlock Text="Audio quality"
                                        Grid.Row="5" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding AudioQualityHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox IsReadOnly="True" Text="{Binding AudioQualityHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="5" Grid.Column="1"
                                      Visibility="{Binding AudioQualityHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
                                 <Button Grid.Row="5" Grid.Column="2"
