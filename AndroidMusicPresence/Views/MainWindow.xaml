@@ -1887,6 +1887,24 @@
                                 Margin="0,0,0,16"
                                 Command="{Binding OpenLogFolderCommand}" />
 
+                            <!-- Config import / export -->
+                            <TextBlock Text="Configuration"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,0,0,4" />
+                            <TextBlock Text="Export all settings to a file, or import a previously exported configuration. Importing replaces your current settings."
+                                       Style="{StaticResource HintTextStyle}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <Button Content="Export config"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="160"
+                                    Command="{Binding ExportConfigCommand}" />
+                                <Button Content="Import config"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="160"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding ImportConfigCommand}" />
+                            </StackPanel>
+
                             <!-- Custom binary paths -->
                             <TextBlock Text="Custom binaries"
                                        Style="{StaticResource FieldLabelStyle}"

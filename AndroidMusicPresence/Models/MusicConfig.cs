@@ -676,6 +676,24 @@ namespace AndroidMusicPresenceLink
             }
         }
 
+        // Writes the given config to an arbitrary path (config import/export). Exceptions
+        // propagate so the caller can surface a failure message.
+        public static void ExportTo(string path, MusicConfig config)
+        {
+            File.WriteAllText(path, JsonSerializer.Serialize(config, JsonOptions));
+        }
+
+        // Reads and normalizes a config from an arbitrary path. Uses NormalizeConfig rather
+        // than Finalize so importing never touches the local legacy config.json. Throws on a
+        // missing/invalid file so the caller can report it.
+        public static MusicConfig ImportFrom(string path)
+        {
+            var json = File.ReadAllText(path);
+            var loaded = JsonSerializer.Deserialize<MusicConfig>(json)
+                ?? throw new InvalidDataException("The file did not contain a valid configuration.");
+            return NormalizeConfig(loaded);
+        }
+
         private static string NormalizeHotkeyCombo(string? stored, int legacyModifier, int legacyKey)
         {
             var fallback = HotkeyHelper.ComboFromLegacy(legacyModifier, legacyKey);

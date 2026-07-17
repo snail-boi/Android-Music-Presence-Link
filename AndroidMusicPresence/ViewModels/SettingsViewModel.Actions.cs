@@ -40,6 +40,12 @@ namespace AndroidMusicPresenceLink
         private RelayCommand? _openLogFolderCommand;
         public RelayCommand OpenLogFolderCommand => _openLogFolderCommand ??= new RelayCommand(OpenLogFolder);
 
+        private RelayCommand? _exportConfigCommand;
+        public RelayCommand ExportConfigCommand => _exportConfigCommand ??= new RelayCommand(ExportConfig);
+
+        private RelayCommand? _importConfigCommand;
+        public RelayCommand ImportConfigCommand => _importConfigCommand ??= new RelayCommand(ImportConfig);
+
         // The header theme button now cycles through all themes; see CycleThemeCommand in
         // the Theming partial.
 
@@ -248,6 +254,73 @@ namespace AndroidMusicPresenceLink
             catch (Exception ex)
             {
                 Interaction?.ShowWarning($"Failed to open log folder: {ex.Message}", "Error");
+            }
+        }
+
+        // Exports the settings currently shown in the window (including unsaved edits, since
+        // BuildConfig reflects the live UI) to a user-chosen JSON file.
+        private void ExportConfig()
+        {
+            try
+            {
+                var dlg = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "Export configuration",
+                    Filter = "Config file|*.json|All files|*.*",
+                    FileName = "musicconfig-export.json",
+                    AddExtension = true,
+                    DefaultExt = ".json"
+                };
+                if (dlg.ShowDialog() != true)
+                    return;
+
+                MusicConfigManager.ExportTo(dlg.FileName, BuildConfig());
+                Interaction?.ShowInfo("Configuration exported.", "Export");
+            }
+            catch (Exception ex)
+            {
+                Interaction?.ShowWarning($"Failed to export configuration: {ex.Message}", "Export");
+            }
+        }
+
+        // Imports a previously exported config, replacing all current settings. UpdateConfig
+        // pushes the imported config back into this window (reseeding the UI and password box).
+        private void ImportConfig()
+        {
+            try
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Import configuration",
+                    Filter = "Config file|*.json|All files|*.*",
+                    CheckFileExists = true
+                };
+                if (dlg.ShowDialog() != true)
+                    return;
+
+                MusicConfig imported;
+                try
+                {
+                    imported = MusicConfigManager.ImportFrom(dlg.FileName);
+                }
+                catch (Exception ex)
+                {
+                    Interaction?.ShowWarning($"That file could not be read as a configuration: {ex.Message}", "Import");
+                    return;
+                }
+
+                if (Interaction?.ConfirmYesNo(
+                        "This will replace all current settings with the imported configuration. Continue?",
+                        "Import configuration") != true)
+                    return;
+
+                MusicConfigManager.Save(imported);
+                (Application.Current as App)?.UpdateConfig(imported);
+                Interaction?.ShowInfo("Configuration imported.", "Import");
+            }
+            catch (Exception ex)
+            {
+                Interaction?.ShowWarning($"Failed to import configuration: {ex.Message}", "Import");
             }
         }
     }
