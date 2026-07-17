@@ -49,14 +49,21 @@ namespace AndroidMusicPresenceLink
             _workingConfig.Hotkeys.ToggleLyricsOverlayKeys = NormalizeComboText(ToggleLyricsOverlayHotkey.Text, _workingConfig.Hotkeys.ToggleLyricsOverlayKeys);
             _workingConfig.Hotkeys.CopyTrackInfoKeys = NormalizeComboText(CopyTrackInfoHotkey.Text, _workingConfig.Hotkeys.CopyTrackInfoKeys);
             _workingConfig.Hotkeys.AudioQualityKeys = NormalizeComboText(AudioQualityHotkey.Text, _workingConfig.Hotkeys.AudioQualityKeys);
+            // These combos are now authoritative, so lock in the migration flag: a hotkey the
+            // user disabled here (empty) must not be re-seeded from the legacy defaults on load.
+            _workingConfig.Hotkeys.ComboHotkeysMigrated = true;
         }
 
-        // Re-parses whatever the field holds (recorded or hand-typed); anything invalid,
-        // including the waiting placeholder, falls back to the previously saved combo.
+        // Re-parses whatever the field holds. An empty field is an intentionally disabled
+        // hotkey and stays empty; the transient "waiting..." placeholder or unparseable text
+        // falls back to the previously saved combo so it isn't clobbered.
         private static string NormalizeComboText(string text, string previousCombo)
         {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;               // disabled
+            if (text == HotkeyFieldViewModel.WaitingForKeyPress) return previousCombo ?? string.Empty;
+
             var fallback = HotkeyHelper.ParseCombo(previousCombo, Array.Empty<int>());
-            var keys = HotkeyHelper.ParseCombo(text?.Trim(), fallback);
+            var keys = HotkeyHelper.ParseCombo(text.Trim(), fallback);
             return keys.Length == 0 ? (previousCombo ?? string.Empty) : HotkeyHelper.ComboToDisplayName(keys);
         }
 

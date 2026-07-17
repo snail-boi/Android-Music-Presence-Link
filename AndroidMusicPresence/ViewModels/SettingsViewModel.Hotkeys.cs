@@ -20,6 +20,18 @@ namespace AndroidMusicPresenceLink
         public HotkeyFieldViewModel ToggleLyricsOverlayHotkey { get; private set; } = null!;
         public HotkeyFieldViewModel CopyTrackInfoHotkey { get; private set; } = null!;
         public HotkeyFieldViewModel AudioQualityHotkey { get; private set; } = null!;
+        public HotkeyFieldViewModel PlayPauseHotkey { get; private set; } = null!;
+        public HotkeyFieldViewModel NextTrackHotkey { get; private set; } = null!;
+        public HotkeyFieldViewModel PreviousTrackHotkey { get; private set; } = null!;
+
+        // False = SMTC mode (Windows' own media keys drive the app, no custom keys).
+        // True = Direct mode (bind custom play/pause/next/previous keys, sent to the phone).
+        private bool _mediaKeysDirectMode;
+        public bool MediaKeysDirectMode
+        {
+            get => _mediaKeysDirectMode;
+            set => Set(ref _mediaKeysDirectMode, value);
+        }
 
         partial void InitHotkeys()
         {
@@ -29,6 +41,9 @@ namespace AndroidMusicPresenceLink
             ToggleLyricsOverlayHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
             CopyTrackInfoHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
             AudioQualityHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
+            PlayPauseHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
+            NextTrackHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
+            PreviousTrackHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
 
             LoadHotkeysFromConfig();
         }
@@ -41,6 +56,10 @@ namespace AndroidMusicPresenceLink
             ToggleLyricsOverlayHotkey.SetFromConfig(_config.Hotkeys.ToggleLyricsOverlayKeys);
             CopyTrackInfoHotkey.SetFromConfig(_config.Hotkeys.CopyTrackInfoKeys);
             AudioQualityHotkey.SetFromConfig(_config.Hotkeys.AudioQualityKeys);
+            PlayPauseHotkey.SetFromConfig(_config.Hotkeys.PlayPauseKeys);
+            NextTrackHotkey.SetFromConfig(_config.Hotkeys.NextTrackKeys);
+            PreviousTrackHotkey.SetFromConfig(_config.Hotkeys.PreviousTrackKeys);
+            MediaKeysDirectMode = _config.Hotkeys.MediaKeysDirectMode;
         }
 
         partial void ApplyHotkeysToConfig(MusicConfig config)
@@ -51,14 +70,22 @@ namespace AndroidMusicPresenceLink
             config.Hotkeys.ToggleLyricsOverlayKeys = NormalizeComboText(ToggleLyricsOverlayHotkey.Text, _config.Hotkeys.ToggleLyricsOverlayKeys);
             config.Hotkeys.CopyTrackInfoKeys = NormalizeComboText(CopyTrackInfoHotkey.Text, _config.Hotkeys.CopyTrackInfoKeys);
             config.Hotkeys.AudioQualityKeys = NormalizeComboText(AudioQualityHotkey.Text, _config.Hotkeys.AudioQualityKeys);
+            config.Hotkeys.PlayPauseKeys = NormalizeComboText(PlayPauseHotkey.Text, _config.Hotkeys.PlayPauseKeys);
+            config.Hotkeys.NextTrackKeys = NormalizeComboText(NextTrackHotkey.Text, _config.Hotkeys.NextTrackKeys);
+            config.Hotkeys.PreviousTrackKeys = NormalizeComboText(PreviousTrackHotkey.Text, _config.Hotkeys.PreviousTrackKeys);
+            config.Hotkeys.MediaKeysDirectMode = MediaKeysDirectMode;
         }
 
-        // Re-parses whatever the field holds (recorded or hand-typed); anything invalid,
-        // including the waiting placeholder, falls back to the previously saved combo.
+        // Re-parses whatever the field holds. An empty field is an intentionally disabled
+        // hotkey and stays empty; the transient "waiting..." placeholder or any unparseable
+        // text falls back to the previously saved combo so it isn't clobbered.
         private static string NormalizeComboText(string text, string previousCombo)
         {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;               // disabled
+            if (text == HotkeyFieldViewModel.WaitingForKeyPress) return previousCombo ?? string.Empty;
+
             var fallback = HotkeyHelper.ParseCombo(previousCombo, Array.Empty<int>());
-            var keys = HotkeyHelper.ParseCombo(text?.Trim(), fallback);
+            var keys = HotkeyHelper.ParseCombo(text.Trim(), fallback);
             return keys.Length == 0 ? (previousCombo ?? string.Empty) : HotkeyHelper.ComboToDisplayName(keys);
         }
     }

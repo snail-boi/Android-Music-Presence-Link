@@ -54,7 +54,9 @@ namespace AndroidMusicPresenceLink
 
             Debugger.show(result == null
                 ? "[HOTKEY] Recording cancelled."
-                : $"[HOTKEY] Recorded combo: {HotkeyHelper.ComboToDisplayName(result)}.");
+                : result.Length == 0
+                    ? "[HOTKEY] Hotkey disabled (Esc)."
+                    : $"[HOTKEY] Recorded combo: {HotkeyHelper.ComboToDisplayName(result)}.");
 
             var callback = _onRecorded;
             _window = null;
@@ -85,7 +87,9 @@ namespace AndroidMusicPresenceLink
 
                 if (e.Key == Key.Escape)
                 {
-                    Finish(null);
+                    // Esc disables the hotkey (clears it) rather than cancelling. An empty
+                    // array is the "disable" signal; null (window deactivation) still cancels.
+                    Finish(Array.Empty<int>());
                     return;
                 }
 

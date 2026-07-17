@@ -343,7 +343,7 @@ namespace AndroidMusicPresenceLink
                     smtcControls.PlaybackStatus = isPlaying ? MediaPlaybackStatus.Playing : MediaPlaybackStatus.Paused;
                     if (_smtcClearedForHalf)
                     {
-                        Debugger.show($"[SMTC] First Full tick after Half/Off — forcing re-push. lastSmtcPushedKey={lastSmtcPushedKey ?? "null"}");
+                        Debugger.show($"[SMTC] First Full tick after Half/Off, forcing re-push. lastSmtcPushedKey={lastSmtcPushedKey ?? "null"}");
                         _smtcClearedForHalf = false;
                         lastSmtcPushedKey = null;
                     }
@@ -823,7 +823,7 @@ namespace AndroidMusicPresenceLink
                 }
             }
 
-            Debugger.show($"[COVERART] Lookup for '{fileNameWithoutExtension}' by '{artist}' — coverSearch={enableCoverSearch}, subsonic={useSubsonic}");
+            Debugger.show($"[COVERART] Lookup for '{fileNameWithoutExtension}' by '{artist}' - coverSearch={enableCoverSearch}, subsonic={useSubsonic}");
 
             // Fresh resolution for this track: clear any prior Subsonic identity. It's re-set only
             // if the Subsonic fallback actually resolves the track below.

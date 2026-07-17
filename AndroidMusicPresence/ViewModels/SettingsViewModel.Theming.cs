@@ -151,7 +151,7 @@ namespace AndroidMusicPresenceLink
 
         public string ThemePageEmptyHint => _themeTab switch
         {
-            TabCustom => "No custom themes yet — press New theme to create one.",
+            TabCustom => "No custom themes yet. press New theme to create one.",
             TabDisabled => "No disabled themes.",
             _ => "All built-in themes are disabled."
         };

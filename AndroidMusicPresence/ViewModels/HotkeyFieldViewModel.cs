@@ -12,7 +12,7 @@ namespace AndroidMusicPresenceLink
     /// </summary>
     internal sealed class HotkeyFieldViewModel : ViewModelBase
     {
-        private const string WaitingForKeyPress = "waiting for key press...";
+        internal const string WaitingForKeyPress = "waiting for key press...";
 
         // Resolved at click time because the parent VM's recording delegate is injected
         // by the window after construction.
@@ -70,9 +70,17 @@ namespace AndroidMusicPresenceLink
 
             start(keys =>
             {
-                if (keys == null || keys.Length == 0)
+                if (keys == null)
                 {
+                    // Cancelled (e.g. window lost focus): restore what was there.
                     Text = _previousText;
+                    return;
+                }
+
+                if (keys.Length == 0)
+                {
+                    // Esc while recording: disable this hotkey (empty combo).
+                    Text = string.Empty;
                     return;
                 }
 

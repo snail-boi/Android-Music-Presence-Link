@@ -1098,7 +1098,7 @@
                     <!-- ====== HOTKEYS ====== -->
                     <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
-                            <TextBlock Text="Click Record, then hold the key combination you want (up to 5 keys, e.g. CTRL+ALT+C) and release to save. Esc cancels."
+                            <TextBlock Text="Click Record, then hold the key combination you want (up to 5 keys, e.g. CTRL+ALT+C) and release to save. Press Esc while recording to disable a hotkey."
                                    Style="{StaticResource HintTextStyle}" />
 
                             <Grid>
@@ -1268,6 +1268,105 @@
                                         Style="{StaticResource SecondaryButtonStyle}"
                                         Command="{Binding AudioQualityHotkey.ConfirmYesCommand}" />
                                     <TextBlock Text="{Binding AudioQualityHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
+                            </Grid>
+
+                            <Separator/>
+                            <CheckBox Content="Custom media keys (Direct mode)"
+                                      IsChecked="{Binding MediaKeysDirectMode, Mode=TwoWay}"
+                                      Margin="0,8,0,4"
+                                      Style="{StaticResource ToggleSwitchStyle}" />
+                            <TextBlock Text="Play/pause and next/previous are normally handled by Windows when your keyboard has media keys (SMTC mode). Enable this to bind your own keys instead - handy when your keyboard has no media keys. In Direct mode these send the command straight to the phone."
+                                   Style="{StaticResource HintTextStyle}" />
+
+                            <Grid Margin="0,4,0,0"
+                                  Visibility="{Binding MediaKeysDirectMode, Converter={StaticResource BoolToVis}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Text="Play / pause"
+                                       Grid.Row="0" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox IsReadOnly="True" Text="{Binding PlayPauseHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Grid.Row="0" Grid.Column="1"
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding PlayPauseHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <Button Grid.Row="0" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,6"
+                                    Command="{Binding PlayPauseHotkey.RecordCommand}"
+                                    Visibility="{Binding PlayPauseHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6"
+                                       Visibility="{Binding PlayPauseHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding PlayPauseHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding PlayPauseHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding PlayPauseHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
+
+                                <TextBlock Text="Next track"
+                                       Grid.Row="1" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox IsReadOnly="True" Text="{Binding NextTrackHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Grid.Row="1" Grid.Column="1"
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding NextTrackHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <Button Grid.Row="1" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,6"
+                                    Command="{Binding NextTrackHotkey.RecordCommand}"
+                                    Visibility="{Binding NextTrackHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6"
+                                       Visibility="{Binding NextTrackHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding NextTrackHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding NextTrackHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding NextTrackHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
+
+                                <TextBlock Text="Previous track"
+                                       Grid.Row="2" Grid.Column="0"
+                                       Style="{StaticResource FieldLabelStyle}" />
+                                <TextBox IsReadOnly="True" Text="{Binding PreviousTrackHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Grid.Row="2" Grid.Column="1"
+                                     Visibility="{Binding PreviousTrackHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <Button Grid.Row="2" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding PreviousTrackHotkey.RecordCommand}"
+                                    Visibility="{Binding PreviousTrackHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                                       Visibility="{Binding PreviousTrackHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding PreviousTrackHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding PreviousTrackHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding PreviousTrackHotkey.ConfirmationMessage}"
                                            VerticalAlignment="Center" TextWrapping="Wrap" />
                                 </DockPanel>
                             </Grid>

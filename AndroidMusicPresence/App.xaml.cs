@@ -84,6 +84,9 @@ namespace AndroidMusicPresenceLink
         private const int HotkeyIdToggleLyricsOverlay = 4;
         private const int HotkeyIdCopyTrackInfo = 5;
         private const int HotkeyIdAudioQuality = 6;
+        private const int HotkeyIdPlayPause = 7;
+        private const int HotkeyIdNextTrack = 8;
+        private const int HotkeyIdPreviousTrack = 9;
         private const int VkVolumeUp = 0xAF;
         private const int VkVolumeDown = 0xAE;
         private const int WmDeviceChange = 0x0219;
@@ -2016,7 +2019,7 @@ namespace AndroidMusicPresenceLink
             {
                 _hotkeyHook = new GlobalHotkeyHook(Dispatcher, OnHotkeyCombo) { Suspended = _hotkeysSuspended };
                 var none = Array.Empty<int>();
-                _hotkeyHook.SetCombos(new[]
+                var combos = new List<(int, int[])>
                 {
                     (HotkeyIdVolumeUp, HotkeyHelper.ParseCombo(Config.Hotkeys.VolumeUpKeys, none)),
                     (HotkeyIdVolumeDown, HotkeyHelper.ParseCombo(Config.Hotkeys.VolumeDownKeys, none)),
@@ -2024,7 +2027,18 @@ namespace AndroidMusicPresenceLink
                     (HotkeyIdToggleLyricsOverlay, HotkeyHelper.ParseCombo(Config.Hotkeys.ToggleLyricsOverlayKeys, none)),
                     (HotkeyIdCopyTrackInfo, HotkeyHelper.ParseCombo(Config.Hotkeys.CopyTrackInfoKeys, none)),
                     (HotkeyIdAudioQuality, HotkeyHelper.ParseCombo(Config.Hotkeys.AudioQualityKeys, none)),
-                });
+                };
+
+                // The custom media hotkeys only exist in Direct mode; in SMTC mode Windows'
+                // own media keys drive the app's media session, so we don't register them.
+                if (Config.Hotkeys.MediaKeysDirectMode)
+                {
+                    combos.Add((HotkeyIdPlayPause, HotkeyHelper.ParseCombo(Config.Hotkeys.PlayPauseKeys, none)));
+                    combos.Add((HotkeyIdNextTrack, HotkeyHelper.ParseCombo(Config.Hotkeys.NextTrackKeys, none)));
+                    combos.Add((HotkeyIdPreviousTrack, HotkeyHelper.ParseCombo(Config.Hotkeys.PreviousTrackKeys, none)));
+                }
+
+                _hotkeyHook.SetCombos(combos);
             }
             catch { }
             Debugger.show("[HOTKEY] Hotkey keyboard hook initialized.");
@@ -2080,6 +2094,18 @@ namespace AndroidMusicPresenceLink
                 case HotkeyIdAudioQuality:
                     Debugger.show("[HOTKEY] Global hotkey used: audio quality.");
                     OpenAudioQualityFromHotkey();
+                    break;
+                case HotkeyIdPlayPause:
+                    Debugger.show("[HOTKEY] Global hotkey used: play/pause (direct).");
+                    _ = PredictivePauseAsync();
+                    break;
+                case HotkeyIdNextTrack:
+                    Debugger.show("[HOTKEY] Global hotkey used: next track (direct).");
+                    _ = PredictiveNextAsync();
+                    break;
+                case HotkeyIdPreviousTrack:
+                    Debugger.show("[HOTKEY] Global hotkey used: previous track (direct).");
+                    _ = PredictivePreviousAsync();
                     break;
             }
         }

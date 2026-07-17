@@ -372,6 +372,20 @@ namespace AndroidMusicPresenceLink
         public string CopyTrackInfoKeys { get; set; } = string.Empty;
         public string AudioQualityKeys { get; set; } = string.Empty;
 
+        // Set once the legacy single-key fields have been migrated into the combo strings
+        // above. After that an empty combo means "disabled by the user" (Esc while recording)
+        // and must NOT be re-seeded from the legacy defaults on load.
+        public bool ComboHotkeysMigrated { get; set; }
+
+        // Custom media hotkeys. In SMTC mode (default) Windows' own media keys drive the app's
+        // media session, so these are unused; in Direct mode they are registered and send the
+        // play/pause/next/previous adb keyevents straight to the phone, for keyboards without
+        // dedicated media keys. Empty = unset/disabled.
+        public bool MediaKeysDirectMode { get; set; }
+        public string PlayPauseKeys { get; set; } = string.Empty;
+        public string NextTrackKeys { get; set; } = string.Empty;
+        public string PreviousTrackKeys { get; set; } = string.Empty;
+
         // Legacy format: single virtual key per hotkey plus one shared Win32 modifier flag
         // (MOD_ALT=1, MOD_CONTROL=2, MOD_SHIFT=4). Only read to migrate old configs.
         public int VolumeUp { get; set; } = 0xAF;
@@ -579,7 +593,12 @@ namespace AndroidMusicPresenceLink
                     ToggleLyricsOverlay = Hotkeys.ToggleLyricsOverlay,
                     CopyTrackInfo = Hotkeys.CopyTrackInfo,
                     AudioQuality = Hotkeys.AudioQuality,
-                    Modifier = Hotkeys.Modifier
+                    Modifier = Hotkeys.Modifier,
+                    ComboHotkeysMigrated = Hotkeys.ComboHotkeysMigrated,
+                    MediaKeysDirectMode = Hotkeys.MediaKeysDirectMode,
+                    PlayPauseKeys = Hotkeys.PlayPauseKeys,
+                    NextTrackKeys = Hotkeys.NextTrackKeys,
+                    PreviousTrackKeys = Hotkeys.PreviousTrackKeys
                 },
                 MainWindow = new MainWindowConfig
                 {
@@ -661,6 +680,14 @@ namespace AndroidMusicPresenceLink
         {
             var fallback = HotkeyHelper.ComboFromLegacy(legacyModifier, legacyKey);
             return HotkeyHelper.ComboToDisplayName(HotkeyHelper.ParseCombo(stored, fallback));
+        }
+
+        // Re-normalizes an already-migrated combo without any legacy fallback: empty (a
+        // deliberately disabled hotkey) stays empty; a valid combo is reformatted.
+        private static string NormalizeExistingCombo(string? stored)
+        {
+            if (string.IsNullOrWhiteSpace(stored)) return string.Empty;
+            return HotkeyHelper.ComboToDisplayName(HotkeyHelper.ParseCombo(stored, Array.Empty<int>()));
         }
 
         private static MusicConfig NormalizeConfig(MusicConfig config)
@@ -826,15 +853,37 @@ namespace AndroidMusicPresenceLink
             if (!allowedMods.Contains(config.Hotkeys.Modifier))
                 config.Hotkeys.Modifier = 0x0001;
 
-            // Migrate legacy modifier+key hotkeys into combo strings and normalize whatever
-            // is already stored (an unparseable combo falls back to the migrated default).
+            // One-time migration of the legacy modifier+key hotkeys into combo strings. This
+            // seeds a combo from the legacy default only while it is empty; it runs once and
+            // then sets the flag. After migration an empty combo means the user disabled it
+            // (Esc while recording), so we must not resurrect it from the legacy default —
+            // instead we only re-normalize whatever is stored (empty stays empty).
             int mod = config.Hotkeys.Modifier;
-            config.Hotkeys.VolumeUpKeys = NormalizeHotkeyCombo(config.Hotkeys.VolumeUpKeys, mod, config.Hotkeys.VolumeUp);
-            config.Hotkeys.VolumeDownKeys = NormalizeHotkeyCombo(config.Hotkeys.VolumeDownKeys, mod, config.Hotkeys.VolumeDown);
-            config.Hotkeys.ToggleScrcpyKeys = NormalizeHotkeyCombo(config.Hotkeys.ToggleScrcpyKeys, mod, config.Hotkeys.ToggleScrcpy);
-            config.Hotkeys.ToggleLyricsOverlayKeys = NormalizeHotkeyCombo(config.Hotkeys.ToggleLyricsOverlayKeys, mod, config.Hotkeys.ToggleLyricsOverlay);
-            config.Hotkeys.CopyTrackInfoKeys = NormalizeHotkeyCombo(config.Hotkeys.CopyTrackInfoKeys, mod, config.Hotkeys.CopyTrackInfo);
-            config.Hotkeys.AudioQualityKeys = NormalizeHotkeyCombo(config.Hotkeys.AudioQualityKeys, mod, config.Hotkeys.AudioQuality);
+            if (!config.Hotkeys.ComboHotkeysMigrated)
+            {
+                config.Hotkeys.VolumeUpKeys = NormalizeHotkeyCombo(config.Hotkeys.VolumeUpKeys, mod, config.Hotkeys.VolumeUp);
+                config.Hotkeys.VolumeDownKeys = NormalizeHotkeyCombo(config.Hotkeys.VolumeDownKeys, mod, config.Hotkeys.VolumeDown);
+                config.Hotkeys.ToggleScrcpyKeys = NormalizeHotkeyCombo(config.Hotkeys.ToggleScrcpyKeys, mod, config.Hotkeys.ToggleScrcpy);
+                config.Hotkeys.ToggleLyricsOverlayKeys = NormalizeHotkeyCombo(config.Hotkeys.ToggleLyricsOverlayKeys, mod, config.Hotkeys.ToggleLyricsOverlay);
+                config.Hotkeys.CopyTrackInfoKeys = NormalizeHotkeyCombo(config.Hotkeys.CopyTrackInfoKeys, mod, config.Hotkeys.CopyTrackInfo);
+                config.Hotkeys.AudioQualityKeys = NormalizeHotkeyCombo(config.Hotkeys.AudioQualityKeys, mod, config.Hotkeys.AudioQuality);
+                config.Hotkeys.ComboHotkeysMigrated = true;
+            }
+            else
+            {
+                config.Hotkeys.VolumeUpKeys = NormalizeExistingCombo(config.Hotkeys.VolumeUpKeys);
+                config.Hotkeys.VolumeDownKeys = NormalizeExistingCombo(config.Hotkeys.VolumeDownKeys);
+                config.Hotkeys.ToggleScrcpyKeys = NormalizeExistingCombo(config.Hotkeys.ToggleScrcpyKeys);
+                config.Hotkeys.ToggleLyricsOverlayKeys = NormalizeExistingCombo(config.Hotkeys.ToggleLyricsOverlayKeys);
+                config.Hotkeys.CopyTrackInfoKeys = NormalizeExistingCombo(config.Hotkeys.CopyTrackInfoKeys);
+                config.Hotkeys.AudioQualityKeys = NormalizeExistingCombo(config.Hotkeys.AudioQualityKeys);
+            }
+
+            // Media hotkeys have no legacy equivalent, so they are only ever re-normalized;
+            // empty stays empty (disabled / not yet bound).
+            config.Hotkeys.PlayPauseKeys = NormalizeExistingCombo(config.Hotkeys.PlayPauseKeys);
+            config.Hotkeys.NextTrackKeys = NormalizeExistingCombo(config.Hotkeys.NextTrackKeys);
+            config.Hotkeys.PreviousTrackKeys = NormalizeExistingCombo(config.Hotkeys.PreviousTrackKeys);
 
             var allowedGradientPoints = new[] { 2, 4, 6, 8 };
             if (!allowedGradientPoints.Contains(config.MediaPlayer.GradientSamplePoints))
