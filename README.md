@@ -90,7 +90,7 @@ If you mainly listen offline and want Discord Rich Presence without syncing your
   - Toggling the lyrics overlay
   - Copying current track info to the clipboard
   - Cycling through audio quality presets
-- Hotkey modifier is configurable (Shift, Ctrl, or Alt)
+- Hotkeys are multi-key combos of up to 5 keys (e.g. Ctrl+Alt+C, or even Ctrl+A+C), recorded by holding the keys together
 - Copy-to-clipboard template is customizable (supports `{artist}`, `{title}`, `{album}`)
 
 ### Next Song Prediction

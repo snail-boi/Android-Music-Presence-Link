@@ -1098,12 +1098,11 @@
                     <!-- ====== HOTKEYS ====== -->
                     <Expander Header="Hotkeys" IsExpanded="False" Margin="0,0,0,12" Expanded="Expander_Expanded" Collapsed="Expander_Collapsed">
                         <StackPanel>
-                            <TextBlock Text="Enter virtual-key codes (letters, function keys or common names) and pick a modifier."
+                            <TextBlock Text="Click Record, then hold the key combination you want (up to 5 keys, e.g. CTRL+ALT+C) and release to save. Esc cancels."
                                    Style="{StaticResource HintTextStyle}" />
 
                             <Grid>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -1117,98 +1116,160 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Text="Modifier"
+                                <TextBlock Text="Volume up"
                                        Grid.Row="0" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <ComboBox Grid.Row="0" Grid.Column="1"
-      Margin="0,0,0,8"
-      ItemsSource="{Binding ModifierOptions}"
-      SelectedValuePath="Value"
-      SelectedValue="{Binding SelectedModifierValue, Mode=TwoWay}">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Name}" />
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
+                                <TextBox Text="{Binding VolumeUpHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Grid.Row="0" Grid.Column="1"
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding VolumeUpHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <Button Grid.Row="0" Grid.Column="2"
+                                    Content="Record"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="90"
+                                    Margin="8,0,0,6"
+                                    Command="{Binding VolumeUpHotkey.RecordCommand}"
+                                    Visibility="{Binding VolumeUpHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6"
+                                       Visibility="{Binding VolumeUpHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding VolumeUpHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding VolumeUpHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding VolumeUpHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
 
-                                <TextBlock Text="Volume up"
+                                <TextBlock Text="Volume down"
                                        Grid.Row="1" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding HotkeyVolumeUpText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox Text="{Binding VolumeDownHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="1" Grid.Column="1"
-                                     Margin="0,0,0,6" />
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding VolumeDownHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
                                 <Button Grid.Row="1" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Command="{Binding RecordVolumeUpCommand}" />
+                                    Command="{Binding VolumeDownHotkey.RecordCommand}"
+                                    Visibility="{Binding VolumeDownHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6"
+                                       Visibility="{Binding VolumeDownHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding VolumeDownHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding VolumeDownHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding VolumeDownHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
 
-                                <TextBlock Text="Volume down"
+                                <TextBlock Text="Toggle audio link"
                                        Grid.Row="2" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding HotkeyVolumeDownText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox Text="{Binding ToggleScrcpyHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="2" Grid.Column="1"
-                                     Margin="0,0,0,6" />
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding ToggleScrcpyHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
                                 <Button Grid.Row="2" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Command="{Binding RecordVolumeDownCommand}" />
+                                    Command="{Binding ToggleScrcpyHotkey.RecordCommand}"
+                                    Visibility="{Binding ToggleScrcpyHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6"
+                                       Visibility="{Binding ToggleScrcpyHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding ToggleScrcpyHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding ToggleScrcpyHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding ToggleScrcpyHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
 
-                                <TextBlock Text="Toggle audio link"
+                                <TextBlock Text="Toggle lyrics"
                                        Grid.Row="3" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding HotkeyToggleScrcpyText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox Text="{Binding ToggleLyricsOverlayHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="3" Grid.Column="1"
-                                     Margin="0,0,0,6" />
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding ToggleLyricsOverlayHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
                                 <Button Grid.Row="3" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Command="{Binding RecordToggleScrcpyCommand}" />
+                                    Command="{Binding ToggleLyricsOverlayHotkey.RecordCommand}"
+                                    Visibility="{Binding ToggleLyricsOverlayHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6"
+                                       Visibility="{Binding ToggleLyricsOverlayHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding ToggleLyricsOverlayHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding ToggleLyricsOverlayHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding ToggleLyricsOverlayHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
 
-                                <TextBlock Text="Toggle lyrics"
+                                <TextBlock Text="Copy track info"
                                        Grid.Row="4" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding HotkeyToggleLyricsOverlayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox Text="{Binding CopyTrackInfoHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="4" Grid.Column="1"
-                                     Margin="0,0,0,6" />
+                                     Margin="0,0,0,6"
+                                     Visibility="{Binding CopyTrackInfoHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
                                 <Button Grid.Row="4" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
                                     Margin="8,0,0,6"
-                                    Command="{Binding RecordToggleLyricsOverlayCommand}" />
+                                    Command="{Binding CopyTrackInfoHotkey.RecordCommand}"
+                                    Visibility="{Binding CopyTrackInfoHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,6"
+                                       Visibility="{Binding CopyTrackInfoHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding CopyTrackInfoHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding CopyTrackInfoHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding CopyTrackInfoHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
 
-                                <TextBlock Text="Copy track info"
+                                <TextBlock Text="Audio quality"
                                        Grid.Row="5" Grid.Column="0"
                                        Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding HotkeyCopyTrackInfoText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <TextBox Text="{Binding AudioQualityHotkey.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Grid.Row="5" Grid.Column="1"
-                                     Margin="0,0,0,6" />
+                                     Visibility="{Binding AudioQualityHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
                                 <Button Grid.Row="5" Grid.Column="2"
                                     Content="Record"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="90"
-                                    Margin="8,0,0,6"
-                                    Command="{Binding RecordCopyTrackInfoCommand}" />
-                                
-
-                                <TextBlock Text="Audio quality"
-                                       Grid.Row="6" Grid.Column="0"
-                                       Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Text="{Binding HotkeyAudioQualityText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     Grid.Row="6" Grid.Column="1" />
-                                <Button Grid.Row="6" Grid.Column="2"
-                                    Content="Record"
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    Width="90"
                                     Margin="8,0,0,0"
-                                    Command="{Binding RecordAudioQualityCommand}" />
+                                    Command="{Binding AudioQualityHotkey.RecordCommand}"
+                                    Visibility="{Binding AudioQualityHotkey.IsEditorVisible, Converter={StaticResource BoolToVis}}" />
+                                <DockPanel Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2"
+                                       Visibility="{Binding AudioQualityHotkey.IsConfirming, Converter={StaticResource BoolToVis}}">
+                                    <Button DockPanel.Dock="Right" Content="No" Width="50" Margin="4,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding AudioQualityHotkey.ConfirmNoCommand}" />
+                                    <Button DockPanel.Dock="Right" Content="Yes" Width="50" Margin="8,0,0,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding AudioQualityHotkey.ConfirmYesCommand}" />
+                                    <TextBlock Text="{Binding AudioQualityHotkey.ConfirmationMessage}"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
                             </Grid>
 
                             <Separator/>

@@ -42,44 +42,42 @@ namespace AndroidMusicPresenceLink
             }
             else
             {
-                // No scrcpy audio session: fall back to the phone's own volume (read over
-                // ADB, cached so this stays synchronous). Unknown -> High, like before.
+                // No scrcpy audio session: fall back to the last known phone volume.
+                // This renders from cache only — no ADB here. The cache is updated by
+                // explicit events: window load, device connect, opening the volume
+                // popup, and volume changes made through this window.
                 level = _lastKnownPhoneVolumeRatio >= 0f
                     ? LevelFromVolume(_lastKnownPhoneVolumeRatio)
                     : VolumeIconLevel.High;
-                KickPhoneVolumeRefresh();
             }
 
             BtnVolume.Content = BuildVolumeIcon(iconBrush, auxIconSize, level);
         }
 
         /// <summary>
-        /// Refreshes the cached phone volume in the background so the glyph tracks the
-        /// device's real volume while scrcpy audio is unavailable. Throttled (unless
-        /// forced) because each read is an ADB dumpsys round-trip; re-renders the icon
-        /// when the value comes back. UI thread only.
+        /// One-shot background read of the phone volume to update the cached level and
+        /// re-render the glyph. Call only on explicit events (window load, device
+        /// connect, after a volume keypress) — each call is an ADB dumpsys round-trip,
+        /// so this must never sit on a periodic path. UI thread only.
         /// </summary>
-        private async void KickPhoneVolumeRefresh(bool force = false)
+        private async void KickPhoneVolumeRefresh()
         {
             if (_getPhoneVolume == null || _phoneVolumeFetchInFlight)
                 return;
             if (_isScrcpyAudioAvailable?.Invoke() == true)
-                return;
-            if (!force && DateTime.UtcNow - _lastPhoneVolumeFetchUtc < PhoneVolumeRefreshInterval)
                 return;
 
             _phoneVolumeFetchInFlight = true;
             try
             {
                 var (current, max) = await _getPhoneVolume().ConfigureAwait(true);
-                _lastPhoneVolumeFetchUtc = DateTime.UtcNow;
                 if (current >= 0 && max > 0)
                 {
                     float ratio = Math.Clamp(current / (float)max, 0f, 1f);
                     if (ratio != _lastKnownPhoneVolumeRatio)
                     {
                         _lastKnownPhoneVolumeRatio = ratio;
-                        RefreshVolumeIcon(); // throttle stops this from re-fetching
+                        RefreshVolumeIcon();
                     }
                 }
             }
@@ -151,10 +149,7 @@ namespace AndroidMusicPresenceLink
             _lastPhoneVolumeMax = max > 0 ? max : 15;
             _lastSentPhoneVolumeIndex = current;
             if (current >= 0)
-            {
                 _lastKnownPhoneVolumeRatio = Math.Clamp(current / (float)_lastPhoneVolumeMax, 0f, 1f);
-                _lastPhoneVolumeFetchUtc = DateTime.UtcNow;
-            }
 
             _suppressVolumeSliderEcho = true;
             try
@@ -210,14 +205,14 @@ namespace AndroidMusicPresenceLink
             // The step may have gone to the phone via ADB keyevent; give it a moment
             // to land, then re-read so the glyph reflects the new level.
             await Task.Delay(600);
-            KickPhoneVolumeRefresh(force: true);
+            KickPhoneVolumeRefresh();
         }
         private async void BtnVolumeUp_Click(object sender, RoutedEventArgs e)
         {
             _stepVolume?.Invoke(true);
             RefreshVolumeIcon();
             await Task.Delay(600);
-            KickPhoneVolumeRefresh(force: true);
+            KickPhoneVolumeRefresh();
         }
 
         private async void BtnSeekBack_Click(object sender, RoutedEventArgs e)

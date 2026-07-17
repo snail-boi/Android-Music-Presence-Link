@@ -362,6 +362,18 @@ namespace AndroidMusicPresenceLink
 
     public class HotkeysConfig
     {
+        // Each hotkey is a combo string like "CTRL+ALT+C": up to 5 keys, modifiers included.
+        // Empty means "not yet migrated" from the legacy fields below; MusicConfigManager
+        // seeds them from Modifier + the single-key fields on load.
+        public string VolumeUpKeys { get; set; } = string.Empty;
+        public string VolumeDownKeys { get; set; } = string.Empty;
+        public string ToggleScrcpyKeys { get; set; } = string.Empty;
+        public string ToggleLyricsOverlayKeys { get; set; } = string.Empty;
+        public string CopyTrackInfoKeys { get; set; } = string.Empty;
+        public string AudioQualityKeys { get; set; } = string.Empty;
+
+        // Legacy format: single virtual key per hotkey plus one shared Win32 modifier flag
+        // (MOD_ALT=1, MOD_CONTROL=2, MOD_SHIFT=4). Only read to migrate old configs.
         public int VolumeUp { get; set; } = 0xAF;
         public int VolumeDown { get; set; } = 0xAE;
         public int ToggleScrcpy { get; set; } = 0x53;
@@ -555,6 +567,12 @@ namespace AndroidMusicPresenceLink
                 },
                 Hotkeys = new HotkeysConfig
                 {
+                    VolumeUpKeys = Hotkeys.VolumeUpKeys,
+                    VolumeDownKeys = Hotkeys.VolumeDownKeys,
+                    ToggleScrcpyKeys = Hotkeys.ToggleScrcpyKeys,
+                    ToggleLyricsOverlayKeys = Hotkeys.ToggleLyricsOverlayKeys,
+                    CopyTrackInfoKeys = Hotkeys.CopyTrackInfoKeys,
+                    AudioQualityKeys = Hotkeys.AudioQualityKeys,
                     VolumeUp = Hotkeys.VolumeUp,
                     VolumeDown = Hotkeys.VolumeDown,
                     ToggleScrcpy = Hotkeys.ToggleScrcpy,
@@ -637,6 +655,12 @@ namespace AndroidMusicPresenceLink
             {
                 Debugger.show("Failed to save music config: " + ex.Message);
             }
+        }
+
+        private static string NormalizeHotkeyCombo(string? stored, int legacyModifier, int legacyKey)
+        {
+            var fallback = HotkeyHelper.ComboFromLegacy(legacyModifier, legacyKey);
+            return HotkeyHelper.ComboToDisplayName(HotkeyHelper.ParseCombo(stored, fallback));
         }
 
         private static MusicConfig NormalizeConfig(MusicConfig config)
@@ -784,6 +808,7 @@ namespace AndroidMusicPresenceLink
             if (config.MediaPlayer.BatteryPollIntervalSeconds < 5)
                 config.MediaPlayer.BatteryPollIntervalSeconds = 150;
 
+            // Legacy single-key fields are only clamped so they seed sane combo strings below.
             if (config.Hotkeys.VolumeUp < 0 || config.Hotkeys.VolumeUp > 0xFF)
                 config.Hotkeys.VolumeUp = 0xAF;
             if (config.Hotkeys.VolumeDown < 0 || config.Hotkeys.VolumeDown > 0xFF)
@@ -800,6 +825,16 @@ namespace AndroidMusicPresenceLink
             var allowedMods = new[] { 0x0001, 0x0002, 0x0004 };
             if (!allowedMods.Contains(config.Hotkeys.Modifier))
                 config.Hotkeys.Modifier = 0x0001;
+
+            // Migrate legacy modifier+key hotkeys into combo strings and normalize whatever
+            // is already stored (an unparseable combo falls back to the migrated default).
+            int mod = config.Hotkeys.Modifier;
+            config.Hotkeys.VolumeUpKeys = NormalizeHotkeyCombo(config.Hotkeys.VolumeUpKeys, mod, config.Hotkeys.VolumeUp);
+            config.Hotkeys.VolumeDownKeys = NormalizeHotkeyCombo(config.Hotkeys.VolumeDownKeys, mod, config.Hotkeys.VolumeDown);
+            config.Hotkeys.ToggleScrcpyKeys = NormalizeHotkeyCombo(config.Hotkeys.ToggleScrcpyKeys, mod, config.Hotkeys.ToggleScrcpy);
+            config.Hotkeys.ToggleLyricsOverlayKeys = NormalizeHotkeyCombo(config.Hotkeys.ToggleLyricsOverlayKeys, mod, config.Hotkeys.ToggleLyricsOverlay);
+            config.Hotkeys.CopyTrackInfoKeys = NormalizeHotkeyCombo(config.Hotkeys.CopyTrackInfoKeys, mod, config.Hotkeys.CopyTrackInfo);
+            config.Hotkeys.AudioQualityKeys = NormalizeHotkeyCombo(config.Hotkeys.AudioQualityKeys, mod, config.Hotkeys.AudioQuality);
 
             var allowedGradientPoints = new[] { 2, 4, 6, 8 };
             if (!allowedGradientPoints.Contains(config.MediaPlayer.GradientSamplePoints))

@@ -11,7 +11,7 @@ namespace AndroidMusicPresenceLink
     ///
     ///   IOnboardingInteraction : the pairing dialog, the name prompt, and the message boxes.
     ///   PickRemoteFolder        : opening the RemoteFolderPicker dialog.
-    ///   StartHotkeyRecording    : capturing a single key press at the window level.
+    ///   StartHotkeyRecording    : capturing a held key combination at the window level.
     ///
     /// It sets the DataContext, hands those seams to the VM, exposes UpdatedConfig, and closes
     /// the dialog when the VM asks. The constructor and UpdatedConfig are unchanged, so
@@ -21,10 +21,7 @@ namespace AndroidMusicPresenceLink
     {
         private readonly OnboardingViewModel _vm;
 
-        // Hotkey capture state. Recording a key is a window-level keyboard concern, so it
-        // stays here rather than in the ViewModel.
-        private bool _isRecordingHotkey;
-        private Action<int>? _onHotkeyRecorded;
+        private readonly HotkeyRecorder _hotkeyRecorder = new HotkeyRecorder();
 
         public MusicConfig UpdatedConfig => _vm.UpdatedConfig;
 
@@ -91,59 +88,9 @@ namespace AndroidMusicPresenceLink
 
         // ── Hotkey key capture (view concern) ─────────────────────────────────
 
-        private void StartRecordingHotkey(Action<int> onRecorded)
+        private void StartRecordingHotkey(Action<int[]?> onRecorded)
         {
-            if (_isRecordingHotkey)
-                return;
-
-            _isRecordingHotkey = true;
-            _onHotkeyRecorded = onRecorded;
-            Title = "Press a key to record hotkey (Esc to cancel)...";
-            Focus();
-            PreviewKeyDown += Recording_PreviewKeyDown;
-            Deactivated += Recording_Deactivated;
-        }
-
-        private void StopRecordingHotkey()
-        {
-            if (!_isRecordingHotkey)
-                return;
-
-            _isRecordingHotkey = false;
-            _onHotkeyRecorded = null;
-            Title = "Welcome to Android Music Presence";
-            PreviewKeyDown -= Recording_PreviewKeyDown;
-            Deactivated -= Recording_Deactivated;
-        }
-
-        private void Recording_Deactivated(object? sender, EventArgs e)
-        {
-            StopRecordingHotkey();
-        }
-
-        private void Recording_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            try
-            {
-                if (!_isRecordingHotkey) return;
-
-                e.Handled = true;
-
-                if (e.Key == Key.Escape)
-                {
-                    StopRecordingHotkey();
-                    return;
-                }
-
-                var key = e.Key == Key.System ? e.SystemKey : e.Key;
-                var vk = KeyInterop.VirtualKeyFromKey(key) & 0xFF;
-                _onHotkeyRecorded?.Invoke(vk);
-                StopRecordingHotkey();
-            }
-            catch
-            {
-                StopRecordingHotkey();
-            }
+            _hotkeyRecorder.Start(this, onRecorded);
         }
     }
 }

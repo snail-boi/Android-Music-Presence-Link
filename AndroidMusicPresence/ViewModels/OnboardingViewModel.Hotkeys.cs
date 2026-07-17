@@ -3,114 +3,61 @@ using System.Collections.Generic;
 
 namespace AndroidMusicPresenceLink
 {
-    /// <summary>One selectable hotkey modifier (Alt/Ctrl/Shift) with its Win32 modifier value.</summary>
-    internal sealed class HotkeyModifierOption
-    {
-        public string Name { get; }
-        public int Value { get; }
-
-        public HotkeyModifierOption(string name, int value)
-        {
-            Name = name;
-            Value = value;
-        }
-    }
-
     /// <summary>
     /// Hotkeys step plus the small Startup step (folded in here rather than a sixth file).
     ///
-    /// Each hotkey is shown as a display string. Recording a key is a keyboard-capture job that
-    /// belongs to the window, so the view supplies it through the injected StartHotkeyRecording
-    /// delegate: the VM hands over a callback that applies the captured virtual-key to the right
-    /// hotkey, and the view performs the actual capture and invokes it.
+    /// Each hotkey is a <see cref="HotkeyFieldViewModel"/> row holding a combo string like
+    /// "CTRL+ALT+C" (up to 5 keys). Recording is a keyboard-capture job that belongs to the
+    /// window, so the view supplies it through the injected StartHotkeyRecording delegate;
+    /// the row VMs handle the waiting placeholder and inline no-modifier confirmation.
     /// </summary>
     internal sealed partial class OnboardingViewModel
     {
-        // Set by the view. Begins key capture; when a key is pressed the view calls back the
-        // supplied action with the virtual-key code.
-        public Action<Action<int>>? StartHotkeyRecording { get; set; }
+        // Set by the view. Begins key capture; the view calls back with the held virtual-key
+        // codes in press order, or null when the recording was cancelled.
+        public Action<Action<int[]?>>? StartHotkeyRecording { get; set; }
 
-        // ── Hotkey display strings ──────────────────────────────────────────────
-
-        private string _hotkeyVolumeUpText = string.Empty;
-        public string HotkeyVolumeUpText { get => _hotkeyVolumeUpText; set => Set(ref _hotkeyVolumeUpText, value); }
-
-        private string _hotkeyVolumeDownText = string.Empty;
-        public string HotkeyVolumeDownText { get => _hotkeyVolumeDownText; set => Set(ref _hotkeyVolumeDownText, value); }
-
-        private string _hotkeyToggleScrcpyText = string.Empty;
-        public string HotkeyToggleScrcpyText { get => _hotkeyToggleScrcpyText; set => Set(ref _hotkeyToggleScrcpyText, value); }
-
-        private string _hotkeyToggleLyricsOverlayText = string.Empty;
-        public string HotkeyToggleLyricsOverlayText { get => _hotkeyToggleLyricsOverlayText; set => Set(ref _hotkeyToggleLyricsOverlayText, value); }
-
-        private string _hotkeyCopyTrackInfoText = string.Empty;
-        public string HotkeyCopyTrackInfoText { get => _hotkeyCopyTrackInfoText; set => Set(ref _hotkeyCopyTrackInfoText, value); }
-
-        private string _hotkeyAudioQualityText = string.Empty;
-        public string HotkeyAudioQualityText { get => _hotkeyAudioQualityText; set => Set(ref _hotkeyAudioQualityText, value); }
-
-        // ── Modifier ────────────────────────────────────────────────────────────
-
-        public IReadOnlyList<HotkeyModifierOption> ModifierOptions { get; } = new[]
-        {
-            new HotkeyModifierOption("Alt", 1),
-            new HotkeyModifierOption("Ctrl", 2),
-            new HotkeyModifierOption("Shift", 4),
-        };
-
-        private int _selectedModifierValue = 1;
-        public int SelectedModifierValue
-        {
-            get => _selectedModifierValue;
-            set => Set(ref _selectedModifierValue, value);
-        }
-
-        // ── Record commands ─────────────────────────────────────────────────────
-
-        public RelayCommand RecordVolumeUpCommand { get; private set; } = null!;
-        public RelayCommand RecordVolumeDownCommand { get; private set; } = null!;
-        public RelayCommand RecordToggleScrcpyCommand { get; private set; } = null!;
-        public RelayCommand RecordToggleLyricsOverlayCommand { get; private set; } = null!;
-        public RelayCommand RecordCopyTrackInfoCommand { get; private set; } = null!;
-        public RelayCommand RecordAudioQualityCommand { get; private set; } = null!;
+        public HotkeyFieldViewModel VolumeUpHotkey { get; private set; } = null!;
+        public HotkeyFieldViewModel VolumeDownHotkey { get; private set; } = null!;
+        public HotkeyFieldViewModel ToggleScrcpyHotkey { get; private set; } = null!;
+        public HotkeyFieldViewModel ToggleLyricsOverlayHotkey { get; private set; } = null!;
+        public HotkeyFieldViewModel CopyTrackInfoHotkey { get; private set; } = null!;
+        public HotkeyFieldViewModel AudioQualityHotkey { get; private set; } = null!;
 
         private void InitHotkeys()
         {
-            RecordVolumeUpCommand = new RelayCommand(() =>
-                StartHotkeyRecording?.Invoke(vk => HotkeyVolumeUpText = HotkeyHelper.VirtualKeyToDisplayName(vk)));
-            RecordVolumeDownCommand = new RelayCommand(() =>
-                StartHotkeyRecording?.Invoke(vk => HotkeyVolumeDownText = HotkeyHelper.VirtualKeyToDisplayName(vk)));
-            RecordToggleScrcpyCommand = new RelayCommand(() =>
-                StartHotkeyRecording?.Invoke(vk => HotkeyToggleScrcpyText = HotkeyHelper.VirtualKeyToDisplayName(vk)));
-            RecordToggleLyricsOverlayCommand = new RelayCommand(() =>
-                StartHotkeyRecording?.Invoke(vk => HotkeyToggleLyricsOverlayText = HotkeyHelper.VirtualKeyToDisplayName(vk)));
-            RecordCopyTrackInfoCommand = new RelayCommand(() =>
-                StartHotkeyRecording?.Invoke(vk => HotkeyCopyTrackInfoText = HotkeyHelper.VirtualKeyToDisplayName(vk)));
-            RecordAudioQualityCommand = new RelayCommand(() =>
-                StartHotkeyRecording?.Invoke(vk => HotkeyAudioQualityText = HotkeyHelper.VirtualKeyToDisplayName(vk)));
+            VolumeUpHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
+            VolumeDownHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
+            ToggleScrcpyHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
+            ToggleLyricsOverlayHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
+            CopyTrackInfoHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
+            AudioQualityHotkey = new HotkeyFieldViewModel(() => StartHotkeyRecording);
 
-            _hotkeyVolumeUpText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.VolumeUp);
-            _hotkeyVolumeDownText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.VolumeDown);
-            _hotkeyToggleScrcpyText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.ToggleScrcpy);
-            _hotkeyToggleLyricsOverlayText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.ToggleLyricsOverlay);
-            _hotkeyCopyTrackInfoText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.CopyTrackInfo);
-            _hotkeyAudioQualityText = HotkeyHelper.VirtualKeyToDisplayName(_workingConfig.Hotkeys.AudioQuality);
-
-            int mod = _workingConfig.Hotkeys.Modifier;
-            _selectedModifierValue = (mod == 1 || mod == 2 || mod == 4) ? mod : 1;
+            VolumeUpHotkey.SetFromConfig(_workingConfig.Hotkeys.VolumeUpKeys);
+            VolumeDownHotkey.SetFromConfig(_workingConfig.Hotkeys.VolumeDownKeys);
+            ToggleScrcpyHotkey.SetFromConfig(_workingConfig.Hotkeys.ToggleScrcpyKeys);
+            ToggleLyricsOverlayHotkey.SetFromConfig(_workingConfig.Hotkeys.ToggleLyricsOverlayKeys);
+            CopyTrackInfoHotkey.SetFromConfig(_workingConfig.Hotkeys.CopyTrackInfoKeys);
+            AudioQualityHotkey.SetFromConfig(_workingConfig.Hotkeys.AudioQualityKeys);
         }
 
         private void CommitHotkeysToConfig()
         {
-            _workingConfig.Hotkeys.VolumeUp = HotkeyHelper.ParseVirtualKey(HotkeyVolumeUpText.Trim(), _workingConfig.Hotkeys.VolumeUp);
-            _workingConfig.Hotkeys.VolumeDown = HotkeyHelper.ParseVirtualKey(HotkeyVolumeDownText.Trim(), _workingConfig.Hotkeys.VolumeDown);
-            _workingConfig.Hotkeys.ToggleScrcpy = HotkeyHelper.ParseVirtualKey(HotkeyToggleScrcpyText.Trim(), _workingConfig.Hotkeys.ToggleScrcpy);
-            _workingConfig.Hotkeys.ToggleLyricsOverlay = HotkeyHelper.ParseVirtualKey(HotkeyToggleLyricsOverlayText.Trim(), _workingConfig.Hotkeys.ToggleLyricsOverlay);
-            _workingConfig.Hotkeys.CopyTrackInfo = HotkeyHelper.ParseVirtualKey(HotkeyCopyTrackInfoText.Trim(), _workingConfig.Hotkeys.CopyTrackInfo);
-            _workingConfig.Hotkeys.AudioQuality = HotkeyHelper.ParseVirtualKey(HotkeyAudioQualityText.Trim(), _workingConfig.Hotkeys.AudioQuality);
+            _workingConfig.Hotkeys.VolumeUpKeys = NormalizeComboText(VolumeUpHotkey.Text, _workingConfig.Hotkeys.VolumeUpKeys);
+            _workingConfig.Hotkeys.VolumeDownKeys = NormalizeComboText(VolumeDownHotkey.Text, _workingConfig.Hotkeys.VolumeDownKeys);
+            _workingConfig.Hotkeys.ToggleScrcpyKeys = NormalizeComboText(ToggleScrcpyHotkey.Text, _workingConfig.Hotkeys.ToggleScrcpyKeys);
+            _workingConfig.Hotkeys.ToggleLyricsOverlayKeys = NormalizeComboText(ToggleLyricsOverlayHotkey.Text, _workingConfig.Hotkeys.ToggleLyricsOverlayKeys);
+            _workingConfig.Hotkeys.CopyTrackInfoKeys = NormalizeComboText(CopyTrackInfoHotkey.Text, _workingConfig.Hotkeys.CopyTrackInfoKeys);
+            _workingConfig.Hotkeys.AudioQualityKeys = NormalizeComboText(AudioQualityHotkey.Text, _workingConfig.Hotkeys.AudioQualityKeys);
+        }
 
-            _workingConfig.Hotkeys.Modifier = SelectedModifierValue;
+        // Re-parses whatever the field holds (recorded or hand-typed); anything invalid,
+        // including the waiting placeholder, falls back to the previously saved combo.
+        private static string NormalizeComboText(string text, string previousCombo)
+        {
+            var fallback = HotkeyHelper.ParseCombo(previousCombo, Array.Empty<int>());
+            var keys = HotkeyHelper.ParseCombo(text?.Trim(), fallback);
+            return keys.Length == 0 ? (previousCombo ?? string.Empty) : HotkeyHelper.ComboToDisplayName(keys);
         }
 
         // ── Startup step ──────────────────────────────────────────────────────

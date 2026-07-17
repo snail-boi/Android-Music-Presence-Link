@@ -9,7 +9,7 @@ namespace AndroidMusicPresenceLink
     ///   OnboardingViewModel.Device    : USB/Wi-Fi connection, auto-detect, pairing
     ///   OnboardingViewModel.Folders   : music remote roots and lyrics folder
     ///   OnboardingViewModel.Apps      : allowed apps list
-    ///   OnboardingViewModel.Hotkeys   : hotkey recording and modifier
+    ///   OnboardingViewModel.Hotkeys   : hotkey combo recording
     ///
     /// It is internal because it exposes AppPackageItem (an internal shared type).
     ///

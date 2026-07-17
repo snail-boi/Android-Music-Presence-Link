@@ -52,13 +52,12 @@ namespace AndroidMusicPresenceLink
         private int _lastSentPhoneVolumeIndex = -1;
         private int _lastPhoneVolumeMax = 15;
         private bool _suppressVolumeSliderEcho;
-        // Cached phone volume (0..1, -1 = unknown) so the volume glyph can track the
-        // device's real volume when no scrcpy audio session exists. Refreshed via a
-        // throttled background ADB read; only touched on the UI thread.
+        // Cached phone volume (0..1, -1 = unknown) so the volume glyph can show the
+        // device's real volume when no scrcpy audio session exists. Never polled:
+        // updated only on explicit events (window load, device connect, popup open,
+        // volume changes made here). UI thread only.
         private float _lastKnownPhoneVolumeRatio = -1f;
-        private DateTime _lastPhoneVolumeFetchUtc = DateTime.MinValue;
         private bool _phoneVolumeFetchInFlight;
-        private static readonly TimeSpan PhoneVolumeRefreshInterval = TimeSpan.FromSeconds(10);
         private string? _currentCoverPath;
         private string? _lastGradientSourcePath;
         private bool? _lastIdleIsDark;
@@ -210,6 +209,7 @@ namespace AndroidMusicPresenceLink
             {
                 ClampSettingsColumnWidth();
                 RefreshVolumeIcon();
+                KickPhoneVolumeRefresh(); // one-shot read so the glyph starts accurate
                 UpdateGradientClip();
                 RefreshConnectionButton();
                 RefreshAudioQualityButton();
@@ -748,9 +748,13 @@ namespace AndroidMusicPresenceLink
             RefreshConnectionButton();
 
             // Fire an immediate battery poll the first time a device becomes reachable
-            // so the icon isn't blank until the 2.5-minute timer ticks.
+            // so the icon isn't blank until the 2.5-minute timer ticks. Same moment is
+            // the one-shot phone-volume read for the volume glyph.
             if (isConnected && wasDisconnected)
+            {
                 _ = PollBatteryAsync();
+                KickPhoneVolumeRefresh();
+            }
         }
 
         // ── Player settings pane (right side) ────────────────────────────────

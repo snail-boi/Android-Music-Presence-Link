@@ -63,6 +63,18 @@ namespace AndroidMusicPresenceLink
         private NextSongManager _nextSongManager = new NextSongManager();
         private SubsonicSongListManager _subsonicSongList = new SubsonicSongListManager();
         private HwndSource? _hotkeySource;
+        private GlobalHotkeyHook? _hotkeyHook;
+        private bool _hotkeysSuspended;
+
+        // Recording a new hotkey must see every key, including ones that are already
+        // registered combos (e.g. re-recording ALT+VOLUME_UP), so the recorder suspends
+        // global matching for the duration. Sticky across hook re-initialization.
+        internal void SetHotkeysSuspended(bool suspended)
+        {
+            _hotkeysSuspended = suspended;
+            if (_hotkeyHook != null)
+                _hotkeyHook.Suspended = suspended;
+        }
         private NotificationToastManager? _toastManager;
         private const string StartupRunValueName = "AndroidMusicPresenceLink";
 
@@ -72,10 +84,8 @@ namespace AndroidMusicPresenceLink
         private const int HotkeyIdToggleLyricsOverlay = 4;
         private const int HotkeyIdCopyTrackInfo = 5;
         private const int HotkeyIdAudioQuality = 6;
-        private const int ModShift = 0x0004;
         private const int VkVolumeUp = 0xAF;
         private const int VkVolumeDown = 0xAE;
-        private const int WmHotkey = 0x0312;
         private const int WmDeviceChange = 0x0219;
         private const int DbtDevnodesChanged = 0x0007;
         private const int DbtDeviceArrival = 0x8000;
@@ -1984,6 +1994,12 @@ namespace AndroidMusicPresenceLink
 
         private void InitializeHotkeys()
         {
+            // UpdateConfig can run before or between init calls (e.g. the media player
+            // persisting runtime state during startup); tear down any live hook first so
+            // a double-init never leaks an installed keyboard hook.
+            DisposeHotkeys();
+
+            // The message-only sink is still needed for WM_DEVICECHANGE broadcasts.
             var parameters = new HwndSourceParameters("HotkeySink")
             {
                 Width = 0,
@@ -1992,16 +2008,26 @@ namespace AndroidMusicPresenceLink
             };
 
             _hotkeySource = new HwndSource(parameters);
-            _hotkeySource.AddHook(HotkeyHook);
+            _hotkeySource.AddHook(DeviceChangeHook);
 
-            // Register Shift + configured keys. Use try/catch to avoid crashing if registration fails.
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp, Config.Hotkeys.Modifier, Config.Hotkeys.VolumeUp); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown, Config.Hotkeys.Modifier, Config.Hotkeys.VolumeDown); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy, Config.Hotkeys.Modifier, Config.Hotkeys.ToggleScrcpy); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay, Config.Hotkeys.Modifier, Config.Hotkeys.ToggleLyricsOverlay); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo, Config.Hotkeys.Modifier, Config.Hotkeys.CopyTrackInfo); } catch { }
-            try { RegisterHotKey(_hotkeySource.Handle, HotkeyIdAudioQuality, Config.Hotkeys.Modifier, Config.Hotkeys.AudioQuality); } catch { }
-            Debugger.show($"[HOTKEY] Hotkeys initialized with modifier 0x{Config.Hotkeys.Modifier:X}.");
+            // Hotkeys are multi-key combos (e.g. CTRL+A+C), which RegisterHotKey can't
+            // express, so a low-level keyboard hook matches them against held keys.
+            try
+            {
+                _hotkeyHook = new GlobalHotkeyHook(Dispatcher, OnHotkeyCombo) { Suspended = _hotkeysSuspended };
+                var none = Array.Empty<int>();
+                _hotkeyHook.SetCombos(new[]
+                {
+                    (HotkeyIdVolumeUp, HotkeyHelper.ParseCombo(Config.Hotkeys.VolumeUpKeys, none)),
+                    (HotkeyIdVolumeDown, HotkeyHelper.ParseCombo(Config.Hotkeys.VolumeDownKeys, none)),
+                    (HotkeyIdToggleScrcpy, HotkeyHelper.ParseCombo(Config.Hotkeys.ToggleScrcpyKeys, none)),
+                    (HotkeyIdToggleLyricsOverlay, HotkeyHelper.ParseCombo(Config.Hotkeys.ToggleLyricsOverlayKeys, none)),
+                    (HotkeyIdCopyTrackInfo, HotkeyHelper.ParseCombo(Config.Hotkeys.CopyTrackInfoKeys, none)),
+                    (HotkeyIdAudioQuality, HotkeyHelper.ParseCombo(Config.Hotkeys.AudioQualityKeys, none)),
+                });
+            }
+            catch { }
+            Debugger.show("[HOTKEY] Hotkey keyboard hook initialized.");
         }
 
         private void UpdateTrayAudioSettings()
@@ -2015,60 +2041,52 @@ namespace AndroidMusicPresenceLink
 
         private void DisposeHotkeys()
         {
+            _hotkeyHook?.Dispose();
+            _hotkeyHook = null;
+
             if (_hotkeySource != null)
             {
-                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeUp);
-                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdVolumeDown);
-                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleScrcpy);
-                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdToggleLyricsOverlay);
-                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdCopyTrackInfo);
-                UnregisterHotKey(_hotkeySource.Handle, HotkeyIdAudioQuality);
-                _hotkeySource.RemoveHook(HotkeyHook);
+                _hotkeySource.RemoveHook(DeviceChangeHook);
                 _hotkeySource.Dispose();
                 _hotkeySource = null;
             }
         }
 
-        private IntPtr HotkeyHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        private void OnHotkeyCombo(int id)
         {
-            if (msg == WmHotkey)
+            switch (id)
             {
-                int id = wParam.ToInt32();
-                switch (id)
-                {
-                    case HotkeyIdVolumeUp:
-                        Debugger.show("[HOTKEY] Global hotkey used: volume up.");
-                        HandleVolumeHotkey(up: true);
-                        handled = true;
-                        break;
-                    case HotkeyIdVolumeDown:
-                        Debugger.show("[HOTKEY] Global hotkey used: volume down.");
-                        HandleVolumeHotkey(up: false);
-                        handled = true;
-                        break;
-                    case HotkeyIdToggleScrcpy:
-                        Debugger.show("[HOTKEY] Global hotkey used: toggle scrcpy.");
-                        ToggleScrcpyNoAudio();
-                        handled = true;
-                        break;
-                    case HotkeyIdToggleLyricsOverlay:
-                        Debugger.show("[HOTKEY] Global hotkey used: toggle lyrics overlay.");
-                        _lyricsOverlayManager?.ToggleVisibility();
-                        ShowToast(_lyricsOverlayManager?.IsOverlayVisible == true ? "Lyrics overlay on" : "Lyrics overlay off");
-                        handled = true;
-                        break;
-                    case HotkeyIdCopyTrackInfo:
-                        Debugger.show("[HOTKEY] Global hotkey used: copy track info.");
-                        handled = TryCopyCurrentTrackInfoToClipboard();
-                        break;
-                    case HotkeyIdAudioQuality:
-                        Debugger.show("[HOTKEY] Global hotkey used: audio quality.");
-                        OpenAudioQualityFromHotkey();
-                        handled = true;
-                        break;
-                }
+                case HotkeyIdVolumeUp:
+                    Debugger.show("[HOTKEY] Global hotkey used: volume up.");
+                    HandleVolumeHotkey(up: true);
+                    break;
+                case HotkeyIdVolumeDown:
+                    Debugger.show("[HOTKEY] Global hotkey used: volume down.");
+                    HandleVolumeHotkey(up: false);
+                    break;
+                case HotkeyIdToggleScrcpy:
+                    Debugger.show("[HOTKEY] Global hotkey used: toggle scrcpy.");
+                    ToggleScrcpyNoAudio();
+                    break;
+                case HotkeyIdToggleLyricsOverlay:
+                    Debugger.show("[HOTKEY] Global hotkey used: toggle lyrics overlay.");
+                    _lyricsOverlayManager?.ToggleVisibility();
+                    ShowToast(_lyricsOverlayManager?.IsOverlayVisible == true ? "Lyrics overlay on" : "Lyrics overlay off");
+                    break;
+                case HotkeyIdCopyTrackInfo:
+                    Debugger.show("[HOTKEY] Global hotkey used: copy track info.");
+                    TryCopyCurrentTrackInfoToClipboard();
+                    break;
+                case HotkeyIdAudioQuality:
+                    Debugger.show("[HOTKEY] Global hotkey used: audio quality.");
+                    OpenAudioQualityFromHotkey();
+                    break;
             }
-            else if (msg == WmDeviceChange)
+        }
+
+        private IntPtr DeviceChangeHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WmDeviceChange)
             {
                 // A change to the USB device tree. DBT_DEVNODES_CHANGED fires for
                 // any plug/unplug without us registering for notifications. Ask the
@@ -2293,12 +2311,6 @@ namespace AndroidMusicPresenceLink
                 return false;
             }
         }
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool RegisterHotKey(IntPtr hWnd, int id, int fsModifiers, int vk);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
         // ── Next / Previous song ──────────────────────────────────────────────
 

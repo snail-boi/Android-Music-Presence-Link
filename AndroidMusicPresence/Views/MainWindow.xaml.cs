@@ -25,9 +25,7 @@ namespace AndroidMusicPresenceLink
         private bool _allowClose;
         private bool _appsManagerOpen;
 
-        // Hotkey capture state (window keyboard concern).
-        private bool _isRecordingHotkey;
-        private Action<int>? _onHotkeyRecorded;
+        private readonly HotkeyRecorder _hotkeyRecorder = new HotkeyRecorder();
 
         public MainWindow()
         {
@@ -252,71 +250,13 @@ namespace AndroidMusicPresenceLink
 
         // ── Hotkey key capture (window keyboard concern) ─────────────────────
 
-        private void StartRecordingHotkey(Action<int> onRecorded)
+        private void StartRecordingHotkey(Action<int[]?> onRecorded)
         {
-            if (_isRecordingHotkey)
-                return;
-
-            _isRecordingHotkey = true;
-            _onHotkeyRecorded = onRecorded;
-            Debugger.show("[HOTKEY] Started recording hotkey.");
-
-            Title = "Press a key to record hotkey (Esc to cancel)...";
-            Focus();
-            PreviewKeyDown += Recording_PreviewKeyDown;
-            Deactivated += Recording_Deactivated;
-        }
-
-        private void StopRecordingHotkey()
-        {
-            if (!_isRecordingHotkey)
-                return;
-
-            Debugger.show("[HOTKEY] Stopped recording hotkey.");
-            _isRecordingHotkey = false;
-            _onHotkeyRecorded = null;
-            Title = "Music Presence Settings";
-            PreviewKeyDown -= Recording_PreviewKeyDown;
-            Deactivated -= Recording_Deactivated;
-        }
-
-        private void Recording_Deactivated(object? sender, EventArgs e)
-        {
-            StopRecordingHotkey();
-        }
-
-        private void Recording_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            try
-            {
-                if (!_isRecordingHotkey) return;
-
-                e.Handled = true;
-
-                if (e.Key == Key.Escape)
-                {
-                    Debugger.show("[HOTKEY] Recording cancelled with Escape.");
-                    StopRecordingHotkey();
-                    return;
-                }
-
-                int vk = KeyToVirtualKey(e);
-                Debugger.show($"[HOTKEY] Recorded key 0x{vk:X2}.");
-
-                _onHotkeyRecorded?.Invoke(vk);
-                StopRecordingHotkey();
-            }
-            catch
-            {
-                StopRecordingHotkey();
-            }
-        }
-
-        private static int KeyToVirtualKey(KeyEventArgs e)
-        {
-            var key = e.Key == Key.System ? e.SystemKey : e.Key;
-            int vk = KeyInterop.VirtualKeyFromKey(key);
-            return vk & 0xFF;
+            // In media player mode the settings content is re-hosted inside the media
+            // player window, so key events never reach this (hidden) window. Attach the
+            // capture to whichever window currently contains the settings content.
+            var host = Window.GetWindow(RootContent) ?? this;
+            _hotkeyRecorder.Start(host, onRecorded);
         }
 
         // ── Expander visibility init (no template trigger) ───────────────────

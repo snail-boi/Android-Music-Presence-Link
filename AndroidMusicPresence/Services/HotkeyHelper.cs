@@ -1,14 +1,97 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AndroidMusicPresenceLink
 {
     /// <summary>
     /// Maps between Windows virtual-key codes and the display/storage strings used
     /// for the global hotkey settings. Shared by the main settings window and onboarding.
+    /// A hotkey is a combo of up to <see cref="MaxComboKeys"/> keys (modifiers included),
+    /// stored and displayed as a "+"-joined string like "CTRL+ALT+C".
     /// </summary>
     internal static class HotkeyHelper
     {
+        public const int MaxComboKeys = 5;
+
+        // Generic modifier virtual keys; left/right variants normalize to these.
+        private const int VkShift = 0x10;
+        private const int VkControl = 0x11;
+        private const int VkAlt = 0x12;
+        private const int VkWin = 0x5B;
+
+        /// <summary>Collapses left/right modifier variants to the generic virtual key.</summary>
+        public static int NormalizeKey(int vk)
+        {
+            switch (vk)
+            {
+                case 0xA0: case 0xA1: return VkShift;
+                case 0xA2: case 0xA3: return VkControl;
+                case 0xA4: case 0xA5: return VkAlt;
+                case 0x5C: return VkWin;
+                default: return vk;
+            }
+        }
+
+        public static bool IsModifier(int vk)
+        {
+            vk = NormalizeKey(vk);
+            return vk == VkShift || vk == VkControl || vk == VkAlt || vk == VkWin;
+        }
+
+        public static string ComboToDisplayName(IReadOnlyList<int> keys)
+            => string.Join("+", keys.Select(VirtualKeyToDisplayName));
+
+        /// <summary>
+        /// Parses a combo string like "CTRL+ALT+C". Any unrecognized token invalidates the
+        /// whole combo and returns <paramref name="fallback"/>. Keys are normalized,
+        /// de-duplicated and capped at <see cref="MaxComboKeys"/>.
+        /// </summary>
+        public static int[] ParseCombo(string? input, int[] fallback)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return fallback;
+
+            var keys = new List<int>();
+            foreach (var part in input.Split('+'))
+            {
+                var token = part.Trim();
+                if (token.Length == 0)
+                    continue;
+
+                int vk = ParseVirtualKey(token, -1);
+                if (vk < 0)
+                    return fallback;
+
+                vk = NormalizeKey(vk);
+                if (!keys.Contains(vk))
+                    keys.Add(vk);
+            }
+
+            if (keys.Count == 0)
+                return fallback;
+
+            return keys.Take(MaxComboKeys).ToArray();
+        }
+
+        /// <summary>
+        /// Builds a combo from the legacy config format: one shared Win32 modifier flag
+        /// (MOD_ALT=1, MOD_CONTROL=2, MOD_SHIFT=4) plus a single virtual key.
+        /// </summary>
+        public static int[] ComboFromLegacy(int modifierFlags, int vk)
+        {
+            var keys = new List<int>();
+            if ((modifierFlags & 0x2) != 0) keys.Add(VkControl);
+            if ((modifierFlags & 0x1) != 0) keys.Add(VkAlt);
+            if ((modifierFlags & 0x4) != 0) keys.Add(VkShift);
+
+            vk = NormalizeKey(vk & 0xFF);
+            if (!keys.Contains(vk))
+                keys.Add(vk);
+
+            return keys.ToArray();
+        }
+
         public static string VirtualKeyToDisplayName(int vk)
         {
             // Letters
@@ -34,7 +117,11 @@ namespace AndroidMusicPresenceLink
                 { 0xB2, "MEDIA_STOP" },
                 { 0x1B, "ESC" },
                 { 0x0D, "ENTER" },
-                { 0x20, "SPACE" }
+                { 0x20, "SPACE" },
+                { VkShift, "SHIFT" },
+                { VkControl, "CTRL" },
+                { VkAlt, "ALT" },
+                { VkWin, "WIN" }
             };
 
             if (map.TryGetValue(vk, out var name))
@@ -63,6 +150,11 @@ namespace AndroidMusicPresenceLink
                     return v2 & 0xFF;
                 return fallback;
             }
+
+            // Single letter/digit character. Checked before the decimal branch so "1"
+            // means the 1 key (0x31), not virtual-key 0x01.
+            if (input.Length == 1 && char.IsLetterOrDigit(input[0]))
+                return char.ToUpperInvariant(input[0]);
 
             // Decimal
             if (int.TryParse(input, out var d))
@@ -95,7 +187,12 @@ namespace AndroidMusicPresenceLink
                 { "ESC", 0x1B },
                 { "ENTER", 0x0D },
                 { "RETURN", 0x0D },
-                { "SPACE", 0x20 }
+                { "SPACE", 0x20 },
+                { "SHIFT", VkShift },
+                { "CTRL", VkControl },
+                { "CONTROL", VkControl },
+                { "ALT", VkAlt },
+                { "WIN", VkWin }
             };
 
             if (map.TryGetValue(normalized, out var mapped)) return mapped;
