@@ -12,7 +12,9 @@ namespace AndroidMusicPresenceLink
     /// Manages the local library list used to find the previous and next song.
     /// The list is built by running find + stat across all configured remote roots,
     /// giving full-precision epoch-second modification times.
-    /// Each entry is stored as "remotepath\tepoch-datetime" on disk.
+    /// Each entry is stored as "compressedpath\tepoch-seconds" on disk: paths are shrunk via
+    /// <see cref="LibraryPathCodec"/> (shared prefixes -> ids in library_paths.txt) and times
+    /// via <see cref="LibraryTime"/> (epoch seconds).
     /// The file is pre-sorted at scan time according to the user's chosen sort mode.
     /// Re-sorting on a sort-mode change does not require a rescan.
     /// </summary>
@@ -354,70 +356,6 @@ namespace AndroidMusicPresenceLink
 
         // ── Persistence ───────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Builds a path segment index from the full entry list.
-        /// Any path segment (directory component) that appears in more than one entry
-        /// is assigned a random 5-digit ID. Single-use segments stay inline.
-        /// Returns: dict of ID -> segment string.
-        /// </summary>
-        private static Dictionary<string, string> BuildPathIndex(List<LibraryEntry> entries)
-        {
-            Debugger.show($"[NEXTSONG] BuildPathIndex: analysing {entries.Count} entries for shared segments.");
-            var segmentCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-
-            foreach (var entry in entries)
-            {
-                var path = entry.RemotePath;
-                int pos = 0;
-                while (true)
-                {
-                    int slash = path.IndexOf('/', pos + 1);
-                    if (slash < 0) break;
-                    var segment = path.Substring(0, slash + 1);
-                    segmentCounts.TryGetValue(segment, out int c);
-                    segmentCounts[segment] = c + 1;
-                    pos = slash;
-                }
-            }
-
-            var rng = new Random();
-            var used = new HashSet<string>();
-            var index = new Dictionary<string, string>(StringComparer.Ordinal);
-
-            foreach (var kvp in segmentCounts.OrderByDescending(k => k.Key.Length))
-            {
-                if (kvp.Value < 2) continue;
-
-                string id;
-                do { id = rng.Next(10000, 99999).ToString(); } while (used.Contains(id));
-                used.Add(id);
-                index[kvp.Key] = id;
-                Debugger.show($"[NEXTSONG] Index: {id} = \"{kvp.Key}\" (used by {kvp.Value} entries)");
-            }
-
-            Debugger.show($"[NEXTSONG] BuildPathIndex complete. {index.Count} segments indexed.");
-            return index;
-        }
-
-        /// <summary>
-        /// Replaces the longest matching index segment in the path with its ID.
-        /// Returns the compressed path string.
-        /// </summary>
-        private static string CompressPath(string fullPath, Dictionary<string, string> segmentToId)
-        {
-            // Try longest segments first (already ordered by BuildPathIndex, but we need
-            // to search here so sort by key length descending).
-            foreach (var kvp in segmentToId.OrderByDescending(k => k.Key.Length))
-            {
-                if (fullPath.StartsWith(kvp.Key, StringComparison.Ordinal))
-                {
-                    // Replace the prefix with its numeric ID.
-                    return kvp.Value + "/" + fullPath.Substring(kvp.Key.Length);
-                }
-            }
-            return fullPath;
-        }
-
         private async Task WriteListAsync(List<LibraryEntry> entries)
         {
             try
@@ -427,13 +365,12 @@ namespace AndroidMusicPresenceLink
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                     Directory.CreateDirectory(dir);
 
-                var segmentToId = BuildPathIndex(entries);
-                var idToSegment = segmentToId.ToDictionary(k => k.Value, k => k.Key);
+                // Remote paths are absolute, so the codec runs in rooted mode.
+                var codec = LibraryPathCodec.Build(entries.Select(e => e.RemotePath), rooted: true);
 
-                if (idToSegment.Count > 0)
+                if (!codec.IsEmpty)
                 {
-                    var indexLines = idToSegment.Select(kvp => $"{kvp.Key}\t{kvp.Value}");
-                    await File.WriteAllLinesAsync(_pathIndexFilePath, indexLines, Encoding.UTF8).ConfigureAwait(false);
+                    await File.WriteAllLinesAsync(_pathIndexFilePath, codec.Serialize(), Encoding.UTF8).ConfigureAwait(false);
                     Debugger.show($"[NEXTSONG] Path index written to: {_pathIndexFilePath}");
                 }
                 else if (File.Exists(_pathIndexFilePath))
@@ -443,10 +380,10 @@ namespace AndroidMusicPresenceLink
                 }
 
                 var lines = entries.Select(e =>
-                    $"{CompressPath(e.RemotePath, segmentToId)}\t{e.DateModified:O}");
+                    $"{codec.Compress(e.RemotePath)}\t{LibraryTime.ToStorage(e.DateModified)}");
                 await File.WriteAllLinesAsync(_listFilePath, lines, Encoding.UTF8).ConfigureAwait(false);
 
-                Debugger.show($"[NEXTSONG] List written to: {_listFilePath} ({entries.Count} entries, {idToSegment.Count} indexed segments).");
+                Debugger.show($"[NEXTSONG] List written to: {_listFilePath} ({entries.Count} entries).");
             }
             catch (Exception ex)
             {
@@ -468,26 +405,15 @@ namespace AndroidMusicPresenceLink
                     return;
                 }
 
-                var idToSegment = new Dictionary<string, string>(StringComparer.Ordinal);
-                if (File.Exists(_pathIndexFilePath))
-                {
-                    var indexLines = await File.ReadAllLinesAsync(_pathIndexFilePath, Encoding.UTF8).ConfigureAwait(false);
-                    foreach (var line in indexLines)
-                    {
-                        var parts = line.Split('\t');
-                        if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[0]))
-                            idToSegment[parts[0].Trim()] = parts[1];
-                    }
-                    Debugger.show($"[NEXTSONG] Path index loaded: {idToSegment.Count} segments.");
-                }
-                else
-                {
-                    Debugger.show("[NEXTSONG] No path index file, paths stored as-is.");
-                }
+                var codec = File.Exists(_pathIndexFilePath)
+                    ? LibraryPathCodec.Load(await File.ReadAllLinesAsync(_pathIndexFilePath, Encoding.UTF8).ConfigureAwait(false), rooted: true)
+                    : LibraryPathCodec.Load(Array.Empty<string>(), rooted: true);
+                Debugger.show(codec.IsEmpty
+                    ? "[NEXTSONG] No path index file, paths stored as-is."
+                    : "[NEXTSONG] Path index loaded.");
 
                 var rawLines = await File.ReadAllLinesAsync(_listFilePath, Encoding.UTF8).ConfigureAwait(false);
                 var entries = new List<LibraryEntry>(rawLines.Length);
-                int expandedCount = 0;
                 int failedCount = 0;
 
                 foreach (var line in rawLines)
@@ -496,40 +422,19 @@ namespace AndroidMusicPresenceLink
                     if (parts.Length < 1 || string.IsNullOrWhiteSpace(parts[0])) { failedCount++; continue; }
 
                     var storedPath = parts[0];
-                    var date = parts.Length > 1 && DateTime.TryParse(parts[1], out var d) ? d : DateTime.MinValue;
+                    var date = parts.Length > 1 ? LibraryTime.Parse(parts[1]) : DateTime.MinValue;
 
-                    var fullPath = ExpandPath(storedPath, idToSegment);
-                    if (fullPath != storedPath) expandedCount++;
-
-                    entries.Add(new LibraryEntry(fullPath, date));
+                    entries.Add(new LibraryEntry(codec.Expand(storedPath), date));
                 }
 
                 _entries = entries;
                 _loaded = true;
-                Debugger.show($"[NEXTSONG] Loaded {_entries.Count} entries ({expandedCount} paths expanded, {failedCount} lines skipped).");
+                Debugger.show($"[NEXTSONG] Loaded {_entries.Count} entries ({failedCount} lines skipped).");
             }
             catch (Exception ex)
             {
                 Debugger.show("[NEXTSONG] EnsureLoadedAsync failed: " + ex.Message);
             }
-        }
-
-        /// <summary>
-        /// Expands a compressed path back to its full form.
-        /// A compressed path starts with a 5-digit numeric ID followed by '/'.
-        /// </summary>
-        private static string ExpandPath(string storedPath, Dictionary<string, string> idToSegment)
-        {
-            if (idToSegment.Count == 0) return storedPath;
-
-            int firstSlash = storedPath.IndexOf('/');
-            if (firstSlash < 1) return storedPath;
-
-            var candidate = storedPath.Substring(0, firstSlash);
-            if (idToSegment.TryGetValue(candidate, out var segment))
-                return segment + storedPath.Substring(firstSlash + 1);
-
-            return storedPath;
         }
 
         // Forces a reload on the next access (e.g. after a rescan).

@@ -18,6 +18,7 @@ namespace AndroidMusicPresenceLink
     internal class SubsonicSongListManager
     {
         private readonly string _listFilePath;
+        private readonly string _pathIndexFilePath;
 
         private List<SubsonicClient.LibrarySong> _entries = new();
         private string _loadedServerUrl = string.Empty;
@@ -31,6 +32,7 @@ namespace AndroidMusicPresenceLink
         public SubsonicSongListManager()
         {
             _listFilePath = AppPaths.GetDataPath("subsonic_library_list.txt");
+            _pathIndexFilePath = AppPaths.GetDataPath("subsonic_library_paths.txt");
         }
 
         public bool IsListPresent => File.Exists(_listFilePath);
@@ -258,8 +260,12 @@ namespace AndroidMusicPresenceLink
 
         // ── Persistence ───────────────────────────────────────────────────────
         // Line 1: "#server\t<url>", then one song per line:
-        // id \t coverArtId \t created(ISO) \t path \t title \t artist
-        // Tabs inside values are folded to spaces on write so the format stays parseable.
+        // id \t coverArtId \t created(epoch-seconds) \t compressedPath \t title \t artist
+        // Paths are shrunk via LibraryPathCodec (shared prefixes -> ids in the sidecar file
+        // subsonic_library_paths.txt) and times via LibraryTime. Tabs inside values are folded
+        // to spaces on write so the format stays parseable. The track/cover ids and the
+        // title/artist are kept as-is: the ids are needed to stream and fetch covers for the
+        // neighbouring songs, and title/artist are retained for potential future use.
 
         private async Task WriteListAsync(string serverUrl, List<SubsonicClient.LibrarySong> entries)
         {
@@ -271,12 +277,28 @@ namespace AndroidMusicPresenceLink
 
                 static string Safe(string? v) => (v ?? string.Empty).Replace('\t', ' ');
 
+                // Subsonic paths are relative, so the codec runs in non-rooted mode. Compute
+                // the safe path per entry once so Build and Compress see identical input.
+                var safePaths = entries.Select(e => Safe(e.Path)).ToList();
+                var codec = LibraryPathCodec.Build(safePaths, rooted: false);
+
+                if (!codec.IsEmpty)
+                {
+                    await File.WriteAllLinesAsync(_pathIndexFilePath, codec.Serialize(), Encoding.UTF8).ConfigureAwait(false);
+                    Debugger.show($"[SUBSONGLIST] Path index written to: {_pathIndexFilePath}");
+                }
+                else if (File.Exists(_pathIndexFilePath))
+                {
+                    File.Delete(_pathIndexFilePath);
+                    Debugger.show("[SUBSONGLIST] No shared segments; deleted stale path index.");
+                }
+
                 var lines = new List<string>(entries.Count + 1)
                 {
                     $"#server\t{Safe(serverUrl.Trim())}"
                 };
-                lines.AddRange(entries.Select(e =>
-                    $"{Safe(e.Id)}\t{Safe(e.CoverArtId)}\t{e.CreatedUtc:O}\t{Safe(e.Path)}\t{Safe(e.Title)}\t{Safe(e.Artist)}"));
+                lines.AddRange(entries.Select((e, i) =>
+                    $"{Safe(e.Id)}\t{Safe(e.CoverArtId)}\t{LibraryTime.ToStorage(e.CreatedUtc)}\t{codec.Compress(safePaths[i])}\t{Safe(e.Title)}\t{Safe(e.Artist)}"));
 
                 await File.WriteAllLinesAsync(_listFilePath, lines, Encoding.UTF8).ConfigureAwait(false);
                 Debugger.show($"[SUBSONGLIST] List written: {entries.Count} entries.");
@@ -300,6 +322,10 @@ namespace AndroidMusicPresenceLink
                     return;
                 }
 
+                var codec = File.Exists(_pathIndexFilePath)
+                    ? LibraryPathCodec.Load(await File.ReadAllLinesAsync(_pathIndexFilePath, Encoding.UTF8).ConfigureAwait(false), rooted: false)
+                    : LibraryPathCodec.Load(Array.Empty<string>(), rooted: false);
+
                 var rawLines = await File.ReadAllLinesAsync(_listFilePath, Encoding.UTF8).ConfigureAwait(false);
                 var entries = new List<SubsonicClient.LibrarySong>(rawLines.Length);
                 string serverUrl = string.Empty;
@@ -316,14 +342,14 @@ namespace AndroidMusicPresenceLink
                     if (parts.Length < 6 || string.IsNullOrWhiteSpace(parts[0]))
                         continue;
 
-                    DateTime created = DateTime.TryParse(parts[2], null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var d)
-                        ? d : DateTime.MinValue;
+                    DateTime created = LibraryTime.Parse(parts[2]);
+                    var path = codec.Expand(parts[3]);
 
                     entries.Add(new SubsonicClient.LibrarySong(
                         parts[0],
                         parts[4],
                         parts[5],
-                        string.IsNullOrWhiteSpace(parts[3]) ? null : parts[3],
+                        string.IsNullOrWhiteSpace(path) ? null : path,
                         string.IsNullOrWhiteSpace(parts[1]) ? null : parts[1],
                         created));
                 }
