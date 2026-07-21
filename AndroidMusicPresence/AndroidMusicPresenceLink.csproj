@@ -66,6 +66,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="NAudio" Version="2.2.1" />
 		<PackageReference Include="QRCoder" Version="1.8.0" />
 	</ItemGroup>
 
@@ -106,9 +107,6 @@
 		<None Update="Assets\avcodec-62.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Update="Assets\avformat-62.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 		<None Update="Assets\avutil-60.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
@@ -118,16 +116,10 @@
 		<None Update="Assets\ffmpeg.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Update="Assets\libusb-1.0.dll">
+		<None Update="Assets\scrcpy-server-v4.1">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Update="Assets\scrcpy-noconsole.vbs">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Assets\scrcpy-server">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Assets\scrcpy.exe">
+		<None Update="Assets\scrcpy_audio.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Assets\SDL3.dll">
@@ -157,9 +149,10 @@
 		<MakeDir Directories="$(PortableOutputDir)" />
 
 		<ItemGroup>
-			<PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll;$(TargetDir)QRCoder.dll" />
+			<PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll;$(TargetDir)QRCoder.dll;$(TargetDir)NAudio*.dll" />
 			<PortableResourceFiles Include="$(TargetDir)Assets\**\*" />
 			<PortableTrayFiles Include="$(TargetDir)Tray_Icons\**\*" />
+			<PortableLicenseFiles Include="$(MSBuildProjectDirectory)\..\LICENSE;$(MSBuildProjectDirectory)\..\THIRD_PARTY_LICENSES.txt" />
 		</ItemGroup>
 
 		<RemoveDir Directories="$(PortableStageDir)" Condition="Exists('$(PortableStageDir)')" />
@@ -167,6 +160,7 @@
 		<Copy SourceFiles="@(PortableRootFiles)" DestinationFolder="$(PortableStageDir)" />
 		<Copy SourceFiles="@(PortableResourceFiles)" DestinationFiles="@(PortableResourceFiles->'$(PortableStageDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')" />
 		<Copy SourceFiles="@(PortableTrayFiles)" DestinationFiles="@(PortableTrayFiles->'$(PortableStageDir)Tray_Icons\%(RecursiveDir)%(Filename)%(Extension)')" />
+		<Copy SourceFiles="@(PortableLicenseFiles)" DestinationFolder="$(PortableStageDir)" />
 		<WriteLinesToFile File="$(PortableStageDir)portable.mode" Lines="portable" Overwrite="true" />
 		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;if (Test-Path '$(PortableZipPath)') { Remove-Item '$(PortableZipPath)' -Force }; Compress-Archive -Path '$(PortableStageDir)*' -DestinationPath '$(PortableZipPath)' -Force&quot;" />
 		<RemoveDir Directories="$(PortableStageDir)" />

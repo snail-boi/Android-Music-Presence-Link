@@ -35,6 +35,19 @@ Source: "{#BinDir}\WinRT.Runtime.dll";                           DestDir: "{app}
 Source: "{#BinDir}\Microsoft.Windows.SDK.NET.dll";               DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\QRCoder.dll";                                 DestDir: "{app}"; Flags: ignoreversion
 
+; NAudio (audio-link playback via WasapiOut)
+Source: "{#BinDir}\NAudio.dll";                                  DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.Core.dll";                             DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.Wasapi.dll";                           DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.WinMM.dll";                            DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.Asio.dll";                             DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.Midi.dll";                             DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.WinForms.dll";                         DestDir: "{app}"; Flags: ignoreversion
+
+; License notices (ship with the binary distribution)
+Source: "..\LICENSE";                                            DestDir: "{app}"; Flags: ignoreversion
+Source: "..\THIRD_PARTY_LICENSES.txt";                           DestDir: "{app}"; Flags: ignoreversion
+
 ; Tray icons
 Source: "{#BinDir}\Tray_Icons\Tray_USB.ico";          DestDir: "{app}\Tray_Icons"; Flags: ignoreversion
 Source: "{#BinDir}\Tray_Icons\Tray_TCP.ico";          DestDir: "{app}\Tray_Icons"; Flags: ignoreversion
@@ -49,15 +62,12 @@ Source: "{#BinDir}\Assets\adb.exe";                  DestDir: "{userappdata}\Sna
 Source: "{#BinDir}\Assets\AdbWinApi.dll";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\AdbWinUsbApi.dll";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\avcodec-62.dll";           DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\avformat-62.dll";          DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\avutil-60.dll";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\disconnected.png";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\ffmpeg.exe";               DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\libusb-1.0.dll";           DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\AMPLLOGO.png";             DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\scrcpy-noconsole.vbs";     DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\scrcpy-server";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\scrcpy.exe";               DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\scrcpy-server-v4.1";       DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\scrcpy_audio.dll";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\SDL3.dll";                 DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\swresample-6.dll";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 

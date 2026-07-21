@@ -57,7 +57,10 @@ namespace AndroidMusicPresenceLink
         private TrayIconManager? _trayIconManager;
         private MusicPresenceService? _presenceService;
         private MainWindow? _settingsWindow;
-        private Process? _scrcpyProcess;
+        // The in-process audio link (scrcpy_audio.dll + WasapiOut). Replaces the
+        // old external scrcpy.exe process; same lifecycle shape (null when off,
+        // HasEnded when dead, Ended event ~ Process.Exited).
+        private ScrcpyAudioLink? _audioLink;
         private LyricsOverlayManager? _lyricsOverlayManager;
         private MediaPlayerWindow? _mediaPlayerWindow;
         private NextSongManager _nextSongManager = new NextSongManager();
@@ -107,11 +110,11 @@ namespace AndroidMusicPresenceLink
 
         private bool _isScrcpyRunning;
         private bool _isExiting;
-        // Device id (USB serial or "ip:port") that _scrcpyProcess was started against.
+        // Device id (USB serial or "ip:port") that _audioLink was started against.
         // Used to detect when the active connection changes mid-session and the audio
         // link needs to be migrated to the new transport.
         private string? _scrcpyDeviceId;
-        // Whether _scrcpyProcess was started over USB (vs Wi-Fi). Cached so we don't
+        // Whether _audioLink was started over USB (vs Wi-Fi). Cached so we don't
         // re-derive it from _scrcpyDeviceId everywhere.
         private bool _scrcpyDeviceIsUsb;
         // Set while a transport switch is in progress so reentrant tray-state events
@@ -159,6 +162,9 @@ namespace AndroidMusicPresenceLink
             Debugger.IsEnabled = Config.AppSettings.DebugMode;
             Debugger.AdvancedEnabled = Config.AppSettings.AdvancedDebugMode;
             AdbHelper.AdbPath = Config.Paths.Adb;
+            // The audio-link native DLL and its dependencies live in the Assets
+            // resource folder (AppData when installed, .\Assets when portable).
+            ScrcpyAudioNative.NativeDllDirectory = AppPaths.ResourceRoot;
             if (Config.Theme.RandomAtStartup)
             {
                 var randomTheme = ThemeCatalog.RandomEnabledThemeName(Config);
@@ -328,14 +334,14 @@ namespace AndroidMusicPresenceLink
         ///
         /// When the device is empty (transient, e.g. USB just yanked, Wi-Fi not yet
         /// enumerated) we do nothing: scrcpy will either survive the blip or die on
-        /// its own, and ScrcpyProcessExited handles the post-death recovery via
+        /// its own, and ScrcpyAudioLinkEnded handles the post-death recovery via
         /// _audioLinkDesired.
         /// </summary>
         private void CheckAudioLinkTransport()
         {
             if (_isExiting) return;
             if (_scrcpySwitchInProgress) return;
-            if (_scrcpyProcess == null || _scrcpyProcess.HasExited) return;
+            if (_audioLink == null || _audioLink.HasEnded) return;
             if (string.IsNullOrEmpty(_scrcpyDeviceId)) return;
             // Auto-switching requires a fast enough update cycle to be reliable.
             if (Config.Polling.Interval > UpdateIntervalMode.Fast) return;
@@ -348,7 +354,7 @@ namespace AndroidMusicPresenceLink
                 return;
 
             // Device empty: don't stop, don't switch, just wait. If scrcpy dies during
-            // this gap, ScrcpyProcessExited will arm recovery.
+            // this gap, ScrcpyAudioLinkEnded will arm recovery.
             if (string.IsNullOrWhiteSpace(liveDevice))
             {
                 Debugger.show($"Audio-link: device transiently empty (was {_scrcpyDeviceId}); waiting.");
@@ -394,10 +400,10 @@ namespace AndroidMusicPresenceLink
                 await Task.Delay(400).ConfigureAwait(true);
                 if (!_audioLinkDesired || _isExiting) return;
 
-                var process = LaunchScrcpyProcess(newDevice);
-                if (process == null)
+                var link = ScrcpyAudioLink.TryStart(Config, newDevice);
+                if (link == null)
                 {
-                    Debugger.show("Audio-link switch: LaunchScrcpyProcess returned null.");
+                    Debugger.show("Audio-link switch: ScrcpyAudioLink.TryStart returned null.");
                     _trayIconManager?.SetScrcpyRunning(false);
                     UpdateTrayAudioSettings();
                     ApplyTrayState();
@@ -406,11 +412,10 @@ namespace AndroidMusicPresenceLink
                     return;
                 }
 
-                _scrcpyProcess = process;
+                _audioLink = link;
                 _scrcpyDeviceId = newDevice;
                 _scrcpyDeviceIsUsb = newIsUsb;
-                _scrcpyProcess.EnableRaisingEvents = true;
-                _scrcpyProcess.Exited += ScrcpyProcessExited;
+                link.Ended += ScrcpyAudioLinkEnded;
                 _isScrcpyRunning = true;
                 _trayIconManager?.SetScrcpyRunning(true);
                 UpdateTrayAudioSettings();
@@ -452,7 +457,7 @@ namespace AndroidMusicPresenceLink
                 {
                     _audioLinkDesired = true;
                     _audioLinkRecoveryAttempts = 0;
-                    if (_scrcpyProcess == null || _scrcpyProcess.HasExited)
+                    if (_audioLink == null || _audioLink.HasEnded)
                     {
                         StartScrcpyNoAudio();
                     }
@@ -462,7 +467,7 @@ namespace AndroidMusicPresenceLink
                     _audioLinkDesired = false;
                     _audioLinkRecoveryAttempts = 0;
                     CancelAudioLinkRecovery();
-                    if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
+                    if (_audioLink != null && !_audioLink.HasEnded)
                     {
                         _ = StopScrcpyAsync();
                         ShowToast("Audio link stopped");
@@ -489,7 +494,7 @@ namespace AndroidMusicPresenceLink
                 AudioQualityPresets.ApplyToConfig(Config, preset);
                 MusicConfigManager.Save(Config);
 
-                bool wasRunning = _scrcpyProcess != null && !_scrcpyProcess.HasExited;
+                bool wasRunning = _audioLink != null && !_audioLink.HasEnded;
 
                 // UpdateConfig pushes everywhere (settings UI, tray, media player label).
                 UpdateConfig(Config);
@@ -541,7 +546,7 @@ namespace AndroidMusicPresenceLink
                     AudioQualityPresets.ApplyCustomToConfig(Config, codec, bitrate, bufferMs, flacLevel);
                     MusicConfigManager.Save(Config);
 
-                    bool wasRunning = _scrcpyProcess != null && !_scrcpyProcess.HasExited;
+                    bool wasRunning = _audioLink != null && !_audioLink.HasEnded;
                     UpdateConfig(Config);
 
                     if (wasRunning)
@@ -676,7 +681,7 @@ namespace AndroidMusicPresenceLink
 
             // Restart the audio link if it is running and the codec/bitrate/buffer changed,
             // so the new settings take effect immediately without needing a manual restart.
-            if (audioChanged && _scrcpyProcess != null && !_scrcpyProcess.HasExited && Config.AudioLink.AutoRestartOnQualityChange)
+            if (audioChanged && _audioLink != null && !_audioLink.HasEnded && Config.AudioLink.AutoRestartOnQualityChange)
                 _ = RestartScrcpyForPresetAsync();
 
             // When the no-cover icon changes, force the next tick to re-push the image and
@@ -1522,7 +1527,7 @@ namespace AndroidMusicPresenceLink
         }
         private void ToggleScrcpyNoAudio()
         {
-            if (_scrcpyProcess != null && !_scrcpyProcess.HasExited)
+            if (_audioLink != null && !_audioLink.HasEnded)
             {
                 _audioLinkDesired = false;
                 _audioLinkRecoveryAttempts = 0;
@@ -1548,20 +1553,21 @@ namespace AndroidMusicPresenceLink
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(Config.Paths.Scrcpy) || !File.Exists(Config.Paths.Scrcpy))
+            if (!ScrcpyAudioLink.AssetsAvailable(out var missingFile))
             {
                 _audioLinkDesired = false;
-                (Application.Current as App)?.ShowToast("scrcpy.exe not found!", ToastLevel.Error);
+                Debugger.show("StartScrcpyNoAudio: missing native file: " + missingFile);
+                (Application.Current as App)?.ShowToast("Audio link files missing!", ToastLevel.Error);
                 return;
             }
 
             try
             {
-                var process = LaunchScrcpyProcess(device);
-                if (process == null)
+                var link = LaunchAudioLink(device);
+                if (link == null)
                 {
                     _audioLinkDesired = false;
-                    (Application.Current as App)?.ShowToast("scrcpy failed to start.", ToastLevel.Error);
+                    (Application.Current as App)?.ShowToast("Audio link failed to start.", ToastLevel.Error);
                     _isScrcpyRunning = false;
                     _trayIconManager?.SetScrcpyRunning(false);
                     UpdateTrayAudioSettings();
@@ -1569,11 +1575,10 @@ namespace AndroidMusicPresenceLink
                     return;
                 }
 
-                _scrcpyProcess = process;
+                _audioLink = link;
                 _scrcpyDeviceId = device;
                 _scrcpyDeviceIsUsb = !device.Contains(':');
-                _scrcpyProcess.EnableRaisingEvents = true;
-                _scrcpyProcess.Exited += ScrcpyProcessExited;
+                link.Ended += ScrcpyAudioLinkEnded;
                 _isScrcpyRunning = true;
                 _trayIconManager?.SetScrcpyRunning(true);
                 UpdateTrayAudioSettings();
@@ -1583,7 +1588,7 @@ namespace AndroidMusicPresenceLink
             catch (Exception ex)
             {
                 _audioLinkDesired = false;
-                (Application.Current as App)?.ShowToast($"scrcpy launch failed: {ex.Message}", ToastLevel.Error);
+                (Application.Current as App)?.ShowToast($"Audio link launch failed: {ex.Message}", ToastLevel.Error);
                 _isScrcpyRunning = false;
                 _trayIconManager?.SetScrcpyRunning(false);
                 UpdateTrayAudioSettings();
@@ -1592,82 +1597,23 @@ namespace AndroidMusicPresenceLink
         }
 
         /// <summary>
-        /// Builds the scrcpy argument string for a given device id. Pure (no side effects),
-        /// shared between the user-initiated start and the transport-switch path so both
-        /// paths produce identical args modulo the -s target.
+        /// Starts an in-process audio link bound to the given device id. Returns the
+        /// started link (with no Ended handler attached yet), or null on failure.
+        /// Caller is responsible for wiring up state and lifetime. No UI side effects
+        /// so this can be used during background transport switches.
         /// </summary>
-        private string BuildScrcpyArgs(string device)
-        {
-            var codec = string.IsNullOrWhiteSpace(Config.AudioLink.Codec) ? "raw" : Config.AudioLink.Codec.Trim();
-            var buffer = Config.AudioLink.BufferMs > 0 ? Config.AudioLink.BufferMs : 50;
-
-            var argParts = new List<string>
-            {
-                $"-s {device}",
-                "--no-video",
-                "--no-window",
-                "--audio-source=playback",
-                $"--audio-codec={codec}",
-                $"--audio-buffer={buffer}"
-            };
-
-            if (!codec.Equals("raw", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(Config.AudioLink.Bitrate))
-            {
-                var bitrateText = Config.AudioLink.Bitrate.Trim();
-                if (bitrateText.EndsWith("K", StringComparison.OrdinalIgnoreCase))
-                {
-                    bitrateText = bitrateText[..^1];
-                }
-
-                if (int.TryParse(bitrateText, out var bitrateValue) && bitrateValue > 0)
-                {
-                    argParts.Add($"--audio-bit-rate={bitrateValue}K");
-                }
-            }
-
-            if (codec.Equals("flac", StringComparison.OrdinalIgnoreCase))
-            {
-                argParts.Add($"--audio-codec-options=flac-compression-level={Math.Clamp(Config.AudioLink.FlacCompressionLevel, 1, 8)}");
-            }
-
-            return string.Join(" ", argParts);
-        }
-
-        /// <summary>
-        /// Launches a scrcpy process bound to the given device id. Returns the started
-        /// Process (with EnableRaisingEvents NOT yet set and no Exited handler attached),
-        /// or null on failure. Caller is responsible for wiring up state and lifetime.
-        /// No UI side effects so this can be used during background transport switches.
-        /// </summary>
-        private Process? LaunchScrcpyProcess(string device)
+        private ScrcpyAudioLink? LaunchAudioLink(string device)
         {
             if (_isExiting || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
                 return null;
 
-            if (string.IsNullOrWhiteSpace(Config.Paths.Scrcpy) || !File.Exists(Config.Paths.Scrcpy))
-            {
-                Debugger.show("LaunchScrcpyProcess: scrcpy.exe not found at " + (Config.Paths.Scrcpy ?? "<null>"));
-                return null;
-            }
-
-            var args = BuildScrcpyArgs(device);
-            Debugger.show($"Starting scrcpy (device={device}) with args: {args}");
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = Config.Paths.Scrcpy,
-                Arguments = args,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            return Process.Start(psi);
+            return ScrcpyAudioLink.TryStart(Config, device);
         }
 
         private async Task StopScrcpyAsync()
         {
-            var process = _scrcpyProcess;
-            _scrcpyProcess = null;
+            var link = _audioLink;
+            _audioLink = null;
             _scrcpyDeviceId = null;
             _scrcpyDeviceIsUsb = false;
             _isScrcpyRunning = false;
@@ -1675,53 +1621,35 @@ namespace AndroidMusicPresenceLink
             UpdateTrayAudioSettings();
             ApplyTrayState();
 
-            if (process == null)
+            if (link == null)
                 return;
 
             try
             {
-                process.Exited -= ScrcpyProcessExited;
-                process.EnableRaisingEvents = false;
-
-                await Task.Run(() =>
-                {
-                    if (!process.HasExited)
-                    {
-                        process.Kill(true);
-                        process.WaitForExit(2000);
-                    }
-                });
+                link.Ended -= ScrcpyAudioLinkEnded;
+                await link.StopAsync();
             }
             catch (Exception ex)
             {
                 if (!Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
                 {
-                    (Application.Current as App)?.ShowToast($"Failed to stop scrcpy: {ex.Message}", ToastLevel.Error);
+                    (Application.Current as App)?.ShowToast($"Failed to stop audio link: {ex.Message}", ToastLevel.Error);
                 }
-            }
-            finally
-            {
-                process.Dispose();
             }
         }
 
-        private void ScrcpyProcessExited(object? sender, EventArgs e)
+        private void ScrcpyAudioLinkEnded(ScrcpyAudioLink ended)
         {
-            // Guard against stale Exited events from a process we already replaced during
+            // Guard against stale Ended events from a link we already replaced during
             // a transport switch. PerformAudioLinkSwitchAsync detaches the handler before
-            // stopping the old process, so anything reaching here should be the currently
-            // tracked _scrcpyProcess. The ReferenceEquals check is a safety net.
-            if (sender is Process exited && !ReferenceEquals(exited, _scrcpyProcess))
-            {
-                // Stale event from a process we already replaced; just dispose it.
-                try { exited.Dispose(); } catch { }
+            // stopping the old link, so anything reaching here should be the currently
+            // tracked _audioLink. The ReferenceEquals check is a safety net.
+            if (!ReferenceEquals(ended, _audioLink))
                 return;
-            }
 
             if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
             {
-                _scrcpyProcess?.Dispose();
-                _scrcpyProcess = null;
+                _audioLink = null;
                 _scrcpyDeviceId = null;
                 _scrcpyDeviceIsUsb = false;
                 _isScrcpyRunning = false;
@@ -1734,8 +1662,7 @@ namespace AndroidMusicPresenceLink
                 bool wasUsb = _scrcpyDeviceIsUsb;
                 string? oldDevice = _scrcpyDeviceId;
 
-                _scrcpyProcess?.Dispose();
-                _scrcpyProcess = null;
+                _audioLink = null;
                 _scrcpyDeviceId = null;
                 _scrcpyDeviceIsUsb = false;
                 _isScrcpyRunning = false;
@@ -1822,8 +1749,8 @@ namespace AndroidMusicPresenceLink
                     if (_isExiting) return;
                     if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
                     if (!_audioLinkDesired) return;
-                    // Someone else (e.g. user, switch path) already restarted scrcpy.
-                    if (_scrcpyProcess != null && !_scrcpyProcess.HasExited) return;
+                    // Someone else (e.g. user, switch path) already restarted the link.
+                    if (_audioLink != null && !_audioLink.HasEnded) return;
 
                     var device = _presenceService?.CurrentDevice ?? string.Empty;
                     if (!string.IsNullOrWhiteSpace(device))
@@ -1864,27 +1791,26 @@ namespace AndroidMusicPresenceLink
         /// </summary>
         private void StartAudioLinkSilently(string device)
         {
-            if (string.IsNullOrWhiteSpace(Config.Paths.Scrcpy) || !File.Exists(Config.Paths.Scrcpy))
+            if (!ScrcpyAudioLink.AssetsAvailable(out var missingFile))
             {
-                Debugger.show("Audio-link recovery: scrcpy.exe not found, abandoning.");
+                Debugger.show("Audio-link recovery: missing native file: " + missingFile);
                 _audioLinkDesired = false;
                 return;
             }
 
             try
             {
-                var process = LaunchScrcpyProcess(device);
-                if (process == null)
+                var link = LaunchAudioLink(device);
+                if (link == null)
                 {
-                    Debugger.show("Audio-link recovery: LaunchScrcpyProcess returned null, abandoning.");
+                    Debugger.show("Audio-link recovery: LaunchAudioLink returned null, abandoning.");
                     return;
                 }
 
-                _scrcpyProcess = process;
+                _audioLink = link;
                 _scrcpyDeviceId = device;
                 _scrcpyDeviceIsUsb = !device.Contains(':');
-                _scrcpyProcess.EnableRaisingEvents = true;
-                _scrcpyProcess.Exited += ScrcpyProcessExited;
+                link.Ended += ScrcpyAudioLinkEnded;
                 _isScrcpyRunning = true;
                 _trayIconManager?.SetScrcpyRunning(true);
                 UpdateTrayAudioSettings();
@@ -1892,8 +1818,8 @@ namespace AndroidMusicPresenceLink
 
                 // Don't announce success yet. A relaunch during a USB/Wi-Fi flap can die
                 // again within a second or two, so we only consider the link reconnected
-                // once this process has survived a short grace period.
-                _ = ConfirmAudioLinkReconnectAsync(process);
+                // once this session has survived a short grace period.
+                _ = ConfirmAudioLinkReconnectAsync(link);
             }
             catch (Exception ex)
             {
@@ -1912,7 +1838,7 @@ namespace AndroidMusicPresenceLink
         /// the recovery attempt budget. Stays silent if the process died in the meantime
         /// (the flap case) or was replaced by a transport switch.
         /// </summary>
-        private async Task ConfirmAudioLinkReconnectAsync(Process process)
+        private async Task ConfirmAudioLinkReconnectAsync(ScrcpyAudioLink link)
         {
             try
             {
@@ -1925,8 +1851,8 @@ namespace AndroidMusicPresenceLink
 
             if (_isExiting) return;
             if (!_audioLinkDesired) return;
-            if (!ReferenceEquals(_scrcpyProcess, process)) return;
-            if (process.HasExited) return;
+            if (!ReferenceEquals(_audioLink, link)) return;
+            if (link.HasEnded) return;
 
             // Held long enough to count as a real reconnect: reset the budget so a future
             // genuine drop gets a fresh set of attempts, and announce it once.
@@ -1965,33 +1891,24 @@ namespace AndroidMusicPresenceLink
             _audioLinkDesired = false;
             CancelAudioLinkRecovery();
 
-            var process = _scrcpyProcess;
-            _scrcpyProcess = null;
+            var link = _audioLink;
+            _audioLink = null;
             _scrcpyDeviceId = null;
             _scrcpyDeviceIsUsb = false;
             _isScrcpyRunning = false;
             _trayIconManager?.SetScrcpyRunning(false);
             UpdateTrayAudioSettings();
 
-            if (process == null)
+            if (link == null)
                 return;
 
             try
             {
-                process.Exited -= ScrcpyProcessExited;
-                process.EnableRaisingEvents = false;
-
-                if (!process.HasExited)
-                {
-                    process.Kill(true);
-                }
+                link.Ended -= ScrcpyAudioLinkEnded;
+                link.Stop();
             }
             catch
             {
-            }
-            finally
-            {
-                process.Dispose();
             }
         }
 
@@ -2143,11 +2060,11 @@ namespace AndroidMusicPresenceLink
 
         private bool TryAdjustScrcpyVolume(float delta)
         {
-            var process = _scrcpyProcess;
-            if (process == null || process.HasExited)
+            var link = _audioLink;
+            if (link == null || link.HasEnded)
                 return false;
 
-            return ScrcpyVolumeController.TryAdjustVolume(process.Id, delta);
+            return link.TryAdjustVolume(delta);
         }
 
         // ---- Volume helpers exposed to MediaPlayerWindow ----
@@ -2160,29 +2077,29 @@ namespace AndroidMusicPresenceLink
         /// </summary>
         private bool IsScrcpyAudioSessionAvailable()
         {
-            var process = _scrcpyProcess;
-            if (process == null || process.HasExited)
+            var link = _audioLink;
+            if (link == null || link.HasEnded)
                 return false;
 
-            return ScrcpyVolumeController.TryGetVolume(process.Id, out _);
+            return link.TryGetVolume(out _);
         }
 
         private float? TryGetScrcpyVolume()
         {
-            var process = _scrcpyProcess;
-            if (process == null || process.HasExited)
+            var link = _audioLink;
+            if (link == null || link.HasEnded)
                 return null;
 
-            return ScrcpyVolumeController.TryGetVolume(process.Id, out var v) ? v : (float?)null;
+            return link.TryGetVolume(out var v) ? v : (float?)null;
         }
 
         private void TrySetScrcpyVolume(float volume)
         {
-            var process = _scrcpyProcess;
-            if (process == null || process.HasExited)
+            var link = _audioLink;
+            if (link == null || link.HasEnded)
                 return;
 
-            ScrcpyVolumeController.TrySetVolume(process.Id, volume);
+            link.TrySetVolume(volume);
         }
 
         /// <summary>

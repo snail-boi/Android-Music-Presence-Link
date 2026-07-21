@@ -1,12 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace AndroidMusicPresenceLink
 {
@@ -70,7 +64,7 @@ namespace AndroidMusicPresenceLink
 
         partial void InitAudioCodec()
         {
-            ListCodecsCommand = new RelayCommand(() => _ = LoadScrcpyCodecsAsync());
+            ListCodecsCommand = new RelayCommand(LoadScrcpyCodecs);
             LoadAudioCodecFromConfig();
         }
 
@@ -202,39 +196,29 @@ namespace AndroidMusicPresenceLink
             _config.AudioLink.QualityPresetName = preset.Name;
         }
 
-        private async Task LoadScrcpyCodecsAsync()
+        // The audio codecs the pipeline can actually use. This set is fixed by
+        // what both ends support, not by the device: the scrcpy server only
+        // accepts these for --audio-codec, and the audio DLL's decoder only
+        // handles these (raw/opus/aac/flac). All four are guaranteed on any
+        // Android 10+ device, so there is nothing to query — listing device
+        // encoders would only ever return a subset of this and needs no adb
+        // round-trip, no connected device, and no external scrcpy.exe.
+        // "raw" is first (safe fallback), then the rest alphabetically.
+        private static readonly string[] SupportedAudioCodecs = { "raw", "aac", "flac", "opus" };
+
+        private void LoadScrcpyCodecs()
         {
             if (_isLoadingCodecs)
                 return;
 
             _isLoadingCodecs = true;
-            CodecStatus = "Loading...";
-
             try
             {
-                if (string.IsNullOrWhiteSpace(_config.Paths.Scrcpy) || !File.Exists(_config.Paths.Scrcpy))
-                {
-                    CodecStatus = "scrcpy.exe not found.";
-                    return;
-                }
-
-                var device = await DeviceQuery.ResolveActiveDeviceAsync(_config).ConfigureAwait(true);
-                if (string.IsNullOrWhiteSpace(device))
-                {
-                    CodecStatus = "No device connected.";
-                    return;
-                }
-
-                Debugger.show("Listing scrcpy encoders...");
-                var output = await Task.Run(() => RunScrcpyListEncoders(_config.Paths.Scrcpy, device)).ConfigureAwait(true);
-                Debugger.show(string.IsNullOrWhiteSpace(output) ? "scrcpy encoder list returned no output." : "scrcpy encoder list received.");
-                var codecs = ParseScrcpyAudioCodecs(output);
-
                 AudioCodecs.Clear();
-                foreach (var codec in codecs)
+                foreach (var codec in SupportedAudioCodecs)
                     AudioCodecs.Add(codec);
 
-                _config.AudioLink.AvailableCodecs = codecs.ToList();
+                _config.AudioLink.AvailableCodecs = SupportedAudioCodecs.ToList();
                 MusicConfigManager.Save(_config);
                 UpdateSavedSnapshot();
 
@@ -243,73 +227,13 @@ namespace AndroidMusicPresenceLink
             }
             catch (Exception ex)
             {
-                CodecStatus = "Failed to list codecs.";
-                Interaction?.ShowWarning($"Failed to list scrcpy codecs: {ex.Message}", "Error");
+                CodecStatus = "Failed to load codecs.";
+                Debugger.show("LoadScrcpyCodecs failed: " + ex.Message);
             }
             finally
             {
                 _isLoadingCodecs = false;
             }
-        }
-
-        private static string RunScrcpyListEncoders(string scrcpyPath, string device)
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = scrcpyPath,
-                Arguments = $"-s {device} --list-encoders",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-
-            try
-            {
-                using var proc = Process.Start(psi);
-                if (proc == null)
-                    return string.Empty;
-
-                string output = proc.StandardOutput.ReadToEnd();
-                string error = proc.StandardError.ReadToEnd();
-                proc.WaitForExit();
-                return output + Environment.NewLine + error;
-            }
-            catch (Exception ex)
-            {
-                Debugger.show("scrcpy list encoders failed: " + ex.Message);
-                return string.Empty;
-            }
-        }
-
-        private static List<string> ParseScrcpyAudioCodecs(string output)
-        {
-            var codecs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "raw"
-            };
-
-            if (!string.IsNullOrWhiteSpace(output))
-            {
-                foreach (var line in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (!line.Contains("--audio-codec=", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var match = Regex.Match(line, "--audio-codec=([a-z0-9]+)", RegexOptions.IgnoreCase);
-                    if (match.Success)
-                        codecs.Add(match.Groups[1].Value.ToLowerInvariant());
-                }
-            }
-
-            Debugger.show($"Parsed scrcpy audio codecs: {string.Join(", ", codecs.OrderBy(c => c))}");
-
-            return codecs
-                .OrderBy(c => c.Equals("raw", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                .ThenBy(c => c)
-                .ToList();
         }
 
         private static int GetTypicalBitrate(string codec)

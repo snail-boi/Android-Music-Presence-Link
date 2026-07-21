@@ -18,13 +18,10 @@ TABLE OF CONTENTS
 ================================================================================
 
 1. scrcpy                          Apache License 2.0
-2. FFmpeg (avcodec, avformat,      GNU Lesser General Public License v2.1
-   avutil, swresample DLLs and
-   ffmpeg.exe)
+2. FFmpeg                          LGPL v2.1 (libraries) / GPL v3 (ffmpeg.exe)
 3. Android Debug Bridge (adb,      Apache License 2.0
    AdbWinApi.dll, AdbWinUsbApi.dll)
 4. SDL3                            zlib License
-5. libusb                          GNU Lesser General Public License v2.1
 
 
 ================================================================================
@@ -36,11 +33,21 @@ Author:     Romain Vimont (Genymobile)
 Website:    https://github.com/Genymobile/scrcpy
 License:    Apache License, Version 2.0
 
-Files in this distribution: scrcpy.exe, scrcpy-server, scrcpy-console.bat,
-                            scrcpy-noconsole.vbs
+Files in this distribution: scrcpy_audio.dll (MODIFIED - see below),
+                            scrcpy-server-v4.1 (unmodified)
 
 Copyright (C) 2018-2025 Genymobile
 Copyright (C) 2018-2025 Romain Vimont
+Copyright (C) 2026 snail-boi (audio-only port modifications)
+
+MODIFICATION NOTICE (per Apache 2.0 section 4(b)): scrcpy_audio.dll is NOT an
+official scrcpy build. It is a derivative work that trims scrcpy down to an
+audio-only Windows DLL: all video, rendering, input, USB/HID, the CLI, and
+SDL audio playback were removed, and a small C API was added that outputs
+decoded PCM to the host app instead of playing it. The complete corresponding
+source for this modified component is included in this repository under
+native/scrcpy-audio/ (also Apache 2.0). scrcpy-server-v4.1 is the unmodified
+official Genymobile server binary.
 
 Licensed under the Apache License, Version 2.0; the full text is reproduced
 in section A below.
@@ -52,21 +59,34 @@ in section A below.
 
 Project:    FFmpeg
 Website:    https://ffmpeg.org/
-License:    GNU Lesser General Public License v2.1 or later
-
-Files in this distribution: ffmpeg.exe, avcodec-62.dll, avformat-62.dll,
-                            avutil-60.dll, swresample-6.dll
-
-The FFmpeg binaries shipped here are LGPL-licensed builds. FFmpeg is a
-trademark of Fabrice Bellard, originator of the FFmpeg project.
+License:    Split — see (a) and (b) below. FFmpeg is a trademark of Fabrice
+            Bellard, originator of the FFmpeg project.
 
 Copyright (C) 2000-2025 the FFmpeg developers
 
-The full text of the GNU Lesser General Public License v2.1 is reproduced
-in section B below.
+Two differently-licensed FFmpeg builds are distributed:
 
-Source code for the version of FFmpeg distributed with this installer is
-available at: https://ffmpeg.org/download.html
+(a) FFmpeg libraries: avcodec-62.dll, avutil-60.dll, swresample-6.dll
+    License: GNU Lesser General Public License v2.1 or later.
+    These are LGPL builds (the same LGPL FFmpeg bundled with scrcpy; the build
+    contains no GPL components such as libx264/libx265). They are loaded by
+    scrcpy_audio.dll for audio decoding. The full LGPL v2.1 text is reproduced
+    in section B below.
+
+(b) ffmpeg.exe
+    License: GNU General Public License, Version 3.
+    This is the gyan.dev "essentials" GPL build (configured with --enable-gpl
+    --enable-version3 and GPL components such as libx264/libx265). It is used
+    only as a separate process for cover-art extraction and audio tag editing.
+    Because it is GPLv3 — the same license as this application — its full text
+    is the LICENSE file distributed with the application (see the notice at the
+    top of this document).
+
+Source code for the FFmpeg versions distributed here is available at:
+    https://ffmpeg.org/download.html
+    - ffmpeg.exe build sources:   https://www.gyan.dev/ffmpeg/builds/
+    - LGPL library build sources: https://github.com/Genymobile/scrcpy
+      (app/deps build scripts)
 
 
 ================================================================================
@@ -113,25 +133,6 @@ freely, subject to the following restrictions:
 2. Altered source versions must be plainly marked as such, and must not be
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
-
-
-================================================================================
-5. libusb
-================================================================================
-
-Project:    libusb
-Website:    https://libusb.info/
-License:    GNU Lesser General Public License v2.1 or later
-
-Files in this distribution: libusb-1.0.dll
-
-Copyright (C) the libusb contributors
-
-The full text of the GNU Lesser General Public License v2.1 is reproduced
-in section B below.
-
-Source code for the version of libusb distributed with this installer is
-available at: https://github.com/libusb/libusb
 
 
 ================================================================================
@@ -348,7 +349,8 @@ SECTION A. APACHE LICENSE, VERSION 2.0
 SECTION B. GNU LESSER GENERAL PUBLIC LICENSE, VERSION 2.1
 ================================================================================
 
-(Applies to: FFmpeg DLLs, libusb)
+(Applies to: FFmpeg libraries — avcodec-62.dll, avutil-60.dll,
+ swresample-6.dll)
 
                   GNU LESSER GENERAL PUBLIC LICENSE
                        Version 2.1, February 1999

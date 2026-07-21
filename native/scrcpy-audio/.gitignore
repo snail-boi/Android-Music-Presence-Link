@@ -1,0 +1,6 @@
+# Build output
+/build/
+
+# Downloaded build dependencies (FFmpeg + SDL3 prebuilts, scrcpy-server).
+# These are large and fetched separately — see README "Building".
+/deps/
