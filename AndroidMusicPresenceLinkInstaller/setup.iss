@@ -35,6 +35,19 @@ Source: "{#BinDir}\WinRT.Runtime.dll";                           DestDir: "{app}
 Source: "{#BinDir}\Microsoft.Windows.SDK.NET.dll";               DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\QRCoder.dll";                                 DestDir: "{app}"; Flags: ignoreversion
 
+; NAudio (audio-link playback via WasapiOut)
+Source: "{#BinDir}\NAudio.dll";                                  DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.Core.dll";                             DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.Wasapi.dll";                           DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.WinMM.dll";                            DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.Asio.dll";                             DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.Midi.dll";                             DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\NAudio.WinForms.dll";                         DestDir: "{app}"; Flags: ignoreversion
+
+; License notices (ship with the binary distribution)
+Source: "..\LICENSE";                                            DestDir: "{app}"; Flags: ignoreversion
+Source: "..\THIRD_PARTY_LICENSES.txt";                           DestDir: "{app}"; Flags: ignoreversion
+
 ; Tray icons
 Source: "{#BinDir}\Tray_Icons\Tray_USB.ico";          DestDir: "{app}\Tray_Icons"; Flags: ignoreversion
 Source: "{#BinDir}\Tray_Icons\Tray_TCP.ico";          DestDir: "{app}\Tray_Icons"; Flags: ignoreversion

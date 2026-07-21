@@ -152,6 +152,7 @@
 			<PortableRootFiles Include="$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).dll;$(TargetDir)$(AssemblyName).exe;$(TargetDir)$(AssemblyName).pdb;$(TargetDir)$(AssemblyName).runtimeconfig.json;$(TargetDir)Microsoft.Windows.SDK.NET.dll;$(TargetDir)WinRT.Runtime.dll;$(TargetDir)QRCoder.dll;$(TargetDir)NAudio*.dll" />
 			<PortableResourceFiles Include="$(TargetDir)Assets\**\*" />
 			<PortableTrayFiles Include="$(TargetDir)Tray_Icons\**\*" />
+			<PortableLicenseFiles Include="$(MSBuildProjectDirectory)\..\LICENSE;$(MSBuildProjectDirectory)\..\THIRD_PARTY_LICENSES.txt" />
 		</ItemGroup>
 
 		<RemoveDir Directories="$(PortableStageDir)" Condition="Exists('$(PortableStageDir)')" />
@@ -159,6 +160,7 @@
 		<Copy SourceFiles="@(PortableRootFiles)" DestinationFolder="$(PortableStageDir)" />
 		<Copy SourceFiles="@(PortableResourceFiles)" DestinationFiles="@(PortableResourceFiles->'$(PortableStageDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')" />
 		<Copy SourceFiles="@(PortableTrayFiles)" DestinationFiles="@(PortableTrayFiles->'$(PortableStageDir)Tray_Icons\%(RecursiveDir)%(Filename)%(Extension)')" />
+		<Copy SourceFiles="@(PortableLicenseFiles)" DestinationFolder="$(PortableStageDir)" />
 		<WriteLinesToFile File="$(PortableStageDir)portable.mode" Lines="portable" Overwrite="true" />
 		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;if (Test-Path '$(PortableZipPath)') { Remove-Item '$(PortableZipPath)' -Force }; Compress-Archive -Path '$(PortableStageDir)*' -DestinationPath '$(PortableZipPath)' -Force&quot;" />
 		<RemoveDir Directories="$(PortableStageDir)" />
