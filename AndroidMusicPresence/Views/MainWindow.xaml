@@ -1930,24 +1930,6 @@
                                         Command="{Binding BrowseAdbCommand}" />
                             </Grid>
 
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="60" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="scrcpy" Grid.Column="0" Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox Grid.Column="1"
-                                         Text="{Binding CustomScrcpyPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         IsReadOnly="True"
-                                         Margin="0,0,6,0" />
-                                <Button Grid.Column="2"
-                                        Content="Browse"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Width="72"
-                                        Command="{Binding BrowseScrcpyCommand}" />
-                            </Grid>
-
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="60" />

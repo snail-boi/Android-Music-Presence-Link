@@ -49,15 +49,12 @@ Source: "{#BinDir}\Assets\adb.exe";                  DestDir: "{userappdata}\Sna
 Source: "{#BinDir}\Assets\AdbWinApi.dll";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\AdbWinUsbApi.dll";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\avcodec-62.dll";           DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\avformat-62.dll";          DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\avutil-60.dll";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\disconnected.png";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\ffmpeg.exe";               DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\libusb-1.0.dll";           DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\AMPLLOGO.png";             DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\scrcpy-noconsole.vbs";     DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\scrcpy-server";            DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
-Source: "{#BinDir}\Assets\scrcpy.exe";               DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\scrcpy-server-v4.1";       DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
+Source: "{#BinDir}\Assets\scrcpy_audio.dll";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\SDL3.dll";                 DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 Source: "{#BinDir}\Assets\swresample-6.dll";         DestDir: "{userappdata}\Snail\Assets"; Flags: ignoreversion
 

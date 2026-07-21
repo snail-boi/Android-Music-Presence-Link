@@ -193,7 +193,6 @@ namespace AndroidMusicPresenceLink
     {
         public string Adb { get; set; } = AppPaths.GetResourcePath("adb.exe");
         public string FfmpegPath { get; set; } = AppPaths.GetResourcePath("ffmpeg.exe");
-        public string Scrcpy { get; set; } = AppPaths.GetResourcePath("scrcpy.exe");
         public string CoverCachePath { get; set; } = AppPaths.GetDataPath("CoverCache");
         // Custom image shown in the media player when no cover art is found. Empty = use no image.
         public string NoCoverIconPath { get; set; } = string.Empty;
@@ -458,7 +457,6 @@ namespace AndroidMusicPresenceLink
                 {
                     Adb = Paths.Adb,
                     FfmpegPath = Paths.FfmpegPath,
-                    Scrcpy = Paths.Scrcpy,
                     CoverCachePath = Paths.CoverCachePath,
                     NoCoverIconPath = Paths.NoCoverIconPath
                 },

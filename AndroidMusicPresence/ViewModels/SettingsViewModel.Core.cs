@@ -164,9 +164,6 @@ namespace AndroidMusicPresenceLink
         private string _customAdbPath = string.Empty;
         public string CustomAdbPath { get => _customAdbPath; set => Set(ref _customAdbPath, value); }
 
-        private string _customScrcpyPath = string.Empty;
-        public string CustomScrcpyPath { get => _customScrcpyPath; set => Set(ref _customScrcpyPath, value); }
-
         private string _customFfmpegPath = string.Empty;
         public string CustomFfmpegPath { get => _customFfmpegPath; set => Set(ref _customFfmpegPath, value); }
 
@@ -175,13 +172,6 @@ namespace AndroidMusicPresenceLink
         {
             var path = BrowseForExecutable("adb.exe", "ADB executable|adb.exe|All executables|*.exe");
             if (path != null) CustomAdbPath = path;
-        });
-
-        private RelayCommand? _browseScrcpyCommand;
-        public RelayCommand BrowseScrcpyCommand => _browseScrcpyCommand ??= new RelayCommand(() =>
-        {
-            var path = BrowseForExecutable("scrcpy.exe", "scrcpy executable|scrcpy.exe|All executables|*.exe");
-            if (path != null) CustomScrcpyPath = path;
         });
 
         private RelayCommand? _browseFfmpegCommand;
@@ -195,7 +185,6 @@ namespace AndroidMusicPresenceLink
         public RelayCommand ResetBinaryPathsCommand => _resetBinaryPathsCommand ??= new RelayCommand(() =>
         {
             CustomAdbPath = AppPaths.GetResourcePath("adb.exe");
-            CustomScrcpyPath = AppPaths.GetResourcePath("scrcpy.exe");
             CustomFfmpegPath = AppPaths.GetResourcePath("ffmpeg.exe");
         });
 
@@ -349,7 +338,6 @@ namespace AndroidMusicPresenceLink
 
             var paths = _config.Paths ?? new PathsConfig();
             _customAdbPath = paths.Adb;
-            _customScrcpyPath = paths.Scrcpy;
             _customFfmpegPath = paths.FfmpegPath;
             _noCoverIconPath = paths.NoCoverIconPath ?? string.Empty;
 
@@ -416,8 +404,6 @@ namespace AndroidMusicPresenceLink
             config.Paths ??= new PathsConfig();
             config.Paths.Adb = string.IsNullOrWhiteSpace(CustomAdbPath)
                 ? AppPaths.GetResourcePath("adb.exe") : CustomAdbPath.Trim();
-            config.Paths.Scrcpy = string.IsNullOrWhiteSpace(CustomScrcpyPath)
-                ? AppPaths.GetResourcePath("scrcpy.exe") : CustomScrcpyPath.Trim();
             config.Paths.FfmpegPath = string.IsNullOrWhiteSpace(CustomFfmpegPath)
                 ? AppPaths.GetResourcePath("ffmpeg.exe") : CustomFfmpegPath.Trim();
             config.Paths.NoCoverIconPath = NoCoverIconPath.Trim();
@@ -520,7 +506,6 @@ namespace AndroidMusicPresenceLink
                 if (a == null || b == null) return a == b;
                 return string.Equals(a.Adb, b.Adb, StringComparison.Ordinal)
                     && string.Equals(a.FfmpegPath, b.FfmpegPath, StringComparison.Ordinal)
-                    && string.Equals(a.Scrcpy, b.Scrcpy, StringComparison.Ordinal)
                     && string.Equals(a.CoverCachePath, b.CoverCachePath, StringComparison.Ordinal)
                     && string.Equals(a.NoCoverIconPath ?? string.Empty, b.NoCoverIconPath ?? string.Empty, StringComparison.OrdinalIgnoreCase);
             }
