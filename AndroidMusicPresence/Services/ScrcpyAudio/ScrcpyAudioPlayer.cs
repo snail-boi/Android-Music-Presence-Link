@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
@@ -76,6 +77,11 @@ namespace AndroidMusicPresenceLink
         private readonly ScrcpyWaveProvider _waveProvider = new();
         private bool _running;
 
+        // Last requested volume (0..1). Applied to this process's Windows audio
+        // session, but cached here so the value survives the brief gap before
+        // the session registers with Windows, and is readable without a COM hit.
+        private float _desiredVolume = 1f;
+
         /// <summary>Raised from native background threads — marshal to the UI thread yourself.</summary>
         public event Action<ScrcpyAudioEvent>? SessionEvent;
 
@@ -87,15 +93,83 @@ namespace AndroidMusicPresenceLink
         public string DeviceName => ScrcpyAudioNative.GetDeviceName();
 
         /// <summary>
-        /// Playback volume of the forwarded audio (0..1). Applied as software
-        /// gain to the PCM inside this app only — it must NOT touch the device
-        /// master volume (NAudio's WasapiOut.Volume does exactly that) or the
-        /// Windows mixer.
+        /// Playback volume of the audio link (0..1). Applied to THIS process's
+        /// Windows audio session (ISimpleAudioVolume) — i.e. the per-app slider
+        /// shown in the Windows Volume Mixer. Setting it here moves that slider,
+        /// dragging that slider changes playback, and it never touches the
+        /// global/master volume of the output device.
         /// </summary>
         public float Volume
         {
-            get => _waveProvider.Gain;
-            set => _waveProvider.Gain = Math.Clamp(value, 0f, 1f);
+            get => _desiredVolume;
+            set
+            {
+                _desiredVolume = Math.Clamp(value, 0f, 1f);
+                ApplySessionVolume(_desiredVolume);
+            }
+        }
+
+        // Set ISimpleAudioVolume on every active render session owned by this
+        // process. Returns true if at least one session was found and updated.
+        // Enumerates all active render endpoints (not just the default) so it
+        // still works if the user switched the default output mid-session.
+        private static bool ApplySessionVolume(float volume)
+        {
+            bool applied = false;
+            try
+            {
+                uint pid = (uint)Environment.ProcessId;
+                using var enumerator = new MMDeviceEnumerator();
+                foreach (var device in enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
+                {
+                    using (device)
+                    {
+                        SessionCollection sessions;
+                        try { sessions = device.AudioSessionManager.Sessions; }
+                        catch { continue; }
+
+                        for (int i = 0; i < sessions.Count; i++)
+                        {
+                            var session = sessions[i];
+                            if (session.GetProcessID != pid)
+                                continue;
+                            try
+                            {
+                                session.SimpleAudioVolume.Volume = volume;
+                                applied = true;
+                            }
+                            catch
+                            {
+                                // A session can disappear between enumeration and use.
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // No active render endpoint / session manager unavailable.
+                System.Diagnostics.Debug.WriteLine("ApplySessionVolume failed: " + ex.Message);
+            }
+            return applied;
+        }
+
+        // The session appears a moment after playback starts; retry applying the
+        // pending volume until it exists, so the mixer shows the right level and
+        // the restored volume takes effect right away.
+        private void ScheduleSessionVolumeApply()
+        {
+            _ = Task.Run(async () =>
+            {
+                foreach (var delayMs in new[] { 60, 150, 350, 700, 1200 })
+                {
+                    await Task.Delay(delayMs).ConfigureAwait(false);
+                    if (!_running)
+                        return;
+                    if (ApplySessionVolume(_desiredVolume))
+                        return;
+                }
+            });
         }
 
         public void Start(ScrcpyAudioOptions options)
@@ -140,6 +214,10 @@ namespace AndroidMusicPresenceLink
                 _wasapiOut = new WasapiOut(AudioClientShareMode.Shared, true, options.OutputLatencyMs);
                 _wasapiOut.Init(_waveProvider);
                 _wasapiOut.Play();
+
+                // Push the restored/desired volume onto the app's audio session
+                // once Windows registers it (a moment after Play()).
+                ScheduleSessionVolumeApply();
             }
             catch
             {
@@ -189,20 +267,12 @@ namespace AndroidMusicPresenceLink
         /// <summary>
         /// IWaveProvider that pulls interleaved float32 48 kHz stereo PCM from
         /// the native DLL. Read() always fills the buffer (silence-padded), so
-        /// WasapiOut never underruns. Volume is applied here as sample gain,
-        /// affecting only this stream.
+        /// WasapiOut never underruns. Volume is not applied here — it is handled
+        /// by the Windows audio session (see <see cref="Volume"/>).
         /// </summary>
         private sealed class ScrcpyWaveProvider : IWaveProvider
         {
-            private float _gain = 1f;
-
             public WaveFormat WaveFormat { get; } = WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
-
-            public float Gain
-            {
-                get => Volatile.Read(ref _gain);
-                set => Volatile.Write(ref _gain, value);
-            }
 
             public int Read(byte[] buffer, int offset, int count)
             {
@@ -216,16 +286,6 @@ namespace AndroidMusicPresenceLink
                 {
                     handle.Free();
                 }
-
-                float gain = Gain;
-                if (gain != 1f)
-                {
-                    var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(
-                        buffer.AsSpan(offset, count - count % 4));
-                    for (int i = 0; i < samples.Length; i++)
-                        samples[i] *= gain;
-                }
-
                 return count;
             }
         }
