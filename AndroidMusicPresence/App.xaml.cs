@@ -43,7 +43,7 @@ using System.Windows.Media;
 // v1.5.0 : the big boy update aka the MVVM refactor update aka the rewrite update aka nexts and previous's update
 // v1.6.0 : the embedded lyrics and metadata editing update with some adaptive poll rates on the side
 // v1.7.0 : random bulshit go 3 the threequening update
-
+// v1.8.0 : the fat trimming update
 
 namespace AndroidMusicPresenceLink
 {
